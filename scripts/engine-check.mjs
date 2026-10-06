@@ -63,14 +63,19 @@ const lockMax = { ...lockPlans, ...distributeToMax(oct, R, lockPlans, null, lock
 eq('고정 후 Max 채우기도 고정한 날 유지', lockMax['2026-10-07'], 600);
 eq('고정 후 Max 채우기 합계 = Max', fmtDur(summarizeMonth(2026, 9, recs, R, lockMax, now).projected), '230:00');
 
-// 휴일 근무: 10/10(토) 5시간 계획 → 근무일에 넣을 시간이 5시간 줄어든다
+// 휴일 근무: 10/10(토) 5시간 계획 → Max에서는 차감, 필요시간은 그대로
 const hol = summarizeMonth(2026, 9, recs, R, { '2026-10-10': 300 }, now);
-eq('휴일 근무 계획이 월 예상에 더해짐', fmtDur(hol.projectedDiff), fmtDur(oct.projectedDiff + 300));
-eq('휴일 근무만큼 근무일 필요분 감소', fmtDur(oct.workToGo - hol.workToGo), '5:00');
+eq('휴일 근무는 필요시간 대비 예상에 안 들어감', fmtDur(hol.projectedDiff), fmtDur(oct.projectedDiff));
+eq('휴일 근무만큼 Max 여유 감소', fmtDur(oct.possibleLeft - hol.possibleLeft), '5:00');
+eq('휴일 근무가 있어도 근무일 필요분은 그대로', fmtDur(hol.workToGo), fmtDur(oct.workToGo));
 const holEven = summarizeMonth(2026, 9, recs, R, { '2026-10-10': 300, ...distributeEvenly(hol, R, { '2026-10-10': 300 }) }, now);
-eq('휴일 근무 포함 균등 배분 합계 = 필요시간', fmtDur(holEven.projectedDiff), '0:00');
+eq('휴일 근무 있어도 균등 배분은 필요시간을 근무일로 채움', fmtDur(holEven.projectedDiff), '0:00');
+const holMax = summarizeMonth(2026, 9, recs, R, { '2026-10-10': 300, ...distributeToMax(hol, R, { '2026-10-10': 300 }) }, now);
+eq('휴일 근무 포함 Max 채우기 합계 = Max', fmtDur(holMax.projected), '230:00');
 const holPast = summarizeMonth(2026, 9, { ...recs, '2026-10-03': { in: '09:00', out: '13:30' } }, R, {}, now);
 eq('지난 휴일 근무 실적 인정 (10/3 토 4:30 체류)', fmtDur(holPast.holidayWork), '4:00');
+eq('지난 휴일 근무는 남은 필요시간을 줄이지 않음', fmtDur(holPast.remainingNeed), fmtDur(oct.remainingNeed));
+eq('지난 휴일 근무는 Max까지 남은 시간을 줄임', fmtDur(oct.remainingPossible - holPast.remainingPossible), '4:00');
 eq('지난 휴일 근무는 평일 누적초과에서 제외', holPast.weekdayOvertime, oct.weekdayOvertime);
 
 // Max까지 채우기 (회사 기준: 하루·주 제한 없음, 월 Max만) → 월 예상이 정확히 Max

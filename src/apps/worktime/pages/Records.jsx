@@ -23,7 +23,9 @@ export default function Records({ state, dispatch, now, view, setView }) {
     setSel(ymd(d));
   };
 
-  const monthDone = s.days.filter((d) => !d.isFuture).reduce((a, d) => a + d.recognized, 0);
+  // 필요시간에 쳐주는 건 근무일 실적만, 휴일 근무는 따로 (Max에만 반영)
+  const monthDone = s.days.filter((d) => !d.isFuture && d.isWorkday).reduce((a, d) => a + d.recognized, 0);
+  const holidayDone = s.days.filter((d) => !d.isFuture && !d.isWorkday).reduce((a, d) => a + d.recognized, 0);
   const isCurrent = s.today != null;
 
   return (
@@ -66,10 +68,13 @@ export default function Records({ state, dispatch, now, view, setView }) {
             <span><i className="sw weekend" />주말</span>
             <span><i className="sw family" />패밀리데이</span>
             <span><i className="sw holiday-work" />휴일 근무</span>
+            <span><i className="sw today" />오늘</span>
+            <span className="muted">아래 숫자: 지난 날 = 인정 · 앞으로 = 예정</span>
           </div>
           <div className="month-total">
             <span>필요 <b>{fmtDur(s.required)}</b></span>
             <span>{isCurrent ? '현재까지 인정' : '인정'} <b>{fmtDur(monthDone)}</b></span>
+            {holidayDone > 0 && <span>휴일 근무 <b>{fmtDur(holidayDone)}</b> <span className="muted">(Max에만 반영)</span></span>}
             {isCurrent ? (
               <span>계획 포함 예상 <b className={s.projectedDiff < 0 ? 'tone-bad' : 'tone-good'}>{fmtDur(s.projectedDiff, { sign: true })}</b></span>
             ) : (
@@ -87,36 +92,57 @@ export default function Records({ state, dispatch, now, view, setView }) {
 
 function DayCell({ d, plans, rules, selected, onClick, family }) {
   const isFamily = d.isRest || (family && !d.leave && d.isWorkday);
+  const holidayWork = !d.isWorkday && (d.actual > 0 || (!d.isPast && plans[d.key] != null));
   const cls = [
     'cal-d',
     selected && 'sel',
     d.isToday && 'today',
+    d.isFuture && 'future',
     d.holiday && 'holiday',
     !d.holiday && !d.isWorkday && 'weekend',
     isFamily && 'family',
-    !d.isWorkday && (d.actual > 0 || (!d.isPast && plans[d.key] != null)) && 'holiday-work',
+    holidayWork && 'holiday-work',
   ]
     .filter(Boolean)
     .join(' ');
   const showPlan = (d.isFuture || d.isToday) && (d.isWorkday || plans[d.key] != null);
   const planVal = showPlan ? projectedOf(d, plans, rules) : null;
+
+  // 아래쪽 큰 숫자: 지난 날은 인정, 오늘은 근무 중, 앞으로는 계획
+  let foot = null;
+  if (d.live) foot = { label: '근무 중', value: fmtDur(d.recognized), tone: 'live' };
+  else if (d.isPast && d.recognized > 0) foot = { label: holidayWork ? '휴일 근무' : '인정', value: fmtDur(d.recognized), tone: holidayWork ? 'hw' : '' };
+  else if (showPlan && planVal > 0) foot = { label: holidayWork ? '휴일 예정' : '예정', value: fmtDur(planVal), tone: 'plan' };
+  else if (d.isPast && d.isWorkday && d.credit === 0 && !d.isRest) foot = { label: '기록 없음', value: '', tone: 'none' };
+
+  const tag = d.holiday
+    ? { text: d.holiday, tone: 'hol' }
+    : d.leaveLabel
+      ? { text: d.leaveLabel, tone: d.isRest ? 'fam' : 'leave' }
+      : isFamily
+        ? { text: '패밀리데이 후보', tone: 'fam' }
+        : null;
+
   return (
     <button className={cls} onClick={onClick} aria-pressed={selected} aria-label={dayLabel(d.date)}>
-      <div className="top">
-        <span className={`dnum ${d.dow === 0 ? 'sun' : d.dow === 6 ? 'sat' : ''}`}>{d.date.getDate()}</span>
-        {d.leaveLabel && <Pill tone="leave">{d.leaveLabel}</Pill>}
+      <div className="cd-head">
+        <span className={`dnum ${d.dow === 0 || d.holiday ? 'sun' : d.dow === 6 ? 'sat' : ''}`}>{d.date.getDate()}</span>
+        {d.isToday && <span className="cd-today">오늘</span>}
+        {d.warnings.length > 0 && <span className="cd-warn" title={d.warnings.join(', ')}>!</span>}
       </div>
-      {d.holiday && <span className="hol">{d.holiday}</span>}
-      {family && !d.leave && d.isWorkday && <span className="fam">패밀리데이 후보</span>}
+      {tag && <span className={`cd-tag ${tag.tone}`} title={tag.text}>{tag.text}</span>}
       {d.inMin != null && (
-        <span className="times">
-          {fmtClock(d.inMin)}–{d.live ? '근무중' : d.outMin != null ? fmtClock(d.outMin) : '??'}
+        <span className="cd-times num">
+          <span>{fmtClock(d.inMin)}</span>
+          {!d.live && <span className={d.outMin == null ? 'missing' : ''}>{d.outMin != null ? fmtClock(d.outMin) : '퇴근 ?'}</span>}
         </span>
       )}
-      {d.isPast && d.recognized > 0 && <span className="rec num">{fmtDur(d.recognized)}</span>}
-      {d.isToday && d.live && <span className="rec num tone-good">{fmtDur(d.recognized)}</span>}
-      {showPlan && !d.live && <span className="rec plan num">{fmtDur(planVal)}</span>}
-      {d.warnings.length > 0 && <span className="flag" title={d.warnings.join(', ')} />}
+      {foot && (
+        <span className={`cd-foot ${foot.tone}`}>
+          <span className="cd-label">{foot.label}</span>
+          {foot.value && <b className="num">{foot.value}</b>}
+        </span>
+      )}
     </button>
   );
 }

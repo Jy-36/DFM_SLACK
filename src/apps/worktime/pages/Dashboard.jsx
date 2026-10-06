@@ -34,9 +34,9 @@ export default function Dashboard({ state, summary, now, go }) {
       <section className="panel stats" aria-label="이번 달 진행">
         <Stat
           label="현재까지 인정"
-          value={fmtDur(s.recognizedNow)}
+          value={fmtDur(s.recognizedReq)}
           unit="h"
-          foot={s.recognizedNow > workSoFar ? `실근무 ${fmtDur(workSoFar)} · 출장·교육 ${fmtDur(s.recognizedNow - workSoFar)}` : '오늘 근무 포함'}
+          foot={s.holidayDone > 0 ? `휴일 근무 +${fmtDur(s.holidayDone)} 별도 (Max에만 반영)` : '근무일 기준 · 오늘 포함'}
         />
         <Stat label="남은 필요" value={fmtDur(s.remainingNeed)} unit="h" foot={`필요 ${fmtDur(s.required)} 기준`} />
         <Stat label="Max까지 남은" value={fmtDur(s.remainingPossible)} unit="h" foot={`Max ${fmtDur(s.possible)} 기준`} />

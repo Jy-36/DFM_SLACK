@@ -187,10 +187,11 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
   const upcoming = days.filter((d) => !d.isPast && d.isWorkday); // 오늘 포함
   const upcomingWorkCredit = upcoming.reduce((s, d) => s + d.workCredit, 0);
   const capacity = upcoming.reduce((s, d) => s + capacityOf(d, rules), 0);
-  // 오늘부터의 휴일 근무(계획·실적)는 필요시간을 그만큼 덜어준다
+  // 휴일(주말·공휴일) 근무는 Max에서는 차감되지만 필요시간은 덜어주지 않는다
   const holidayDays = days.filter((d) => !d.isPast && !d.isWorkday);
   const holidayPlanned = holidayDays.reduce((s, d) => s + projectedOf(d, plans, rules), 0);
-  const workToGo = Math.max(0, required - done - upcomingWorkCredit - holidayPlanned); // 오늘부터 근무일에 일해야 하는 시간
+  const doneReq = days.filter((d) => d.isPast && d.isWorkday).reduce((s, d) => s + d.recognized, 0); // 필요시간에 쳐주는 실적
+  const workToGo = Math.max(0, required - doneReq - upcomingWorkCredit); // 오늘부터 근무일에 일해야 하는 시간
   const daysToWork = upcoming.filter((d) => capacityOf(d, rules) > 0).length;
   const ratio = capacity ? workToGo / capacity : 0;
   const avgPerDay = Math.round(ratio * rules.dailyStdMin);
@@ -203,7 +204,10 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
   const weekdayOvertime = weekdayDoneSoFar - weekdayRequiredSoFar;
   const holidayWork = days.filter((d) => d.isPast && !d.isWorkday).reduce((s, d) => s + d.recognized, 0);
 
-  const projected = days.reduce((s, d) => s + projectedOf(d, plans, rules), 0);
+  const projected = days.reduce((s, d) => s + projectedOf(d, plans, rules), 0); // 휴일 근무 포함 (Max 비교용)
+  const projectedReq = days.filter((d) => d.isWorkday).reduce((s, d) => s + projectedOf(d, plans, rules), 0); // 필요시간 비교용
+  const recognizedReq = doneReq + (today && today.isWorkday ? today.recognized : 0);
+  const holidayDone = recognizedNow - recognizedReq; // 지난·오늘 휴일 근무 실적
 
   const weeks = [];
   const byKey = new Map();
@@ -270,9 +274,13 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
     holidayPlanned,
     paceDiff: weekdayOvertime,
     projected,
-    projectedDiff: projected - required,
+    projectedReq,
+    projectedDiff: projectedReq - required,
     possibleLeft: possible - projected,
-    remainingNeed: Math.max(0, required - recognizedNow - (upcomingWorkCredit - (today?.workCredit || 0))),
+    recognizedReq,
+    holidayDone,
+    doneReq,
+    remainingNeed: Math.max(0, required - recognizedReq - (upcomingWorkCredit - (today?.isWorkday ? today.workCredit : 0))),
     remainingPossible: Math.max(0, possible - recognizedNow),
     weeks,
     warnings,

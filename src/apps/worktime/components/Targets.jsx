@@ -4,8 +4,9 @@ import { MonthMeter } from '../../../shared/ui.jsx';
 
 export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', showFormula = true, reachable = null }) {
   const t = s.targets;
-  const pastPart = s.recognizedNow; // 오늘 근무 포함
-  const planPart = Math.max(0, s.projected - s.recognizedNow);
+  const pastPart = s.recognizedReq; // 근무일 인정 (오늘 포함) — 필요시간에 쳐주는 부분
+  const holidayPart = s.holidayDone + s.holidayPlanned; // 휴일 근무 실적·계획 — Max에서만 차감
+  const planPart = Math.max(0, s.projectedReq - s.recognizedReq);
   const overMax = s.projected > s.possible;
   const wk = (min) => `${Math.round(min / 60)}h`;
 
@@ -39,7 +40,7 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', sho
           <b className={`num ${s.weekdayOvertime < 0 ? 'tone-bad' : s.weekdayOvertime > 0 ? 'tone-good' : ''}`}>{fmtDur(s.weekdayOvertime, { sign: true })}</b>
           <span className="foot">
             전일까지 필수 {fmtDur(s.weekdayRequiredSoFar)} 대비
-            {s.holidayWork > 0 && ` · 휴일근무 +${fmtDur(s.holidayWork)} 별도`}
+            {s.holidayDone > 0 && ` · 휴일 근무 +${fmtDur(s.holidayDone)} 별도`}
           </span>
         </div>
         <div className="target">
@@ -51,19 +52,20 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', sho
         </div>
       </div>
       <div style={{ paddingTop: 22 }}>
-        <MonthMeter work={pastPart} plan={planPart} total={s.possible} marker={s.required} markerLabel={`필요 ${fmtDur(s.required)}`} />
+        <MonthMeter work={pastPart} plan={planPart} leave={holidayPart} total={s.possible} marker={s.required} markerLabel={`필요 ${fmtDur(s.required)}`} />
       </div>
       <div className="legend" style={{ justifyContent: 'space-between' }}>
         <span style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <span><i style={{ background: 'var(--accent)' }} />인정 {fmtDur(pastPart)}</span>
           <span><i style={{ background: 'var(--sky)' }} />남은 계획 {fmtDur(planPart)}</span>
+          {holidayPart > 0 && <span><i style={{ background: 'var(--leave)' }} />휴일 근무 {fmtDur(holidayPart)} (Max에만 반영)</span>}
         </span>
         <span>Max {fmtDur(s.possible)}</span>
       </div>
       {showFormula && (
         <p className="small muted" style={{ margin: 0 }}>
           필요시간 = min(근무일 {t.workdays}일 × {fmtDurKo(rules.dailyStdMin)} = {fmtDur(t.byWorkdays)}, {wk(rules.stdWeeklyMin)} ÷ 7 × {t.monthDays}일 = {fmtDur(t.byWeekly)}) − 비근무근태 {fmtDur(t.offTotal)}
-          {(s.holidayWork > 0 || s.holidayPlanned > 0) && ` · 휴일근무(실적 ${fmtDur(s.holidayWork)}, 계획 ${fmtDur(s.holidayPlanned)})는 월 정산에 포함, 평일 누적초과에서는 제외`}
+          {(s.holidayDone > 0 || s.holidayPlanned > 0) && ` · 휴일 근무(실적 ${fmtDur(s.holidayDone)}, 계획 ${fmtDur(s.holidayPlanned)})는 Max에서만 차감되고 필요시간·평일 누적초과에는 들어가지 않음`}
         </p>
       )}
     </section>

@@ -21,12 +21,12 @@ export default function Mini({ state, summary, now, expand }) {
           </button>
         </div>
         <div style={{ paddingTop: 18 }}>
-          <MonthMeter work={s.recognizedNow} plan={Math.max(0, s.projected - s.recognizedNow)} total={s.possible} marker={s.required} markerLabel="필요" />
+          <MonthMeter work={s.recognizedReq} leave={s.holidayDone + s.holidayPlanned} plan={Math.max(0, s.projectedReq - s.recognizedReq)} total={s.possible} marker={s.required} markerLabel="필요" />
         </div>
         <div className="mini-nums">
           <div><span>필요</span><b>{fmtDur(s.required)}</b></div>
           <div><span>Max</span><b>{fmtDur(s.possible)}</b></div>
-          <div><span>인정</span><b>{fmtDur(s.recognizedNow)}</b></div>
+          <div><span>인정</span><b>{fmtDur(s.recognizedReq)}</b></div>
         </div>
         <div className="mini-diff">
           <span className="muted">

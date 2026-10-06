@@ -115,13 +115,15 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
             disabled={!holidayPick}
             onClick={() => {
               dispatch({ type: 'plan/set', key: holidayPick, minutes: rules.dailyStdMin, lock: true });
-              notify(`${dayLabel(parseYmd(holidayPick))} 휴일 근무 ${fmtDur(rules.dailyStdMin)}를 넣었습니다. 그만큼 근무일 필요분이 줄어듭니다.`);
+              notify(`${dayLabel(parseYmd(holidayPick))} 휴일 근무 ${fmtDur(rules.dailyStdMin)}를 넣었습니다. Max에서만 차감되고 필요시간은 그대로입니다.`);
               setHolidayPick('');
             }}
           >
             <Icon name="plus" size={14} /> 휴일 근무 추가
           </button>
-          {s.holidayPlanned > 0 && <span className="small muted">이번 달 남은 휴일 근무 {fmtDur(s.holidayPlanned)} 반영 중</span>}
+          <span className="small muted">
+            {s.holidayPlanned > 0 ? `남은 휴일 근무 ${fmtDur(s.holidayPlanned)} · ` : ''}Max에서만 차감되고 필요시간은 줄지 않아요
+          </span>
         </div>
 
         <div className="quick-select" role="group" aria-label="날짜 빠른 선택">
@@ -288,7 +290,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             )}
             <td className="small">
               {d.isToday && d.actual > 0 && <span className="muted">지금까지 {fmtDur(d.actual)} </span>}
-              {isHoliday && <span className="muted">필요시간을 이만큼 덜어줌 </span>}
+              {isHoliday && <span className="muted">Max에서 차감 · 필요시간은 그대로 </span>}
               {d.isRest && <span className="muted">필요시간 유지 · 다른 날에 채움 </span>}
               {rules.familyDayOn && !d.leave && d.key === familyKey && <Pill tone="plan">패밀리데이 후보</Pill>}
               {d.leaveKind === 'off' && <span className="muted">필요시간 −{fmtDur(d.offCredit)} </span>}
