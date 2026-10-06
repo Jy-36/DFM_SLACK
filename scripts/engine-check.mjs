@@ -1,0 +1,93 @@
+// 정산 엔진 계산 확인: node scripts/engine-check.mjs
+import { familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
+import { DEFAULT_RULES as R } from '../src/apps/worktime/lib/rules.js';
+import { generateMockRecords } from '../src/apps/worktime/lib/mockData.js';
+import { fmtDur, fmtClock } from '../src/apps/worktime/lib/time.js';
+
+let fail = 0;
+const eq = (name, got, want) => { const ok = got === want; if (!ok) fail++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}: ${got}${ok ? '' : ` (기대 ${want})`}`); };
+
+eq('휴게: 체류 8:30 → 실근무', fmtDur(netFromGross(510, R)), '8:00');
+eq('휴게: 실근무 8:00 → 최소 체류', fmtDur(grossForNet(480, R)), '8:30');
+
+const now = new Date(2026, 9, 6, 10, 5);
+const recs = generateMockRecords(now);
+const sep = summarizeMonth(2026, 8, recs, R, {}, now);
+eq('9월 Max (52/7×30 = 222.86h → 시간 버림)', fmtDur(sep.possible), '222:00');
+eq('9월 필요 기준 (근무일 19×8=152 vs 40/7×30=171:00 중 작은 값)', fmtDur(sep.targets.base), '152:00');
+eq('9월 비근무근태 (연차8 + 오후반차4)', fmtDur(sep.targets.offTotal), '12:00');
+eq('9월 필요', fmtDur(sep.required), '140:00');
+
+const oct = summarizeMonth(2026, 9, recs, R, {}, now);
+eq('10월 Max (52/7×31 = 230.29h → 시간 버림)', fmtDur(oct.possible), '230:00');
+eq('10월 Max 분 단위 설정', fmtDur(summarizeMonth(2026, 9, recs, { ...R, maxRounding: 'minute' }, {}, now).possible), '230:17');
+eq('10월 필요', fmtDur(oct.required), '146:00');
+console.log('     10월 평일 누적초과', fmtDur(oct.weekdayOvertime, { sign: true }), '(전일까지 필수', fmtDur(oct.weekdayRequiredSoFar), '/ 실적', fmtDur(oct.weekdayDoneSoFar) + ')');
+console.log('     오늘 목표 퇴근', fmtClock(checkoutFor(oct.today, oct.todayTarget, R)), '· 하루 평균', fmtDur(oct.avgPerDay), '· 남은', fmtDur(oct.workToGo));
+
+const even = summarizeMonth(2026, 9, recs, R, distributeEvenly(oct, R), now);
+eq('균등 배분 후 월말 차이', fmtDur(even.projectedDiff), '0:00');
+const pick = oct.upcoming.filter((d) => d.dow === 2 || d.dow === 4).map((d) => d.key);
+const amongPlans = distributeAmong(oct, R, {}, pick);
+const among = summarizeMonth(2026, 9, recs, R, amongPlans, now);
+eq('선택한 날에만 나눠 넣은 뒤 차이', fmtDur(among.projectedDiff), '0:00');
+
+// 2026-07: 평일 23일 − 제헌절(7/17) = 근무일 22일 → min(176:00, 40/7×31 = 177:00) = 176:00
+const jul = summarizeMonth(2026, 6, {}, R, {}, now);
+eq('2026-07 근무일 (제헌절 반영)', jul.workdayCount, 22);
+eq('2026-07 필요', fmtDur(jul.required), '176:00');
+// 주 환산값이 더 작은 경우 확인 (주 소정 36h로 가정): 36/7×31 = 159.43h → 시간 버림 159:00
+eq('주 환산값 시간 버림 (36h/7×31)', fmtDur(summarizeMonth(2026, 6, {}, { ...R, stdWeeklyMin: 2160 }, {}, now).required), '159:00');
+eq('주 환산값 분 단위 설정', fmtDur(summarizeMonth(2026, 6, {}, { ...R, stdWeeklyMin: 2160, maxRounding: 'minute' }, {}, now).required), '159:25');
+// 패밀리데이: 21일이 있는 주 금요일, 쉬어도 필요시간은 그대로 → 다른 날에 채움
+eq('패밀리데이 2026-10 (21일 수 → 23일 금)', familyDayKey(2026, 9), '2026-10-23');
+eq('패밀리데이 2026-11 (21일 토 → 20일 금)', familyDayKey(2026, 10), '2026-11-20');
+eq('패밀리데이 2026-12 (21일 월 → 25일 금)', familyDayKey(2026, 11), '2026-12-25');
+const famRecs = { ...recs, '2026-10-23': { leave: 'family' } };
+const fam = summarizeMonth(2026, 9, famRecs, R, {}, now);
+eq('패밀리데이 선택해도 필요시간 그대로', fmtDur(fam.required), fmtDur(oct.required));
+eq('패밀리데이 선택 시 기본 계획은 8h 부족', fmtDur(fam.projectedDiff), fmtDur(oct.projectedDiff - 480));
+const famEven = distributeEvenly(fam, R);
+const famAfter = summarizeMonth(2026, 9, famRecs, R, famEven, now);
+eq('균등 배분이 패밀리데이 8h를 다른 날로 채움', fmtDur(famAfter.projectedDiff), '0:00');
+eq('패밀리데이에는 계획 0', famAfter.days.find((d) => d.key === '2026-10-23').isRest && !('2026-10-23' in famEven), true);
+
+// 시간 고정: 10/7을 10시간으로 고정하면 나머지 날만 줄어들고 합계는 필요시간과 같다
+const lockPlans = { '2026-10-07': 600 };
+const locks = { '2026-10-07': true };
+const lockEven = { ...lockPlans, ...distributeEvenly(oct, R, lockPlans, locks) };
+const lockAfter = summarizeMonth(2026, 9, recs, R, lockEven, now);
+eq('고정한 날은 그대로', lockEven['2026-10-07'], 600);
+eq('고정 후 균등 배분 합계 = 필요시간', fmtDur(lockAfter.projectedDiff), '0:00');
+const lockMax = { ...lockPlans, ...distributeToMax(oct, R, lockPlans, null, locks) };
+eq('고정 후 Max 채우기도 고정한 날 유지', lockMax['2026-10-07'], 600);
+eq('고정 후 Max 채우기 합계 = Max', fmtDur(summarizeMonth(2026, 9, recs, R, lockMax, now).projected), '230:00');
+
+// 휴일 근무: 10/10(토) 5시간 계획 → 근무일에 넣을 시간이 5시간 줄어든다
+const hol = summarizeMonth(2026, 9, recs, R, { '2026-10-10': 300 }, now);
+eq('휴일 근무 계획이 월 예상에 더해짐', fmtDur(hol.projectedDiff), fmtDur(oct.projectedDiff + 300));
+eq('휴일 근무만큼 근무일 필요분 감소', fmtDur(oct.workToGo - hol.workToGo), '5:00');
+const holEven = summarizeMonth(2026, 9, recs, R, { '2026-10-10': 300, ...distributeEvenly(hol, R, { '2026-10-10': 300 }) }, now);
+eq('휴일 근무 포함 균등 배분 합계 = 필요시간', fmtDur(holEven.projectedDiff), '0:00');
+const holPast = summarizeMonth(2026, 9, { ...recs, '2026-10-03': { in: '09:00', out: '13:30' } }, R, {}, now);
+eq('지난 휴일 근무 실적 인정 (10/3 토 4:30 체류)', fmtDur(holPast.holidayWork), '4:00');
+eq('지난 휴일 근무는 평일 누적초과에서 제외', holPast.weekdayOvertime, oct.weekdayOvertime);
+
+// Max까지 채우기 (회사 기준: 하루·주 제한 없음, 월 Max만) → 월 예상이 정확히 Max
+const maxPlans = distributeToMax(oct, R, {});
+const mx = summarizeMonth(2026, 9, recs, R, maxPlans, now);
+eq('Max 배분 후 월 예상 = Max', fmtDur(mx.projected), fmtDur(mx.possible));
+const ins = earlierStarts(oct, R, maxPlans, {});
+const todayOut = oct.today.inMin + grossForNet(maxPlans[oct.todayKey], R);
+eq('오늘 Max 계획이 22:00 안에 끝남', todayOut <= 22 * 60, true);
+eq('출근을 앞당긴 날은 모두 22:00 이전 퇴근', Object.entries(ins).every(([k, t]) => { const [h, m] = t.split(':').map(Number); return h * 60 + m + grossForNet(maxPlans[k], R) <= 22 * 60; }), true);
+console.log('     앞당긴 출근:', [...new Set(Object.values(ins))].join(', '));
+console.log('     Max 배분: 날짜별', [...new Set(Object.values(maxPlans).map((v) => fmtDur(v)))].join(', '), '· 주별', mx.weeks.map((w) => fmtDur(w.projected)).join(' '));
+// 제한을 켠 경우: 1일 12h · 주 52h 를 지킴
+const RL = { ...R, dailyLimitOn: true, weeklyLimitOn: true };
+const octL = summarizeMonth(2026, 9, recs, RL, {}, now);
+const mxL = summarizeMonth(2026, 9, recs, RL, distributeToMax(octL, RL, {}), now);
+eq('[제한 켬] 주 52h 초과 없음', mxL.weeks.every((w) => w.projected <= RL.maxWeeklyMin), true);
+eq('[제한 켬] 1일 12h 초과 없음', Object.values(distributeToMax(octL, RL, {})).every((v) => v <= RL.maxDailyMin), true);
+eq('[제한 끔] 13시간 근무도 그대로 인정', summarizeMonth(2026, 9, { ...recs, '2026-10-01': { in: '07:00', out: '21:00' } }, R, {}, now).days[0].recognized, 780);
+process.exit(fail ? 1 : 0);

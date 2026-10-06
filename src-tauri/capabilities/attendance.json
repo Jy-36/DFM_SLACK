@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/remote-schema.json",
+  "identifier": "attendance",
+  "description": "사내 근태 사이트 창: 근태 표 HTML 전송 하나만 허용. urls는 실제 사내 주소로 바꿀 것",
+  "windows": ["attendance"],
+  "remote": {
+    "urls": ["https://attendance.internal.example/*"]
+  },
+  "permissions": ["allow-submit-attendance-html"]
+}
