@@ -211,7 +211,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
       {g.days.map((d) => {
         const isHoliday = !d.isWorkday;
         const locked = !!locks[d.key];
-        const planned = d.isToday ? defaultPlanFor(d, rules) : plans[d.key] ?? defaultPlanFor(d, rules);
+        const planned = plans[d.key] ?? defaultPlanFor(d, rules);
         const inMin = d.isToday && d.inMin != null ? d.inMin : toMin(planIns[d.key] || rules.planDefaultIn);
         const outMin = inMin + grossForNet(planned, rules) + (d.isToday ? 0 : d.plannedExclude);
         const fullOff = !isHoliday && capacityOf(d, rules) === 0 && d.workCredit === 0;
@@ -250,11 +250,6 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             <td>
               {fullOff ? (
                 <span className="muted">—</span>
-              ) : d.isToday ? (
-                <span className="plan-cell fixed-credit" title="오늘은 계획을 바꾸지 않습니다. 기본 계획 기준이고, 지금까지 일한 시간보다 줄지 않습니다.">
-                  <span className="stepper locked"><input value={fmtDur(Math.max(planned, d.actual))} readOnly aria-label="오늘 실근무 (고정)" id={`pl-${d.key}`} /></span>
-                  <span className="lock-btn on" aria-hidden="true"><Icon name="lock" size={15} /></span>
-                </span>
               ) : d.workCredit > 0 ? (
                 <span className="plan-cell fixed-credit" title={`${d.leaveLabel}은 그날 ${fmtDur(d.workCredit)}로 고정되어 더 넣거나 배분하지 않습니다`}>
                   <span className="stepper locked"><input value={fmtDur(d.workCredit)} readOnly aria-label={`${d.leaveLabel} 인정 시간 (고정)`} id={`pl-${d.key}`} /></span>
@@ -311,7 +306,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
               </td>
             )}
             <td className="small">
-              {d.isToday && <span className="muted">오늘 고정 · 최소 {fmtDur(d.actual)} (지금까지) </span>}
+              {d.isToday && d.actual > 0 && <span className="muted" title="오늘은 지금까지 일한 시간보다 낮게 잡을 수 없습니다">최소 {fmtDur(d.actual)} (지금까지) </span>}
               {d.plannedExclude > 0 && <span className="muted">제외 −{fmtDur(d.plannedExclude)} </span>}
               {d.isRest && <span title="쉬어도 필수 근무 시간은 그대로라 다른 날에 채웁니다"><Pill tone="plan">패밀리데이 · 다른 날에 채움</Pill> </span>}
               {rules.familyDayOn && !d.leave && d.key === familyKey && <Pill tone="plan">패밀리데이 후보</Pill>}
@@ -346,7 +341,7 @@ function PlanActions({ s, rules, plans, planIns, locks, lockedCount, edited, las
   const mark = (kind, extra = {}) => dispatch({ type: 'plan/last', last: { kind, at: Date.now(), ...extra } });
   const on = (kind) => last?.kind === kind;
   const tag = (kind) => on(kind) && <span className="just-tag">방금 반영</span>;
-  const lockNote = lockedCount ? `고정한 ${lockedCount}일과 오늘은 그대로 두고 ` : '오늘은 그대로 두고 ';
+  const lockNote = lockedCount ? `고정한 ${lockedCount}일은 그대로 두고 ` : '';
   const applyTarget = () => {
     const h = Number(hours);
     if (!Number.isFinite(h)) return notify('목표 시간을 숫자로 넣으세요.');
@@ -377,7 +372,7 @@ function PlanActions({ s, rules, plans, planIns, locks, lockedCount, edited, las
       </button>
       <button
         className={`btn ${on('max') ? 'just' : ''}`}
-        title="오늘을 뺀 남은 근무일에 고르게 나눠 최대 근무 시간까지 채웁니다"
+        title="남은 근무일에 고르게 나눠 최대 근무 시간까지 채웁니다 (오늘은 지금까지 일한 시간 이상)"
         onClick={() => {
           const next = distributeToMax(s, rules, plans, null, locks);
           const ins = earlierStarts(s, rules, next, planIns);
@@ -390,7 +385,7 @@ function PlanActions({ s, rules, plans, planIns, locks, lockedCount, edited, las
       </button>
       <button
         className={`btn ${on('even') ? 'just' : ''}`}
-        title="필요 시간(필수 근무 시간 − 실제 근무 시간)을 오늘을 뺀 남은 근무일에 고르게 나눕니다"
+        title="필요 시간(필수 근무 시간 − 실제 근무 시간)을 남은 근무일에 고르게 나눕니다 (오늘은 지금까지 일한 시간 이상)"
         onClick={() => {
           dispatch({ type: 'plan/merge', plans: distributeEvenly(s, rules, plans, locks) });
           mark('even');
@@ -421,7 +416,7 @@ function PlanActions({ s, rules, plans, planIns, locks, lockedCount, edited, las
             </div>
             <p className="small muted" style={{ margin: 0 }}>
               {basis === 'ot' ? `OT ${hours || 0}h = 초과 근무 ${Number(hours || 0) + Math.round(inc / 60)}h. ` : ''}
-              오늘·고정한 날은 그대로 두고 나머지 근무일에 나눕니다. 최대 근무 시간({fmtDur(s.possible)})은 넘지 않습니다.
+              고정한 날은 그대로 두고 나머지 근무일에 나눕니다 (오늘은 지금까지 일한 시간 아래로 안 내려감). 최대 근무 시간({fmtDur(s.possible)})은 넘지 않습니다.
             </p>
             <button className="btn primary" onClick={applyTarget}>이 목표로 배분</button>
           </div>
@@ -560,9 +555,7 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
   const hoursMin = parseDurInput(hours);
 
   const apply = () => {
-    // 오늘은 계획 시간을 바꾸지 않는다 (근태만 바꿀 수 있음)
-    const timeKeys = keys.filter((k) => k !== s.todayKey);
-    if (leave !== undefined && timeKeys.length < keys.length) dispatch({ type: 'plan/bulk', keys: [s.todayKey], leave: leave || null, leaveMin });
+    const timeKeys = keys;
     const payload = { type: 'plan/bulk', keys: timeKeys, lock: true };
     if (how === 'hours') {
       if (hoursMin == null) return notify('실근무 시간을 9:30처럼 입력하세요.');
@@ -578,7 +571,12 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
       payload.leaveMin = leaveMin;
     }
     dispatch(payload);
-    notify(`${timeKeys.length}일에 적용하고 고정했습니다.${timeKeys.length < keys.length ? ' 오늘은 시간을 바꾸지 않았습니다.' : ''}`);
+    // 오늘은 지금까지 일한 시간보다 낮아지지 않게
+    const today = s.today;
+    if (today && keys.includes(today.key) && payload.minutes != null && payload.minutes < today.actual) {
+      dispatch({ type: 'plan/set', key: today.key, minutes: today.actual, lock: true });
+    }
+    notify(`${timeKeys.length}일에 적용하고 고정했습니다.`);
   };
 
   const fillMax = () => {

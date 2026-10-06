@@ -224,8 +224,7 @@ export function projectedOf(day, plans, rules) {
   if (day.isPast) return day.recognized;
   if (day.workCredit > 0) return day.workCredit; // 출장·교육: 8시간 고정
   // 종일 비근무근태(연차 등)인 날은 계획이 남아 있어도 일하지 않는 것으로 본다
-  // 오늘은 계획을 바꾸지 않는다: 기본 계획 그대로, 지금까지 일한 시간이 최소
-  const planned = day.offCredit >= rules.dailyStdMin || day.isRest ? 0 : day.isToday ? defaultPlanFor(day, rules) : plans[day.key] ?? defaultPlanFor(day, rules);
+  const planned = day.offCredit >= rules.dailyStdMin || day.isRest ? 0 : plans[day.key] ?? defaultPlanFor(day, rules);
   const work = day.isToday ? Math.max(planned, day.actual) : planned;
   return capDay(work + day.workCredit, rules);
 }
@@ -400,17 +399,20 @@ const plannedWork = (d, plans, rules) => projectedOf(d, plans, rules) - d.workCr
  * → { plans, capped, reached } (reached = 실제로 맞춘 초과 근무 시간)
  */
 export function distributeToTarget(summary, rules, plans = {}, locks = {}, excessTarget = 0) {
-  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
+  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key]);
   const fixed = summary.upcoming.filter((d) => !free.includes(d)).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
   const need = Math.max(0, summary.workToGo + excessTarget - fixed);
-  let alloc = waterFill(need, free.map((d) => dailyCapOf(d, rules)));
+  // 오늘은 지금까지 일한 시간보다 낮아지지 않게
+  const floorOf = (d) => (d.isToday ? d.actual : 0);
+  const floors = free.map(floorOf);
+  let alloc = waterFill(need - floors.reduce((a, b) => a + b, 0), free.map((d, i) => Math.max(0, dailyCapOf(d, rules) - floors[i]))).map((v, i) => v + floors[i]);
   // 최대 근무 시간: 주말·휴일 포함 월 전체 예상이 넘지 않게
   const freeKeys = new Set(free.map((d) => d.key));
   const others = summary.days.filter((d) => !freeKeys.has(d.key)).reduce((s, d) => s + projectedOf(d, plans, rules), 0);
   const room = summary.possible - others;
   let capped = false;
   if (alloc.reduce((a, b) => a + b, 0) > room) {
-    alloc = waterFill(room, alloc);
+    alloc = waterFill(room - floors.reduce((a, b) => a + b, 0), alloc.map((v, i) => v - floors[i])).map((v, i) => v + floors[i]);
     capped = true;
   }
   const out = {};
@@ -423,15 +425,15 @@ export function distributeToTarget(summary, rules, plans = {}, locks = {}, exces
 
 /** 남은 필요시간을 오늘~월말 근무일에 균등 배분. locks로 고정한 날은 그대로 두고 나머지에만 나눈다 */
 export function distributeEvenly(summary, rules, plans = {}, locks = {}) {
-  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
-  const fixed = summary.upcoming.filter((d) => locks[d.key] || d.isToday).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
+  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key]);
+  const fixed = summary.upcoming.filter((d) => locks[d.key]).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
   return spread(free, Math.max(0, summary.workToGo - fixed), rules, (d) => (d.isToday ? d.actual : 0));
 }
 
 /** 선택한 날에만 남은 필요시간을 나눠 넣고, 나머지 날은 지금 계획을 유지 */
 export function distributeAmong(summary, rules, plans, keys, locks = {}) {
   const sel = new Set(keys);
-  const chosen = summary.upcoming.filter((d) => sel.has(d.key) && capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
+  const chosen = summary.upcoming.filter((d) => sel.has(d.key) && capacityOf(d, rules) > 0 && !locks[d.key]);
   const chosenKeys = new Set(chosen.map((d) => d.key));
   const others = summary.upcoming.filter((d) => !chosenKeys.has(d.key));
   const fixed = others.reduce((s, d) => s + plannedWork(d, plans, rules), 0);
@@ -473,7 +475,7 @@ function waterFill(room, caps) {
  */
 export function distributeToMax(summary, rules, plans = {}, keys = null, locks = {}) {
   const sel = keys ? new Set(keys) : null;
-  const targets = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday && (!sel || sel.has(d.key)));
+  const targets = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && (!sel || sel.has(d.key)));
   if (!targets.length) return {};
   const tKeys = new Set(targets.map((d) => d.key));
   const dayCap = (d) => Math.max(d.isToday ? d.actual : 0, dailyCapOf(d, rules));
