@@ -12,7 +12,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.11.0';
+export const WORKTIME_VERSION = '0.12.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -31,6 +31,23 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
   // 근무기록에서 아직 반영하지 않은 수정 (다른 메뉴에 다녀와도 유지)
   const [recDraft, setRecDraft] = useState({});
   const draftCount = Object.keys(recDraft).length;
+  // 왼쪽 메뉴 접기 (확장 화면에서 달력을 넓게)
+  const [navMini, setNavMini] = useState(() => {
+    try {
+      return localStorage.getItem('worktime.navMini') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleNav = () =>
+    setNavMini((v) => {
+      try {
+        localStorage.setItem('worktime.navMini', v ? '0' : '1');
+      } catch {
+        /* 저장 불가 */
+      }
+      return !v;
+    });
 
   // 근무 중 시간은 30초마다 갱신
   useEffect(() => {
@@ -77,7 +94,7 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
   }
 
   return (
-    <div className="app fade-in">
+    <div className={`app fade-in ${navMini ? 'nav-mini' : ''}`}>
       <nav className="nav" aria-label="WorkTime 메뉴">
         <div className="brand">
           <BrandMark />
@@ -87,12 +104,16 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
           </div>
         </div>
         {NAV.map(([key, label]) => (
-          <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)}>
+          <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
             <Icon name={key} />
-            {label}
+            <span className="nav-label">{label}</span>
             {key === 'records' && draftCount > 0 && <span className="nav-dot" title={`반영 안 한 수정 ${draftCount}건`}>{draftCount}</span>}
           </button>
         ))}
+        <button type="button" className="nav-btn nav-toggle" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
+          <Icon name={navMini ? 'navOpen' : 'navClose'} />
+          <span className="nav-label">메뉴 접기</span>
+        </button>
         <div className="nav-foot">
           <span>
             <Pill tone={state.dataMode === 'portal' ? 'accent' : 'plan'}>

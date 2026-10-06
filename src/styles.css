@@ -835,3 +835,49 @@ html[data-mode='widget'] body { overflow: hidden; }
 @keyframes rowflash { 0%, 30% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
 
 .info-pop b { font-size: inherit; line-height: inherit; letter-spacing: 0; font-weight: 700; color: inherit; }
+
+/* ── 왼쪽 메뉴 접기 ── */
+.nav-toggle { margin-top: 8px; color: var(--faint); }
+.app.nav-mini { grid-template-columns: 68px minmax(0, 1fr); }
+.app.nav-mini .nav { padding-inline: 10px; align-items: stretch; }
+.app.nav-mini .brand { justify-content: center; padding-inline: 0; }
+.app.nav-mini .brand-text, .app.nav-mini .nav-label, .app.nav-mini .nav-foot { display: none; }
+.app.nav-mini .nav-btn { justify-content: center; padding-inline: 0; position: relative; }
+.app.nav-mini .nav-dot { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; font-size: 10px; }
+.app.nav-mini .nav-toggle { margin-top: auto; }
+.app .nav-toggle { margin-top: auto; }
+.app:not(.nav-mini) .nav-foot { margin-top: 10px; }
+@media (max-width: 900px) { .nav-toggle { display: none !important; } }
+
+/* ── 근무기록: 달력은 가로 스크롤 없이 칸을 줄여서 맞춤 ── */
+.cal { grid-template-columns: repeat(7, minmax(0, 1fr)); min-width: 0; }
+.cal-d { min-width: 0; }
+.ex-row select.input { height: 38px; width: 100%; min-width: 0; }
+.reason-custom { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.reason-custom .input { flex: 1; min-width: 0; }
+
+/* ── 위젯: 더 어두운 색 · 위아래 간격 줄임 · 날짜 ── */
+.widget {
+  inset: 5px; gap: 4px; padding: 9px 12px 9px; grid-template-rows: auto auto auto auto; align-content: space-between;
+  background: linear-gradient(150deg, #0a1736 0%, #102454 55%, #16306b 100%);
+  border: 1px solid rgba(140, 170, 255, 0.16); box-shadow: 0 8px 22px rgba(0, 6, 25, 0.45);
+}
+.wg-date { font-weight: 600; font-size: 11.5px; color: rgba(255, 255, 255, 0.62); margin-left: 2px; }
+.wg-clock-wrap { gap: 2px; }
+.wg-clock { font-size: 36px; }
+.wg-main { align-items: center; }
+.wg-bar { height: 4px; background: rgba(255, 255, 255, 0.14); }
+.wg-bar i { background: linear-gradient(90deg, #7fb2ff, #ffffff); }
+
+/* ── 앱(요약) 모드: 설치형에서 모서리가 둥근 창 ── */
+html.tauri[data-mode='compact'], html.tauri[data-mode='compact'] body { background: transparent !important; background-image: none !important; }
+html.tauri[data-mode='compact'] body { overflow: hidden; }
+html.tauri[data-mode='compact'] .shell {
+  height: 100vh; overflow: hidden auto; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--bg); background-image: radial-gradient(900px 400px at 0% -10%, var(--bg-glow), transparent 60%);
+  scrollbar-width: thin;
+}
+/* 제외시간 한 건 = 1줄: 시각 구간 / 2줄: 사유 + 빼기 */
+.ex-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.ex-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.ex-row .ex-range, .ex-row .ex-min { grid-column: 1 / -1; }

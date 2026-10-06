@@ -45,16 +45,17 @@ export function useTheme() {
 }
 
 export const WINDOW_SIZES = {
-  widget: { width: 300, height: 184 },
-  compact: { width: 420, height: 820 },
-  full: { width: 1280, height: 860 },
+  widget: { width: 300, height: 164 },
+  compact: { width: 420, height: 820 }, // 높이는 모니터 작업 영역에 맞춰 꽉 채움
+  full: { width: 1440, height: 940 }, // 근무기록 달력이 가로 스크롤 없이 들어가는 크기 (모니터보다 크면 줄임)
 };
+const EDGE = 12; // 위젯과 화면 가장자리 사이 여백
 
 const WIDGET_KEY = 'dfmslack.widget';
 const tauriWin = async () => {
   if (!window.__TAURI_INTERNALS__) return null;
   const mod = await import('@tauri-apps/api/window');
-  return { win: mod.getCurrentWindow(), LogicalSize: mod.LogicalSize };
+  return { win: mod.getCurrentWindow(), mod, LogicalSize: mod.LogicalSize };
 };
 
 /** 설치형에서만: 항상 위 켜기/끄기 */
@@ -67,27 +68,57 @@ export async function setAlwaysOnTop(on) {
   }
 }
 
-/** 실제 창 크기를 바꾼다. Tauri 창 → 창 API, Edge 앱 창 → resizeTo. 안 되면 화면 배치만 바뀐다. */
-export async function resizeWindow(mode, opts = {}) {
+/** 모드별 창 위치·크기 (물리 픽셀). 작업 영역 = 작업 표시줄을 뺀 모니터 영역
+ *  위젯: 오른쪽 맨 위 · 요약(앱): 오른쪽 끝에 위아래 꽉 차게 · 확장: 가운데 */
+export function placementFor(mode, area, scale = 1) {
+  const { x: X, y: Y, width: W, height: H } = area;
+  const px = (v) => Math.round(v * scale);
   const size = WINDOW_SIZES[mode];
+  if (mode === 'widget') {
+    const w = px(size.width);
+    const h = px(size.height);
+    return { x: X + W - w - px(EDGE), y: Y + px(EDGE), width: w, height: h };
+  }
+  if (mode === 'compact') {
+    const w = Math.min(px(size.width), W);
+    return { x: X + W - w, y: Y, width: w, height: H };
+  }
+  const w = Math.min(px(size.width), W);
+  const h = Math.min(px(size.height), H);
+  return { x: X + Math.round((W - w) / 2), y: Y + Math.round((H - h) / 2), width: w, height: h };
+}
+
+/** 실제 창 크기·위치를 바꾼다. Tauri 창 → 창 API, Edge 앱 창 → resizeTo/moveTo. */
+export async function resizeWindow(mode, opts = {}) {
   try {
     const t = await tauriWin();
     if (t) {
+      const { win, mod } = t;
       // 최소 크기를 먼저 바꿔야 위젯 크기로 줄어든다
-      const min = mode === 'widget' ? { width: 260, height: 150 } : { width: 380, height: 600 };
-      try { await t.win.setMinSize(new t.LogicalSize(min.width, min.height)); } catch { /* 권한 없음 */ }
-      await t.win.setSize(new t.LogicalSize(size.width, size.height));
-      // 위젯은 그림자 없는 투명 창 + (선택) 항상 위, 다른 화면은 보통 창
-      try { await t.win.setShadow(mode !== 'widget'); } catch { /* 권한 없음 */ }
+      const min = mode === 'widget' ? { width: 260, height: 140 } : { width: 380, height: 600 };
+      try { await win.setMinSize(new mod.LogicalSize(min.width, min.height)); } catch { /* 권한 없음 */ }
+      try { if (await win.isMaximized()) await win.unmaximize(); } catch { /* 무시 */ }
+      // 위젯·요약은 모서리가 둥근 투명 창(그림자 없음), 확장은 보통 창
+      try { await win.setShadow(mode === 'full'); } catch { /* 권한 없음 */ }
+      const mon = (await mod.currentMonitor()) || (await mod.primaryMonitor());
+      if (mon) {
+        const wa = mon.workArea || { position: mon.position, size: mon.size };
+        const area = { x: wa.position.x, y: wa.position.y, width: wa.size.width, height: wa.size.height };
+        const p = placementFor(mode, area, mon.scaleFactor || 1);
+        await win.setSize(new mod.PhysicalSize(p.width, p.height));
+        await win.setPosition(new mod.PhysicalPosition(p.x, p.y));
+      } else {
+        const size = WINDOW_SIZES[mode];
+        await win.setSize(new mod.LogicalSize(size.width, size.height));
+      }
       await setAlwaysOnTop(mode === 'widget' && opts.onTop);
       return;
     }
-    const dx = size.width - window.innerWidth;
-    window.resizeTo(window.outerWidth + dx, window.outerHeight + (size.height - window.innerHeight));
-    // 오른쪽 아래로 넘치지 않게 위치 보정
-    const left = Math.min(window.screenX, Math.max(0, screen.availWidth - window.outerWidth));
-    const top = Math.min(window.screenY, Math.max(0, screen.availHeight - window.outerHeight));
-    window.moveTo(left, top);
+    // Edge 앱 창: 같은 배치를 화면 좌표로
+    const area = { x: screen.availLeft ?? 0, y: screen.availTop ?? 0, width: screen.availWidth, height: screen.availHeight };
+    const p = placementFor(mode, area, 1);
+    window.resizeTo(p.width, p.height);
+    window.moveTo(p.x, p.y);
   } catch {
     /* 창 크기를 바꿀 수 없는 환경 (일반 브라우저 탭 등) */
   }
@@ -116,6 +147,10 @@ export function useWidgetPrefs() {
 export function useWindowMode(getWidget = () => ({})) {
   // 실행할 때는 항상 요약 화면으로 시작
   const [mode, setModeState] = useState('compact');
+  // 처음 열 때도 요약 화면 자리(모니터 오른쪽 끝)에 둔다
+  useEffect(() => {
+    resizeWindow('compact', getWidget());
+  }, []);
   const setMode = (next) => {
     setModeState(next);
     writePref(MODE_KEY, next);

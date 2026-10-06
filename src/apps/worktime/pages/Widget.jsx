@@ -1,6 +1,6 @@
 // 위젯: 바탕화면 위에 띄워 두는 아주 작은 창. 오늘 퇴근 목표 · 진행 · 월말 예상만.
 // 설치형에서는 투명 창이라 투명도만큼 뒤가 비치고, 항상 위를 켤 수 있다.
-import { fmtDur, fmtClock } from '../lib/time.js';
+import { fmtDur, fmtClock, dayLabel } from '../lib/time.js';
 import { checkoutFor } from '../lib/engine.js';
 import { Icon } from '../../../shared/ui.jsx';
 import { DfmLogo } from '../../../shared/Logo.jsx';
@@ -15,7 +15,7 @@ async function win(action) {
   }
 }
 
-export default function Widget({ state, summary, setMode, widget, setWidget }) {
+export default function Widget({ state, summary, now, setMode, widget, setWidget }) {
   const { plans, rules } = state;
   const s = summary;
   const t = s.today;
@@ -32,6 +32,7 @@ export default function Widget({ state, summary, setMode, widget, setWidget }) {
         <span className="wg-brand" data-tauri-drag-region>
           <DfmLogo size={18} />
           <span>WorkTime</span>
+          <span className="wg-date num">{dayLabel(now)}</span>
         </span>
         <span className="wg-actions">
           <button
@@ -60,7 +61,7 @@ export default function Widget({ state, summary, setMode, widget, setWidget }) {
         {working ? (
           <>
             <div className="wg-clock-wrap" data-tauri-drag-region>
-              <span className="wg-label">{t.live ? '퇴근 목표' : '퇴근'}</span>
+              <span className="wg-label">{t.live ? '퇴근 예정' : '퇴근'}</span>
               <b className="wg-clock num">{t.live ? fmtClock(out) : fmtClock(t.outMin ?? out)}</b>
             </div>
             <div className="wg-side">

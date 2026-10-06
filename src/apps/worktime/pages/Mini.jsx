@@ -22,10 +22,10 @@ export default function Mini({ state, summary, now, expand }) {
           </button>
         </div>
         <div style={{ paddingTop: 18 }}>
-          <MonthMeter work={s.recognizedReq} leave={s.holidayDone + s.holidayPlanned} plan={Math.max(0, s.projectedReq - s.recognizedReq)} total={s.possible} marker={s.required} markerLabel="필요" />
+          <MonthMeter work={s.recognizedReq} leave={s.holidayDone + s.holidayPlanned} plan={Math.max(0, s.projectedReq - s.recognizedReq)} total={s.possible} marker={s.required} markerLabel="필수" />
         </div>
         <div className="mini-nums">
-          <div><span>필요</span><b>{fmtDur(s.required)}</b></div>
+          <div><span>필수</span><b>{fmtDur(s.required)}</b></div>
           <div><span>최대</span><b>{fmtDur(s.possible)}</b></div>
           <div><span>인정</span><b>{fmtDur(s.recognizedReq)}</b></div>
         </div>

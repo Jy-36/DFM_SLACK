@@ -209,6 +209,41 @@ function DayCell({ d, plans, rules, selected, dirty, onClick, family }) {
   );
 }
 
+const REASONS = ['개인 용무', '점심 시간', '은행', '병원', '외출'];
+
+/** 제외시간 사유: 자주 쓰는 사유는 고르고, 없으면 직접 입력 */
+function ReasonPick({ id, value, onChange }) {
+  const [custom, setCustom] = useState(() => !!value && !REASONS.includes(value));
+  if (custom) {
+    return (
+      <span className="reason-custom">
+        <input className="input" id={id} value={value} placeholder="사유 직접 입력" autoFocus onChange={(e) => onChange(e.target.value)} />
+        <button type="button" className="link-btn" title="목록에서 고르기" onClick={() => { setCustom(false); if (!REASONS.includes(value)) onChange(''); }}>
+          목록
+        </button>
+      </span>
+    );
+  }
+  return (
+    <select
+      className="input"
+      id={id}
+      value={REASONS.includes(value) ? value : ''}
+      aria-label="제외 사유"
+      onChange={(e) => {
+        if (e.target.value === '__custom') setCustom(true);
+        else onChange(e.target.value);
+      }}
+    >
+      <option value="">사유 선택</option>
+      {REASONS.map((r) => (
+        <option key={r} value={r}>{r}</option>
+      ))}
+      <option value="__custom">직접 입력…</option>
+    </select>
+  );
+}
+
 function DayDetail({ d, rec, orig, dirty, rules, plans, set, clear, revert }) {
   const worked = !!rec.in; // 제외시간은 출근 기록이 있는 날만
   const breakMin = Math.max(0, d.gross - d.excluded - d.actual);
@@ -277,12 +312,10 @@ function DayDetail({ d, rec, orig, dirty, rules, plans, set, clear, revert }) {
                       <TimeField id={`ex-to-${d.key}-${i}`} value={x.to} allowEmpty={false} presets={PRESETS.any} ariaLabel="제외 끝" onChange={(v) => setEx(excludes.map((y, j) => (j === i ? { ...y, to: v } : y)))} />
                     </span>
                   )}
-                  <input
-                    className="input"
+                  <ReasonPick
                     id={`ex-reason-${d.key}-${i}`}
                     value={x.reason || ''}
-                    placeholder="사유 (외출, 병원 등)"
-                    onChange={(e) => setEx(excludes.map((y, j) => (j === i ? { ...y, reason: e.target.value } : y)))}
+                    onChange={(v) => setEx(excludes.map((y, j) => (j === i ? { ...y, reason: v } : y)))}
                   />
                   <button type="button" className="lock-btn" title="빼기" aria-label="제외시간 빼기" onClick={() => setEx(excludes.filter((_, j) => j !== i))}>
                     <Icon name="close" size={14} />
