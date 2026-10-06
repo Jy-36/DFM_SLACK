@@ -26,7 +26,7 @@ export default function Mini({ state, summary, now, expand }) {
         </div>
         <div className="mini-nums">
           <div><span>필요</span><b>{fmtDur(s.required)}</b></div>
-          <div><span>Max</span><b>{fmtDur(s.possible)}</b></div>
+          <div><span>최대</span><b>{fmtDur(s.possible)}</b></div>
           <div><span>인정</span><b>{fmtDur(s.recognizedReq)}</b></div>
         </div>
         <div className="mini-diff">
@@ -34,11 +34,11 @@ export default function Mini({ state, summary, now, expand }) {
             평일 누적초과{' '}
             <b className={`num ${s.weekdayOvertime < 0 ? 'tone-bad' : 'tone-good'}`}>{fmtDur(s.weekdayOvertime, { sign: true })}</b>
           </span>
-          <Pill tone={s.projectedDiff < 0 ? 'bad' : 'good'}>월말 {fmtDur(s.projectedDiff, { sign: true })}</Pill>
+          <Pill tone={s.projectedTotalDiff < 0 ? 'bad' : 'good'}>월말 {fmtDur(s.projectedTotalDiff, { sign: true })} (OT {fmtDur(s.projectedDiff, { sign: true })}{s.weekendTotal > 0 ? ` · 주말 +${fmtDur(s.weekendTotal)}` : ''})</Pill>
         </div>
         <div className="mini-diff small">
           <span className="muted">
-            남은 필요 <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.remainingNeed)}</b> · {s.daysToWork}일 · 하루 평균{' '}
+            필요 <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.remainingNeed)}</b> · {s.daysToWork}일 · 하루 평균{' '}
             <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.avgPerDay)}</b>
           </span>
         </div>
@@ -188,7 +188,7 @@ function UpcomingCard({ s, records, rules, expand }) {
     .filter(([k, r]) => k > s.todayKey && r.leave && rules.leaveTypes[r.leave])
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .slice(0, 3)
-    .map(([k, r]) => ({ key: k, text: `${leaveText(rules, r)}${rules.leaveTypes[r.leave].kind === 'rest' ? ' · 필요시간 유지' : ''}${r.note ? ` · ${r.note}` : ''}`, tone: rules.leaveTypes[r.leave].kind === 'rest' ? 'accent' : 'leave', badge: rules.leaveTypes[r.leave].kind === 'rest' ? '쉼' : '휴가' }));
+    .map(([k, r]) => ({ key: k, text: `${leaveText(rules, r)}${rules.leaveTypes[r.leave].kind === 'rest' ? ' · 필수 근무 시간 유지' : ''}${r.note ? ` · ${r.note}` : ''}`, tone: rules.leaveTypes[r.leave].kind === 'rest' ? 'accent' : 'leave', badge: rules.leaveTypes[r.leave].kind === 'rest' ? '쉼' : '휴가' }));
   const warns = s.warnings.slice(0, 2).map((w) => ({ key: w.key, text: w.text, tone: 'warn' }));
   const fd = s.familyDay;
   const family =

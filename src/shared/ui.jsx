@@ -1,4 +1,41 @@
+import { useEffect, useRef, useState } from 'react';
 import { fmtDur } from '../apps/worktime/lib/time.js';
+
+/** 설명 아이콘: 마우스를 올리면 설명이 뜨고, 누르면 고정된다 */
+export function InfoTip({ text, align = 'left', label = '설명 보기' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  return (
+    <span className={`info-tip ${open ? 'open' : ''} ${align}`} ref={ref}>
+      <button
+        type="button"
+        className="info-btn"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        i
+      </button>
+      <span className="info-pop" role="tooltip">{text}</span>
+    </span>
+  );
+}
 
 export function Pill({ tone = 'neutral', children }) {
   return <span className={`pill ${tone}`}>{children}</span>;

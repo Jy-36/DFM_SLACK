@@ -81,7 +81,7 @@ export default function Widget({ state, summary, setMode, widget, setWidget }) {
       </div>
 
       <div className="wg-foot">
-        <span className={`num ${s.projectedDiff < 0 ? 'tone-bad' : 'tone-good'}`}>월말 {fmtDur(s.projectedDiff, { sign: true })}</span>
+        <span className={`num ${s.projectedTotalDiff < 0 ? 'tone-bad' : 'tone-good'}`} title={`OT ${fmtDur(s.projectedDiff, { sign: true })} · 주말 +${fmtDur(s.weekendTotal)}`}>월말 {fmtDur(s.projectedTotalDiff, { sign: true })}</span>
         <label className="wg-opacity" title="투명도">
           <Icon name="drop" size={12} />
           <input

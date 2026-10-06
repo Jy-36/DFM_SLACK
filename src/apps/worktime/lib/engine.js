@@ -125,7 +125,8 @@ export function evalDay(date, rec, rules, ctx = {}) {
     excluded = excludeWithin(rec, from, to);
     actual = netFromGross(gross - excluded, rules);
   }
-  const plannedExclude = excludeTotal(rec);
+  // 제외시간은 출근 기록이 있는(근무한) 날에만 반영
+  const plannedExclude = inMin != null ? excludeTotal(rec) : 0;
   const recognized = capDay(actual + workCredit, rules);
   const dayRequired = isWorkday ? Math.max(0, rules.dailyStdMin - offCredit) : 0; // 그날 필수근무
 
@@ -273,7 +274,7 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
   for (const w of weeks) {
     if (w.over) warnings.push({ key: w.key, date: parseYmd(w.key), text: `주 ${Math.round(rules.maxWeeklyMin / 60)}시간 초과 예상`, week: true });
   }
-  if (projected > possible) warnings.push({ key: todayKey, date: now, text: '계획이 월 Max를 넘습니다', week: false });
+  if (projected > possible) warnings.push({ key: todayKey, date: now, text: '계획이 최대 근무 시간을 넘습니다', week: false });
 
   const familyKey = familyDayKey(year, month);
   const familyDay = days.find((d) => d.key === familyKey) || null;
@@ -311,7 +312,10 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
     paceDiff: weekdayOvertime,
     projected,
     projectedReq,
-    projectedDiff: projectedReq - required,
+    projectedDiff: projectedReq - required, // OT: 평일(근무일) 기준, 주말·공휴일 근무 제외
+    projectedTotalDiff: projected - required, // 월말 예상: 주말 근무 포함
+    weekendTotal: projected - projectedReq, // 주말·공휴일 근무 (실적 + 계획)
+    needLeft: Math.max(0, required - recognizedReq), // 필요 시간 = 필수 근무 시간 − 현재 근무 시간
     possibleLeft: possible - projected,
     recognizedReq,
     holidayDone,

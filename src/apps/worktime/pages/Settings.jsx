@@ -65,14 +65,14 @@ export default function Settings({ state, dispatch, notify }) {
             </select>
             <small className="muted">2주·분기 단위는 다음 단계에서 지원</small>
           </label>
-          {hoursField('dailyStdMin', '1일 소정근로', '필요시간 후보 ① 근무일 × 이 값')}
-          {hoursField('stdWeeklyMin', '주 소정근로', '필요시간 후보 ② 이 값 ÷ 7 × 월 일수')}
-          {hoursField('maxWeeklyMin', 'Max 계산용 주 시간', '월 Max = 이 값 ÷ 7 × 월 일수')}
+          {hoursField('dailyStdMin', '1일 소정근로', '필수 근무 시간 후보 ① 근무일 × 이 값')}
+          {hoursField('stdWeeklyMin', '주 소정근로', '필수 근무 시간 후보 ② 이 값 ÷ 7 × 월 일수')}
+          {hoursField('maxWeeklyMin', '최대 근무 시간 계산용 주 시간', '최대 근무 시간 = 이 값 ÷ 7 × 월 일수')}
           {toggleField('weeklyLimitOn', '주마다 이 시간 제한', '끄면 월 정산만 봄 (회사 기준)')}
           <label className="field">
             <span>주 환산 시간 버림 단위</span>
             <select className="input" id="rule-max-round" value={r.maxRounding || 'hour'} onChange={(e) => set({ maxRounding: e.target.value })}>
-              <option value="hour">시간 단위 버림 (Max 230:17 → 230:00, 177:08 → 177:00)</option>
+              <option value="hour">시간 단위 버림 (최대 230:17 → 230:00, 177:08 → 177:00)</option>
               <option value="minute">분 단위 (230:17, 177:08)</option>
             </select>
           </label>
@@ -119,7 +119,7 @@ export default function Settings({ state, dispatch, notify }) {
 
         <section className="panel">
           <h2>근태별 처리</h2>
-          <p className="small muted" style={{ marginTop: -6 }}>연차·반차 같은 비근무근태는 필요시간을 줄이고, 출장·교육은 그날 근무시간으로 인정합니다.</p>
+          <p className="small muted" style={{ marginTop: -6 }}>연차·반차 같은 비근무근태는 필수 근무 시간을 줄이고, 출장·교육은 그날 근무시간으로 인정합니다.</p>
           <table className="data-table">
             <thead>
               <tr><th>구분</th><th>처리</th><th>시간</th></tr>
@@ -130,9 +130,9 @@ export default function Settings({ state, dispatch, notify }) {
                   <td>{r.leaveTypes[k].label}</td>
                   <td>
                     <select className="input" style={{ width: 150 }} id={`leave-kind-${k}`} value={r.leaveTypes[k].kind || 'off'} onChange={(e) => setLeave(k, { kind: e.target.value })} aria-label={`${r.leaveTypes[k].label} 처리 방식`}>
-                      <option value="off">필요시간에서 차감</option>
+                      <option value="off">필수 근무 시간에서 차감</option>
                       <option value="work">근무로 인정</option>
-                      <option value="rest">쉼 (필요시간 유지)</option>
+                      <option value="rest">쉼 (필수 근무 시간 유지)</option>
                     </select>
                   </td>
                   <td>

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { fmtDur, fmtClock, toMin, dayLabel, monthLabel, weekKeyOf, parseYmd, parseDurInput } from '../lib/time.js';
 import { defaultPlanFor, projectedOf, distributeEvenly, distributeAmong, distributeToMax, summarizeMonth, grossForNet, netFromGross, capacityOf, dailyCapOf, earlierStarts } from '../lib/engine.js';
 import { LEAVE_ORDER } from '../lib/rules.js';
-import { Icon, Pill } from '../../../shared/ui.jsx';
+import { Icon, Pill, InfoTip } from '../../../shared/ui.jsx';
 import { TimeField, PRESETS } from '../../../shared/TimeField.jsx';
 import { LeaveSelect } from '../components/LeaveSelect.jsx';
 import { TargetsPanel } from '../components/Targets.jsx';
@@ -46,6 +46,13 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
       anchor.current = key;
       return next;
     });
+  // 작은 달력에서 누른 날로 표를 옮기고 잠깐 강조
+  const [flash, setFlash] = useState(null);
+  const jump = (key) => {
+    setFlash(key);
+    requestAnimationFrame(() => document.getElementById(`pl-row-${key}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    setTimeout(() => setFlash((f) => (f === key ? null : f)), 1400);
+  };
   const selectWhere = (fn) => setSel(new Set(rows.filter(fn).map((d) => d.key)));
 
   const thisWeek = weekKeyOf(parseYmd(s.todayKey));
@@ -69,8 +76,9 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>근무 계획</h1>
-          <p>{monthLabel(s.year, s.month)} 남은 근무일에 일할 시간을 정하면 필요시간·Max 대비 결과가 바로 계산됩니다.</p>
+          <h1>
+            근무 계획 <InfoTip text={`${monthLabel(s.year, s.month)} 남은 근무일에 일할 시간을 정하면 필수·최대 근무 시간 대비 결과가 바로 계산됩니다.`} />
+          </h1>
         </div>
         <div className="head-actions">
           <button className="btn" onClick={() => { dispatch({ type: 'plan/replace', plans: {}, clearLocks: true }); setSel(new Set()); }} disabled={!edited && !lockedCount}>
@@ -78,37 +86,45 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
           </button>
           <button
             className="btn"
-            title="남은 근무일에 고르게 나눠 월 Max까지 채웁니다"
+            title="남은 근무일에 고르게 나눠 최대 근무 시간까지 채웁니다"
             onClick={() => {
               const next = distributeToMax(s, rules, plans, null, locks);
               const ins = earlierStarts(s, rules, next, planIns);
               dispatch({ type: 'plan/merge', plans: next, ins });
-              notify(`${lockedCount ? `고정한 ${lockedCount}일은 그대로 두고 ` : ''}월 Max까지 채웠습니다.${Object.keys(ins).length ? ` ${Object.keys(ins).length}일은 22시 전에 끝나도록 출근을 앞당겼습니다.` : ''}`);
+              notify(`${lockedCount ? `고정한 ${lockedCount}일은 그대로 두고 ` : ''}최대 근무 시간까지 채웠습니다.${Object.keys(ins).length ? ` ${Object.keys(ins).length}일은 22시 전에 끝나도록 출근을 앞당겼습니다.` : ''}`);
             }}
           >
-            Max까지 채우기
+            최대까지 채우기
           </button>
           <button
             className="btn primary"
+            title="필요 시간(필수 근무 시간 − 현재 근무 시간)을 남은 근무일에 고르게 나눕니다"
             onClick={() => {
               dispatch({ type: 'plan/merge', plans: distributeEvenly(s, rules, plans, locks) });
-              notify(lockedCount ? `고정한 ${lockedCount}일은 그대로 두고 나머지 날에 나눴습니다.` : '남은 필요시간을 근무일에 고르게 나눴습니다.');
+              notify(lockedCount ? `고정한 ${lockedCount}일은 그대로 두고 나머지 날에 나눴습니다.` : '필요 시간을 남은 근무일에 고르게 나눴습니다.');
             }}
           >
-            남은 필요시간 균등 배분
+            필요 시간 균등 배분
           </button>
         </div>
       </div>
 
       <TargetsPanel s={s} rules={rules} reachable={reachable} />
 
-      <FamilyDayCard s={s} rules={rules} plans={plans} locks={locks} dispatch={dispatch} notify={notify} />
-
       <section className="panel">
         <h2>
           <span>
             남은 근무일 {rows.length}일{' '}
             {rows.length - s.daysToWork > 0 && <span className="small muted" style={{ fontWeight: 500 }}>· 종일 휴가 {rows.length - s.daysToWork}일 포함</span>}
+            <InfoTip
+              text={
+                <>
+                  왼쪽 작은 달력이나 표의 체크로 날짜를 고르고, Shift를 누른 채 누르면 구간을 한 번에 고릅니다.
+                  <br />시간을 직접 바꾼 날은 자물쇠로 고정되어 균등 배분·최대까지 채우기에서 그대로 유지됩니다.
+                  <br />예상 퇴근 = 출근 시각(기본 {rules.planDefaultIn}, 오늘은 실제 출근) + 실근무 + 휴게 (+ 제외시간)
+                </>
+              }
+            />
           </span>
           <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {lockedCount > 0 && <Pill tone="accent"><Icon name="lock" size={12} /> {lockedCount}일 고정</Pill>}
@@ -116,6 +132,9 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
           </span>
         </h2>
 
+        <div className="plan-tools">
+        <MiniCal s={s} rows={rows} sel={sel} toggle={(key, shift) => { toggle(key, shift); jump(key); }} plans={plans} familyKey={rules.familyDayOn ? s.familyKey : null} />
+        <div className="plan-tools-side">
         <div className="holiday-add">
           <span className="small muted">휴일 근무</span>
           <select className="input" id="pl-holiday-pick" value={holidayPick} onChange={(e) => setHolidayPick(e.target.value)} style={{ width: 190 }} aria-label="휴일 근무할 날짜">
@@ -129,16 +148,18 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
             disabled={!holidayPick}
             onClick={() => {
               dispatch({ type: 'plan/set', key: holidayPick, minutes: rules.dailyStdMin, lock: true });
-              notify(`${dayLabel(parseYmd(holidayPick))} 휴일 근무 ${fmtDur(rules.dailyStdMin)}를 넣었습니다. Max에서만 차감되고 필요시간은 그대로입니다.`);
+              notify(`${dayLabel(parseYmd(holidayPick))} 휴일 근무 ${fmtDur(rules.dailyStdMin)}를 넣었습니다. 최대 근무 시간에서만 빠지고 필수 근무 시간은 그대로입니다.`);
               setHolidayPick('');
             }}
           >
             <Icon name="plus" size={14} /> 휴일 근무 추가
           </button>
-          <span className="small muted">
-            {s.holidayPlanned > 0 ? `남은 휴일 근무 ${fmtDur(s.holidayPlanned)} · ` : ''}Max에서만 차감되고 필요시간은 줄지 않아요
-          </span>
+          {s.holidayPlanned > 0 && <span className="small muted">남은 휴일 근무 {fmtDur(s.holidayPlanned)}</span>}
+          <InfoTip text="주말·공휴일 근무는 최대 근무 시간에서만 빠지고 필수 근무 시간은 줄지 않습니다. 월말 예상에서는 OT와 따로 '주말'로 표시됩니다." />
         </div>
+
+        <FamilyDayRow s={s} rules={rules} plans={plans} locks={locks} dispatch={dispatch} notify={notify} />
+
 
         <div className="quick-select" role="group" aria-label="날짜 빠른 선택">
           <span className="small muted">빠른 선택</span>
@@ -152,6 +173,8 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
             </button>
           ))}
           {sel.size > 0 && <button className="chip ghost" onClick={() => setSel(new Set())}>선택 해제</button>}
+        </div>
+        </div>
         </div>
 
         <div className="plan-table-wrap">
@@ -172,7 +195,7 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
                 <th>실근무 계획</th>
                 <th className="r">인정 예정</th>
                 <th>예상 출근 → 퇴근</th>
-                {rules.dailyLimitOn && <th title="1일 최대 근무를 채울 때의 퇴근 시각">Max 퇴근</th>}
+                {rules.dailyLimitOn && <th title="1일 최대 근무를 채울 때의 퇴근 시각">최대 퇴근</th>}
                 <th>비고</th>
               </tr>
             </thead>
@@ -191,14 +214,12 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
                   locks={locks}
                   weekTotal={weekProjected(g.key)}
                   familyKey={s.familyKey}
+                  flash={flash}
                 />
               ))}
             </tbody>
           </table>
         </div>
-        <p className="small muted" style={{ marginBottom: 0 }}>
-          Shift를 누른 채 체크하면 구간을 한 번에 고를 수 있습니다. 시간을 직접 바꾼 날은 자물쇠로 고정되어 균등 배분·Max 채우기에서 그대로 유지됩니다. 자물쇠를 누르면 고정을 풀 수 있습니다. 예상 퇴근 = 출근 시각(기본 {rules.planDefaultIn}, 오늘은 실제 출근) + 실근무 + 휴게.
-        </p>
       </section>
 
       {sel.size > 0 && (
@@ -208,7 +229,7 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
   );
 }
 
-function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, weekTotal, familyKey, locks }) {
+function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, weekTotal, familyKey, locks, flash }) {
   const over = rules.weeklyLimitOn && weekTotal > rules.maxWeeklyMin;
   const mon = parseYmd(g.key);
   return (
@@ -223,7 +244,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
         const late = outMin > toMin(rules.recognizeTo);
         const checked = sel.has(d.key);
         return (
-          <tr key={d.key} className={[d.isToday && 'today-row', checked && 'sel-row', isHoliday && 'holiday-row'].filter(Boolean).join(' ')}>
+          <tr key={d.key} id={`pl-row-${d.key}`} className={[d.isToday && 'today-row', checked && 'sel-row', isHoliday && 'holiday-row', flash === d.key && 'flash-row'].filter(Boolean).join(' ')}>
             <td>
               <input
                 type="checkbox"
@@ -239,7 +260,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             </td>
             <td>
               {isHoliday ? (
-                <Pill tone="bad">휴일 근무{d.holiday ? ` · ${d.holiday}` : ''}</Pill>
+                <span title="최대 근무 시간에서만 빠지고 필수 근무 시간은 그대로"><Pill tone="bad">휴일 근무{d.holiday ? ` · ${d.holiday}` : ''}</Pill></span>
               ) : (
               <LeaveSelect
                 id={`pl-leave-${d.key}`}
@@ -307,11 +328,10 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             )}
             <td className="small">
               {d.isToday && d.actual > 0 && <span className="muted">지금까지 {fmtDur(d.actual)} </span>}
-              {isHoliday && <span className="muted">Max에서 차감 · 필요시간은 그대로 </span>}
               {d.plannedExclude > 0 && <span className="muted">제외 −{fmtDur(d.plannedExclude)} </span>}
-              {d.isRest && <span className="muted">필요시간 유지 · 다른 날에 채움 </span>}
+              {d.isRest && <span title="쉬어도 필수 근무 시간은 그대로라 다른 날에 채웁니다"><Pill tone="plan">패밀리데이 · 다른 날에 채움</Pill> </span>}
               {rules.familyDayOn && !d.leave && d.key === familyKey && <Pill tone="plan">패밀리데이 후보</Pill>}
-              {d.leaveKind === 'off' && <span className="muted">필요시간 −{fmtDur(d.offCredit)} </span>}
+              {d.leaveKind === 'off' && <span className="muted" title="이만큼 필수 근무 시간이 줄어듭니다">필수 −{fmtDur(d.offCredit)} </span>}
               {d.note && <span className="muted">{d.note} </span>}
               {late && <Pill tone="bad">인정시간대 초과</Pill>}
               {!fullOff && rules.minDailyMin > 0 && planned > 0 && planned + d.credit < rules.minDailyMin && <Pill tone="warn">최소 미달</Pill>}
@@ -321,7 +341,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
       })}
       <tr className="week-sum">
         <td />
-        <td colSpan={3}>{mon.getMonth() + 1}/{mon.getDate()} 주 합계 (월~일, 이미 일한 시간 포함)</td>
+        <td colSpan={3} title="월~일, 이미 일한 시간 포함">{mon.getMonth() + 1}/{mon.getDate()} 주 합계</td>
         <td className={`r num ${over ? 'tone-bad' : ''}`}>{fmtDur(weekTotal)}</td>
         <td colSpan={rules.dailyLimitOn ? 3 : 2}>
           {!rules.weeklyLimitOn ? null : over ? <Pill tone="bad">주 {Math.round(rules.maxWeeklyMin / 60)}시간 초과</Pill> : <span>한도 {fmtDur(rules.maxWeeklyMin)}</span>}
@@ -331,61 +351,111 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
   );
 }
 
-/** 패밀리데이: 21일이 있는 주 금요일. 쉬면 필요시간은 그대로라 그날 몫을 다른 날에 채운다 */
-function FamilyDayCard({ s, rules, plans, locks, dispatch, notify }) {
+/** 패밀리데이: 21일이 있는 주 금요일. 쉬어도 필수 근무 시간은 그대로라 그날 몫을 다른 날에 채운다 (작은 한 줄) */
+function FamilyDayRow({ s, rules, plans, locks, dispatch, notify }) {
   const fd = s.familyDay;
   if (!rules.familyDayOn || !fd || !fd.isWorkday || fd.isPast) return null;
   const chosen = fd.leave === 'family';
   const busy = fd.leave && !chosen; // 이미 다른 근태가 있는 날
-  const share = rules.dailyStdMin;
-  const redistribute = () => {
-    dispatch({ type: 'plan/merge', plans: distributeEvenly(s, rules, plans, locks) });
-    notify('패밀리데이 몫을 남은 근무일에 나눠 넣었습니다.');
-  };
+  const short = chosen && s.projectedDiff < 0;
   return (
-    <section className={`family-card ${chosen ? 'on' : ''}`} aria-label="패밀리데이">
-      <div className="family-main">
-        <span className="label">패밀리데이 · {dayLabel(fd.date)}</span>
-        <strong>
-          {chosen ? '이날은 쉬는 것으로 계획했어요' : busy ? `이날은 이미 ${fd.leaveLabel}(으)로 등록되어 있어요` : '이날 쉬고 다른 날에 채울 수 있어요'}
-        </strong>
-        <span className="small muted">
-          {chosen
-            ? `필요시간은 줄지 않아서 ${fmtDur(share)}를 다른 근무일에 더 일해야 해요.${s.projectedDiff < 0 ? ` 지금 계획은 ${fmtDur(-s.projectedDiff)} 부족해요.` : ''}`
-            : `쉬어도 필요시간(${fmtDur(s.required)})은 그대로예요. 대신 ${fmtDur(share)}를 다른 날에 나눠 채워야 해요.`}
-        </span>
-      </div>
-      <div className="family-actions">
-        {chosen ? (
-          <>
-            {s.projectedDiff < 0 && (
-              <button className="btn primary" onClick={redistribute}>다른 날에 나눠 채우기</button>
-            )}
+    <div className={`family-row ${chosen ? 'on' : ''}`} aria-label="패밀리데이">
+      <span className="small muted">패밀리데이</span>
+      <b className="num">{dayLabel(fd.date)}</b>
+      {chosen ? <Pill tone="plan">쉬는 날</Pill> : busy ? <Pill>{fd.leaveLabel}</Pill> : null}
+      {chosen ? (
+        <>
+          {short && (
             <button
-              className="btn"
+              className="btn small primary"
+              title={`OT ${fmtDur(s.projectedDiff)} 부족분을 남은 근무일에 나눕니다`}
               onClick={() => {
-                dispatch({ type: 'plan/bulk', keys: [fd.key], leave: null });
-                notify('패밀리데이를 취소하고 근무로 되돌렸습니다.');
+                dispatch({ type: 'plan/merge', plans: distributeEvenly(s, rules, plans, locks) });
+                notify('패밀리데이 몫을 남은 근무일에 나눠 넣었습니다.');
               }}
             >
-              근무하기로 되돌리기
+              다른 날에 채우기
             </button>
-          </>
-        ) : (
-          !busy && (
-            <button
-              className="btn primary"
-              onClick={() => {
-                dispatch({ type: 'plan/bulk', keys: [fd.key], leave: 'family', minutes: null, inTime: null });
-                notify(`${dayLabel(fd.date)}을 패밀리데이로 쉬는 것으로 바꿨습니다.`);
-              }}
-            >
-              패밀리데이로 쉬기
-            </button>
-          )
-        )}
+          )}
+          <button
+            className="btn small ghost"
+            onClick={() => {
+              dispatch({ type: 'plan/bulk', keys: [fd.key], leave: null });
+              notify('패밀리데이를 취소하고 근무로 되돌렸습니다.');
+            }}
+          >
+            되돌리기
+          </button>
+        </>
+      ) : (
+        !busy && (
+          <button
+            className="btn small"
+            onClick={() => {
+              dispatch({ type: 'plan/bulk', keys: [fd.key], leave: 'family', minutes: null, inTime: null });
+              notify(`${dayLabel(fd.date)}을 패밀리데이로 쉬는 것으로 바꿨습니다.`);
+            }}
+          >
+            쉬기
+          </button>
+        )
+      )}
+      <InfoTip
+        align="right"
+        text={`21일이 있는 주의 금요일. 쉬어도 필수 근무 시간(${fmtDur(s.required)})은 그대로라, 그날 몫 ${fmtDur(rules.dailyStdMin)}를 다른 근무일에 나눠 채워야 합니다.`}
+      />
+    </div>
+  );
+}
+
+/** 작은 달력: 남은 근무일을 눌러 고르고(Shift: 구간) 표의 그 날로 이동 */
+function MiniCal({ s, rows, sel, toggle, plans, familyKey }) {
+  const pickable = new Set(rows.map((d) => d.key));
+  const lead = (s.days[0].dow + 6) % 7;
+  const cells = [...Array(lead).fill(null), ...s.days];
+  while (cells.length % 7) cells.push(null);
+  return (
+    <div className="mini-cal" role="grid" aria-label="날짜 고르기 (Shift: 구간)">
+      <div className="mini-cal-head">
+        <b>{s.month + 1}월</b>
+        <span className="small muted">눌러서 선택 · Shift 구간</span>
       </div>
-    </section>
+      <div className="mini-cal-grid">
+        {['월', '화', '수', '목', '금', '토', '일'].map((w, i) => (
+          <span key={w} className={`mc-h ${i === 6 ? 'sun' : i === 5 ? 'sat' : ''}`}>{w}</span>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <span key={`x${i}`} />;
+          const can = pickable.has(d.key);
+          const cls = [
+            'mc-d',
+            !can && 'off',
+            sel.has(d.key) && 'on',
+            d.isToday && 'mc-today',
+            !d.isWorkday && (d.holiday ? 'hol' : 'wkd'),
+            d.key === familyKey && 'fam',
+            d.leave && d.isWorkday && 'leave',
+            !d.isWorkday && plans[d.key] != null && 'hw',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const tip = [dayLabel(d.date), d.holiday, d.leaveLabel, d.key === familyKey && !d.leave ? '패밀리데이 후보' : null].filter(Boolean).join(' · ');
+          return (
+            <button
+              key={d.key}
+              type="button"
+              className={cls}
+              disabled={!can}
+              title={can ? tip : `${tip}${d.isPast ? ' (지난 날)' : ' (휴일 근무 추가로 넣을 수 있어요)'}`}
+              aria-pressed={sel.has(d.key)}
+              onClick={(e) => toggle(d.key, e.shiftKey)}
+            >
+              {d.date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -432,14 +502,14 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
     const next = distributeToMax(s, rules, plans, keys, locks);
     if (!Object.keys(next).length) return notify('선택한 날 중 일할 수 있는 날이 없습니다.');
     dispatch({ type: 'plan/merge', plans: next, ins: earlierStarts(s, rules, next, planIns) });
-    notify(`선택한 ${Object.keys(next).length}일에 나눠 월 Max까지 채웠습니다.`);
+    notify(`선택한 ${Object.keys(next).length}일에 나눠 최대 근무 시간까지 채웠습니다.`);
   };
 
   const fillNeed = () => {
     const next = distributeAmong(s, rules, plans, keys, locks);
     if (!Object.keys(next).length) return notify('선택한 날 중 일할 수 있는 날이 없습니다.');
     dispatch({ type: 'plan/merge', plans: next });
-    notify(`남은 필요시간을 선택한 ${Object.keys(next).length}일에 나눠 넣었습니다.`);
+    notify(`필요 시간을 선택한 ${Object.keys(next).length}일에 나눠 넣었습니다.`);
   };
 
   return (
@@ -503,11 +573,11 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
 
       <div className="bulk-actions">
         <button className="btn primary" onClick={apply}>{keys.length}일에 적용</button>
-        <button className="btn" onClick={fillNeed} title="선택하지 않은 날의 계획은 그대로 두고, 모자란 필요시간을 선택한 날에 나눕니다">
-          남은 필요시간 나눠 넣기
+        <button className="btn" onClick={fillNeed} title="선택하지 않은 날의 계획은 그대로 두고, 모자란 필요 시간을 선택한 날에 나눕니다">
+          필요 시간 나눠 넣기
         </button>
-        <button className="btn" onClick={fillMax} title="선택하지 않은 날 계획은 그대로 두고, 월 Max까지 남은 시간을 선택한 날에 나눕니다">
-          Max까지 채우기
+        <button className="btn" onClick={fillMax} title="선택하지 않은 날 계획은 그대로 두고, 최대 근무 시간까지 남은 시간을 선택한 날에 나눕니다">
+          최대까지 채우기
         </button>
         <button className="btn" onClick={() => { dispatch({ type: 'plan/lock', keys, locked: true }); notify(`${keys.length}일을 고정했습니다.`); }}>
           <Icon name="lock" size={14} /> 고정

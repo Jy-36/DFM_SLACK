@@ -110,6 +110,8 @@ const ex2 = evalDay(d1, { in: '09:00', out: '18:30', excludes: [{ min: 30 }] }, 
 eq('제외시간(분) 빼고 실근무 (체류 9:30 − 30분 = 9:00 → 휴게 1h)', fmtDur(ex2.actual), '8:00');
 const ex3 = evalDay(d1, { in: '09:00', out: '12:00', excludes: [{ from: '13:00', to: '14:00' }] }, R);
 eq('근무 구간 밖 제외시간은 안 뺌', fmtDur(ex3.actual), '3:00');
+const ex4 = evalDay(d1, { leave: 'annual', excludes: [{ from: '13:00', to: '14:00' }] }, R);
+eq('출근 안 한 날 제외시간 무시', ex4.plannedExclude + ex4.excluded, 0);
 eq('제외시간만큼 예상 퇴근 늦어짐', fmtClock(checkoutFor({ inMin: 540, plannedExclude: 60 }, 480, R)), '18:30');
 
 // 사내 표 읽기: 시간 연차 시간·제외시간 열

@@ -731,3 +731,107 @@ html[data-mode='widget'] body { overflow: hidden; }
 .wg-opacity { display: inline-flex; align-items: center; gap: 5px; color: rgba(255, 255, 255, 0.75); font-size: 11px; }
 .wg-opacity input { width: 74px; accent-color: #fff; }
 .wg-opacity .num { width: 30px; text-align: right; }
+
+/* ── 설명 아이콘 (i): 올리면 미리보기, 누르면 고정 ── */
+.info-tip { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.info-btn {
+  width: 16px; height: 16px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--muted) 55%, transparent);
+  background: none; color: var(--muted); font: 700 10px/1 Georgia, 'Times New Roman', serif; font-style: italic;
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.info-btn:hover, .info-tip.open .info-btn { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.info-pop {
+  position: absolute; top: calc(100% + 8px); left: -10px; z-index: 60; width: max-content; max-width: 260px;
+  padding: 9px 11px; border-radius: 10px; font-size: 12px; line-height: 1.55; font-weight: 500; color: var(--fg); white-space: normal;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(10, 25, 60, 0.18);
+  opacity: 0; transform: translateY(-3px); pointer-events: none; transition: opacity 0.12s, transform 0.12s;
+}
+.info-tip.right .info-pop { left: auto; right: -10px; }
+.info-tip:hover .info-pop, .info-tip.open .info-pop { opacity: 1; transform: none; pointer-events: auto; }
+.info-tip.open .info-pop { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.info-pop b { font-weight: 700; }
+
+/* ── 근무기록: 반영 전 수정 ── */
+.cd-dirty { font-size: 10px; font-weight: 700; color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent); border-radius: 999px; padding: 0 6px; line-height: 16px; }
+.cal-d.dirty { border-style: dashed; border-color: var(--warn); }
+.cal-d.dirty.sel { border-style: solid; }
+.apply-bar {
+  position: sticky; bottom: 14px; z-index: 30; margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); box-shadow: 0 12px 30px rgba(10, 25, 60, 0.18);
+}
+.apply-bar .apply-days { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apply-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 22%, transparent); }
+.nav-dot { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--warn); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+/* 라이트 모드 달력: 휴일·주말·패밀리데이를 더 또렷하게 (배경 + 테두리 색) */
+:root {
+  --cal-holiday: #fde4e4; --cal-holiday-line: #f2b8b8;
+  --cal-weekend: #e9edfa; --cal-weekend-line: #c8d2f0;
+  --cal-family: #d9f0fb; --cal-family-line: #a8d8f0;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --cal-holiday: #2a1820; --cal-weekend: #1b1a33; --cal-family: #0f2a3d; --cal-holiday-line: #4a2632; --cal-weekend-line: #2e2c52; --cal-family-line: #1a4560; } }
+:root[data-theme='dark'] { --cal-holiday: #2a1820; --cal-weekend: #1b1a33; --cal-family: #0f2a3d; --cal-holiday-line: #4a2632; --cal-weekend-line: #2e2c52; --cal-family-line: #1a4560; }
+.cal-d.weekend { border-color: var(--cal-weekend-line); }
+.cal-d.holiday { border-color: var(--cal-holiday-line); }
+.cal-d.family { border-color: var(--cal-family-line); }
+.cal-d.weekend .cd-foot, .cal-d.holiday .cd-foot, .cal-d.family .cd-foot { border-top-color: color-mix(in srgb, var(--fg) 10%, transparent); }
+.cal-legend .sw.holiday { box-shadow: inset 0 0 0 1px var(--cal-holiday-line); }
+.cal-legend .sw.weekend { box-shadow: inset 0 0 0 1px var(--cal-weekend-line); }
+.cal-legend .sw.family { box-shadow: inset 0 0 0 1px var(--cal-family-line); }
+/* 테두리 우선순위: 오늘 > 수정됨 > 날 종류 */
+.cal-d.dirty { border-color: var(--warn); }
+.cal-d.today { border-color: var(--accent); border-style: solid; }
+.cal-d.sel { border-color: var(--accent); }
+
+/* ── 근무 계획: 기준 시간 5칸 ── */
+.target-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .target-grid.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .target-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.target .label { display: inline-flex; align-items: center; }
+.target .month-end b.num { font-size: 24px; }
+.month-end { display: grid; gap: 1px; min-width: 0; }
+.month-end > b { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; }
+.month-end-sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.month-end-sub b { font-size: 12px; font-weight: 700; letter-spacing: 0; }
+.tone-hw { color: var(--leave); }
+.month-end.compact { display: inline-flex; align-items: baseline; gap: 6px; }
+.month-end.compact > b { font-size: inherit; line-height: inherit; letter-spacing: 0; }
+.month-total .info-tip { margin-left: 2px; }
+
+/* 도구 영역: 왼쪽 작은 달력, 오른쪽 휴일 근무·패밀리데이·빠른 선택 */
+.plan-tools { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 12px; }
+.plan-tools-side { display: grid; gap: 10px; min-width: 0; }
+.plan-tools-side .holiday-add, .plan-tools-side .quick-select { margin-bottom: 0; }
+@media (max-width: 860px) { .plan-tools { grid-template-columns: minmax(0, 1fr); } }
+
+.mini-cal { padding: 10px 10px 8px; border-radius: 12px; background: var(--surface-2); }
+.mini-cal-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px 6px; font-size: 13px; }
+.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.mc-h { font-size: 10.5px; font-weight: 700; color: var(--faint); text-align: center; padding-bottom: 2px; }
+.mc-h.sun { color: var(--bad); } .mc-h.sat { color: var(--accent); }
+.mc-d {
+  height: 27px; border: 1px solid transparent; border-radius: 7px; background: var(--surface); color: var(--fg);
+  font: 600 12px/1 var(--font-num); font-variant-numeric: tabular-nums; cursor: pointer; padding: 0; position: relative;
+}
+.mc-d:hover:not(:disabled) { border-color: var(--accent); }
+.mc-d.off { background: none; color: var(--faint); cursor: default; font-weight: 500; }
+.mc-d.wkd { background: var(--cal-weekend); color: var(--accent); }
+.mc-d.hol { background: var(--cal-holiday); color: var(--bad); }
+.mc-d.fam { background: var(--cal-family); }
+.mc-d.off.wkd, .mc-d.off.hol { opacity: 0.75; }
+.mc-d.leave::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--leave); }
+.mc-d.hw { box-shadow: inset 3px 0 0 var(--bad); }
+.mc-d.mc-today { border-color: var(--accent); font-weight: 800; }
+.mc-d.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.family-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 7px 10px 7px 12px; border-radius: 12px;
+  background: var(--cal-family); border: 1px solid var(--cal-family-line); font-size: 13px;
+}
+.family-row.on { border-style: solid; border-color: var(--sky); }
+.btn.small { padding: 4px 10px; font-size: 12.5px; min-height: 0; }
+.plan-table tr.flash-row td { animation: rowflash 1.4s ease-out; }
+@keyframes rowflash { 0%, 30% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
+
+.info-pop b { font-size: inherit; line-height: inherit; letter-spacing: 0; font-weight: 700; color: inherit; }

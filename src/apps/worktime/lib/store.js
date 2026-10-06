@@ -46,6 +46,20 @@ function reducer(state, action) {
       const next = { ...prev, ...action.patch, edited: true };
       return { ...state, records: { ...state.records, [action.key]: next } };
     }
+    case 'records/apply': {
+      // 근무기록에서 모아 둔 수정을 한 번에 반영. null = 그 날 기록 지우기
+      const records = { ...state.records };
+      for (const [key, rec] of Object.entries(action.changes)) {
+        if (rec == null) {
+          delete records[key];
+          continue;
+        }
+        const next = { ...rec, edited: true };
+        if (!next.in || !next.excludes?.length) delete next.excludes; // 제외시간은 출근한 날만
+        records[key] = next;
+      }
+      return { ...state, records };
+    }
     case 'record/clear': {
       const records = { ...state.records };
       delete records[action.key];

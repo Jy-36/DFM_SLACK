@@ -2,16 +2,55 @@ import { useMemo, useState } from 'react';
 import { fmtDur, fmtClock, monthLabel, dayLabel, WEEKDAY_KO, ymd, parseYmd } from '../lib/time.js';
 import { summarizeMonth, projectedOf, defaultPlanFor } from '../lib/engine.js';
 import { LEAVE_ORDER } from '../lib/rules.js';
-import { Icon, Pill, StatusPill } from '../../../shared/ui.jsx';
+import { Icon, Pill, StatusPill, InfoTip } from '../../../shared/ui.jsx';
 import { TimeField, PRESETS } from '../../../shared/TimeField.jsx';
 import { LeaveSelect } from '../components/LeaveSelect.jsx';
+import { MonthEnd } from '../components/Targets.jsx';
 
 const HEAD = [1, 2, 3, 4, 5, 6, 0]; // 월요일 시작
+// 비교할 때 표시용 필드는 빼고 본다
+const strip = (r) => {
+  const { edited, source, ...rest } = r || {};
+  if (!rest.leave) delete rest.leave;
+  if (!rest.excludes?.length) delete rest.excludes;
+  for (const k of Object.keys(rest)) if (rest[k] == null || rest[k] === '') delete rest[k];
+  return Object.keys(rest).sort().reduce((a, k) => ((a[k] = rest[k]), a), {});
+};
 
-export default function Records({ state, dispatch, now, view, setView }) {
-  const { records, rules, plans } = state;
+export default function Records({ state, dispatch, now, view, setView, draft, setDraft, notify }) {
+  const { rules, plans } = state;
   const { y, m } = view;
+  // 수정은 draft에 모았다가 [변경 내용 반영]을 눌러야 저장된다. 화면은 draft를 합친 결과로 미리 보여준다
+  const records = useMemo(() => {
+    const r = { ...state.records };
+    for (const [k, v] of Object.entries(draft)) {
+      if (v == null) delete r[k];
+      else r[k] = v;
+    }
+    return r;
+  }, [state.records, draft]);
   const s = useMemo(() => summarizeMonth(y, m, records, rules, plans, now), [y, m, records, rules, plans, now]);
+  const dirty = Object.keys(draft);
+  const editDay = (key, patch) => {
+    setDraft((prev) => {
+      const base = key in prev ? prev[key] || {} : state.records[key] || {};
+      const next = { ...base, ...patch };
+      for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+      // 원래 기록과 같아지면 수정 목록에서 뺀다
+      const orig = state.records[key] || {};
+      const same = (a, b) => JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+      const out = { ...prev };
+      if (same(next, orig)) delete out[key];
+      else out[key] = next;
+      return out;
+    });
+  };
+  const clearDay = (key) => setDraft((prev) => (state.records[key] ? { ...prev, [key]: null } : (({ [key]: _, ...rest }) => rest)(prev)));
+  const apply = () => {
+    dispatch({ type: 'records/apply', changes: draft });
+    setDraft({});
+    notify?.(`${dirty.length}일 수정을 반영했습니다.`);
+  };
   const [sel, setSel] = useState(() => (s.today ? s.today.key : ymd(new Date(y, m, 1))));
   const selDay = s.days.find((d) => d.key === sel) || s.days[0];
 
@@ -34,8 +73,9 @@ export default function Records({ state, dispatch, now, view, setView }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>근무기록</h1>
-          <p>날짜를 눌러 출퇴근·휴가를 확인하고 직접 보정할 수 있습니다.</p>
+          <h1>
+            근무기록 <InfoTip text="날짜를 눌러 출퇴근·휴가·제외시간을 고친 뒤 아래 [변경 내용 반영]을 눌러야 저장됩니다. 달력에 '수정' 표시가 있는 날이 반영 전입니다." />
+          </h1>
         </div>
         <div className="head-actions">
           <button className="btn icon" onClick={() => move(-1)} aria-label="이전 달"><Icon name="left" /></button>
@@ -58,7 +98,7 @@ export default function Records({ state, dispatch, now, view, setView }) {
               ))}
               {cells.map((d, i) =>
                 d ? (
-                  <DayCell key={d.key} d={d} plans={plans} rules={rules} selected={d.key === sel} onClick={() => setSel(d.key)} family={rules.familyDayOn && d.key === s.familyKey} />
+                  <DayCell key={d.key} d={d} plans={plans} rules={rules} selected={d.key === sel} dirty={d.key in draft} onClick={() => setSel(d.key)} family={rules.familyDayOn && d.key === s.familyKey} />
                 ) : (
                   <div key={`x${i}`} className="cal-d out" aria-hidden="true" />
                 ),
@@ -71,14 +111,14 @@ export default function Records({ state, dispatch, now, view, setView }) {
             <span><i className="sw family" />패밀리데이</span>
             <span><i className="sw holiday-work" />휴일 근무</span>
             <span><i className="sw today" />오늘</span>
-            <span className="muted">아래 숫자: 지난 날 = 인정 · 앞으로 = 예정</span>
+            <InfoTip text="칸 아래 숫자: 지난 날은 인정 시간, 앞으로는 계획(예정) 시간" />
           </div>
           <div className="month-total">
-            <span>필요 <b>{fmtDur(s.required)}</b></span>
+            <span>필수 <b>{fmtDur(s.required)}</b></span>
             <span>{isCurrent ? '현재까지 인정' : '인정'} <b>{fmtDur(monthDone)}</b></span>
-            {holidayDone > 0 && <span>휴일 근무 <b>{fmtDur(holidayDone)}</b> <span className="muted">(Max에만 반영)</span></span>}
+            {holidayDone > 0 && <span>휴일 근무 <b>{fmtDur(holidayDone)}</b> <InfoTip text="주말·공휴일 근무는 최대 근무 시간에서만 빠지고 필수 근무 시간은 줄여주지 않습니다." /></span>}
             {isCurrent ? (
-              <span>계획 포함 예상 <b className={s.projectedDiff < 0 ? 'tone-bad' : 'tone-good'}>{fmtDur(s.projectedDiff, { sign: true })}</b></span>
+              <span className="month-end-line">월말 예상 <MonthEnd s={s} compact /></span>
             ) : (
               <span>정산 <b className={monthDone - s.required < 0 ? 'tone-bad' : 'tone-good'}>{fmtDur(monthDone - s.required, { sign: true })}</b></span>
             )}
@@ -86,13 +126,28 @@ export default function Records({ state, dispatch, now, view, setView }) {
           </div>
         </section>
 
-        <DayDetail key={selDay.key} d={selDay} rec={records[selDay.key] || {}} rules={rules} plans={plans} dispatch={dispatch} />
+        <DayDetail key={selDay.key} d={selDay} rec={records[selDay.key] || {}} orig={state.records[selDay.key]} dirty={selDay.key in draft} rules={rules} plans={plans} set={(patch) => editDay(selDay.key, patch)} clear={() => clearDay(selDay.key)} revert={() => setDraft(({ [selDay.key]: _, ...rest }) => rest)} />
       </div>
+
+      {dirty.length > 0 && (
+        <div className="apply-bar" role="region" aria-label="반영 안 한 수정">
+          <span className="apply-dot" />
+          <span>
+            <b>{dirty.length}일</b> 수정됨 <span className="muted">· 아직 저장 안 됨</span>
+          </span>
+          <span className="apply-days small muted">
+            {dirty.slice().sort().slice(0, 6).map((k) => `${Number(k.slice(5, 7))}/${Number(k.slice(8))}`).join(', ')}
+            {dirty.length > 6 ? ' …' : ''}
+          </span>
+          <button className="btn" onClick={() => setDraft({})}>모두 되돌리기</button>
+          <button className="btn primary" onClick={apply}>변경 내용 반영</button>
+        </div>
+      )}
     </div>
   );
 }
 
-function DayCell({ d, plans, rules, selected, onClick, family }) {
+function DayCell({ d, plans, rules, selected, dirty, onClick, family }) {
   const isFamily = d.isRest || (family && !d.leave && d.isWorkday);
   const holidayWork = !d.isWorkday && (d.actual > 0 || (!d.isPast && plans[d.key] != null));
   const cls = [
@@ -104,6 +159,7 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
     !d.holiday && !d.isWorkday && 'weekend',
     isFamily && 'family',
     holidayWork && 'holiday-work',
+    dirty && 'dirty',
   ]
     .filter(Boolean)
     .join(' ');
@@ -130,6 +186,7 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
       <div className="cd-head">
         <span className={`dnum ${d.dow === 0 || d.holiday ? 'sun' : d.dow === 6 ? 'sat' : ''}`}>{d.date.getDate()}</span>
         {d.isToday && <span className="cd-today">오늘</span>}
+        {dirty && <span className="cd-dirty" title="수정됨 · 반영 전">수정</span>}
         {d.warnings.length > 0 && <span className="cd-warn" title={d.warnings.join(', ')}>!</span>}
       </div>
       {tag && <span className={`cd-tag ${tag.tone}`} title={tag.text}>{tag.text}</span>}
@@ -139,8 +196,8 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
           {!d.live && <span className={d.outMin == null ? 'missing' : ''}>{d.outMin != null ? fmtClock(d.outMin) : '퇴근 ?'}</span>}
         </span>
       )}
-      {(d.excluded > 0 || (d.inMin == null && d.plannedExclude > 0)) && (
-        <span className="cd-ex num" title="제외시간">제외 −{fmtDur(d.inMin != null ? d.excluded : d.plannedExclude)}</span>
+      {d.inMin != null && d.plannedExclude > 0 && (
+        <span className="cd-ex num" title="제외시간">제외 −{fmtDur(d.live ? d.plannedExclude : d.excluded)}</span>
       )}
       {foot && (
         <span className={`cd-foot ${foot.tone}`}>
@@ -152,8 +209,8 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
   );
 }
 
-function DayDetail({ d, rec, rules, plans, dispatch }) {
-  const set = (patch) => dispatch({ type: 'record/set', key: d.key, patch });
+function DayDetail({ d, rec, orig, dirty, rules, plans, set, clear, revert }) {
+  const worked = !!rec.in; // 제외시간은 출근 기록이 있는 날만
   const breakMin = Math.max(0, d.gross - d.excluded - d.actual);
   const excludes = rec.excludes || [];
   const setEx = (list) => set({ excludes: list.length ? list : undefined });
@@ -161,7 +218,10 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
     <aside className="panel detail">
       <div className="kv">
         <h2 style={{ margin: 0 }}>{dayLabel(parseYmd(d.key))}</h2>
-        <StatusPill day={d} />
+        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {dirty && <Pill tone="warn">반영 전</Pill>}
+          <StatusPill day={d} />
+        </span>
       </div>
       {d.holiday && <p className="muted" style={{ margin: 0 }}>{d.holiday} (공휴일)</p>}
 
@@ -189,16 +249,20 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
 
         <div className="field wide">
           <span className="ex-head">
-            제외시간 <small className="muted">외출 등 근무에서 뺄 시간</small>
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => setEx([...excludes, { from: '12:00', to: '13:00', reason: '' }])}
-            >
-              <Icon name="plus" size={13} /> 추가
-            </button>
+            제외시간 <InfoTip text="외출 등 근무에서 뺄 시간. 출근 기록이 있는 날에만 넣을 수 있고, 체류시간에서 먼저 뺀 뒤 휴게 규칙을 적용합니다." />
+            {worked && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setEx([...excludes, { from: '12:00', to: '13:00', reason: '' }])}
+              >
+                <Icon name="plus" size={13} /> 추가
+              </button>
+            )}
           </span>
-          {excludes.length === 0 ? (
+          {!worked ? (
+            <span className="small muted">출근 기록이 있는 날에만 넣을 수 있어요</span>
+          ) : excludes.length === 0 ? (
             <span className="small muted">없음</span>
           ) : (
             <div className="ex-list">
@@ -237,14 +301,14 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
 
       <div style={{ display: 'grid', gap: 6 }}>
         <div className="kv"><span className="muted">체류</span><span className="v">{fmtDur(d.gross)}</span></div>
-        {(d.excluded > 0 || excludes.length > 0) && (
-          <div className="kv"><span className="muted">제외시간</span><span className="v">−{fmtDur(d.inMin != null ? d.excluded : d.plannedExclude)}</span></div>
+        {worked && excludes.length > 0 && (
+          <div className="kv"><span className="muted">제외시간</span><span className="v">−{fmtDur(d.live ? d.plannedExclude : d.excluded)}</span></div>
         )}
         <div className="kv"><span className="muted">휴게 차감</span><span className="v">−{fmtDur(breakMin)}</span></div>
         <div className="kv"><span className="muted">실근무</span><span className="v">{fmtDur(d.actual)}</span></div>
-        {d.offCredit > 0 && <div className="kv"><span className="muted">{d.leaveLabel} (필요시간 차감)</span><span className="v">{fmtDur(d.offCredit)}</span></div>}
+        {d.offCredit > 0 && <div className="kv"><span className="muted">{d.leaveLabel} (필수 근무 시간 차감)</span><span className="v">{fmtDur(d.offCredit)}</span></div>}
         {d.workCredit > 0 && <div className="kv"><span className="muted">출장·교육 근무 인정</span><span className="v">+{fmtDur(d.workCredit)}</span></div>}
-        {d.isRest && <div className="kv"><span className="muted">{d.leaveLabel} · 필요시간 유지</span><span className="v">다른 날에 채움</span></div>}
+        {d.isRest && <div className="kv"><span className="muted">{d.leaveLabel} · 필수 근무 시간 유지</span><span className="v">다른 날에 채움</span></div>}
         {d.isWorkday && <div className="kv"><span className="muted">이날 필수근무</span><span className="v">{fmtDur(d.dayRequired)}</span></div>}
         <div className="kv" style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
           <strong>인정 합계</strong>
@@ -263,11 +327,14 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
 
       <div className="small muted">
         출처: {rec.source === 'portal' ? '사내 근태 사이트' : rec.source === 'mock' ? '가짜 데이터' : rec.in || rec.leave ? '직접 입력' : '기록 없음'}
-        {rec.edited ? ' · 직접 보정함' : ''}
+        {orig?.edited ? ' · 직접 보정함' : ''}
       </div>
-      {(rec.in || rec.out || rec.leave || excludes.length > 0) && (
-        <button className="btn" onClick={() => dispatch({ type: 'record/clear', key: d.key })}>이 날 기록 지우기</button>
-      )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {dirty && <button className="btn" onClick={revert}>이 날 수정 되돌리기</button>}
+        {(rec.in || rec.out || rec.leave || excludes.length > 0) && (
+          <button className="btn ghost" onClick={clear}>이 날 기록 지우기</button>
+        )}
+      </div>
     </aside>
   );
 }

@@ -36,10 +36,10 @@ export default function Dashboard({ state, summary, now, go }) {
           label="현재까지 인정"
           value={fmtDur(s.recognizedReq)}
           unit="h"
-          foot={s.holidayDone > 0 ? `휴일 근무 +${fmtDur(s.holidayDone)} 별도 (Max에만 반영)` : '근무일 기준 · 오늘 포함'}
+          foot={s.holidayDone > 0 ? `주말 근무 +${fmtDur(s.holidayDone)} 별도` : '근무일 기준 · 오늘 포함'}
         />
-        <Stat label="남은 필요" value={fmtDur(s.remainingNeed)} unit="h" foot={`필요 ${fmtDur(s.required)} 기준`} />
-        <Stat label="Max까지 남은" value={fmtDur(s.remainingPossible)} unit="h" foot={`Max ${fmtDur(s.possible)} 기준`} />
+        <Stat label="필요 시간" value={fmtDur(s.needLeft)} unit="h" foot={`필수 ${fmtDur(s.required)} − 현재`} />
+        <Stat label="최대까지 남은" value={fmtDur(s.remainingPossible)} unit="h" foot={`최대 ${fmtDur(s.possible)} 기준`} />
         <Stat
           label="평일 누적초과"
           value={fmtDur(s.weekdayOvertime, { sign: true })}
@@ -49,7 +49,7 @@ export default function Dashboard({ state, summary, now, go }) {
         />
       </section>
 
-      <TargetsPanel s={s} rules={rules} title="월 기준 시간" showFormula={false} />
+      <TargetsPanel s={s} rules={rules} title="월 기준 시간" />
 
       <div className="grid-2">
         <section className="panel">

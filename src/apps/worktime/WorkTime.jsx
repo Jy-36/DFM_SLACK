@@ -12,7 +12,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.10.0';
+export const WORKTIME_VERSION = '0.11.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -28,6 +28,9 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
   const [now, setNow] = useState(() => new Date());
   const [view, setView] = useState(() => ({ y: now.getFullYear(), m: now.getMonth() }));
   const [toast, setToast] = useState(null);
+  // 근무기록에서 아직 반영하지 않은 수정 (다른 메뉴에 다녀와도 유지)
+  const [recDraft, setRecDraft] = useState({});
+  const draftCount = Object.keys(recDraft).length;
 
   // 근무 중 시간은 30초마다 갱신
   useEffect(() => {
@@ -87,6 +90,7 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
           <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)}>
             <Icon name={key} />
             {label}
+            {key === 'records' && draftCount > 0 && <span className="nav-dot" title={`반영 안 한 수정 ${draftCount}건`}>{draftCount}</span>}
           </button>
         ))}
         <div className="nav-foot">
@@ -104,7 +108,7 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
 
       <main className="main">
         {tab === 'dashboard' && <Dashboard {...props} />}
-        {tab === 'records' && <Records {...props} view={view} setView={setView} />}
+        {tab === 'records' && <Records {...props} view={view} setView={setView} draft={recDraft} setDraft={setRecDraft} />}
         {tab === 'plan' && <Planner {...props} />}
         {tab === 'sync' && <Sync {...props} />}
         {tab === 'settings' && <Settings {...props} />}
