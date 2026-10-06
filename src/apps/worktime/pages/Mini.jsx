@@ -66,10 +66,15 @@ export default function Mini({ state, summary, now, expand }) {
 
       <section className="mini-card" aria-label="이번 달 정산">
         <FoldHead
-          title={`${monthLabel(s.year, s.month).replace(/^\d+년 /, '')} 정산`}
+          title={`${monthLabel(s.year, s.month).replace(/^\d+년 /, '')} 현황`}
           open={!fold.month}
           onToggle={() => toggle('month')}
-          extra={<span className="fold-peek num">필요 {fmtDur(s.needLeft)}</span>}
+          extra={
+            <span className="fold-peek num">
+              필요 {fmtDur(s.needLeft)} · 평일 누적초과{' '}
+              <b className={s.weekdayOvertime < 0 ? 'tone-bad' : 'tone-good'}>{fmtDur(s.weekdayOvertime, { sign: true })}</b>
+            </span>
+          }
         >
           <button className="link-btn" onClick={() => expand('plan')}>
             근무 계획 <Icon name="chevron" size={14} />
@@ -91,7 +96,7 @@ export default function Mini({ state, summary, now, expand }) {
           </span>
         </div>
         <div className="mini-diff mini-ot">
-          <span className="muted">예상 초과 근무</span>
+          <span className="muted">예상 초과 근무 시간</span>
           <MonthEnd s={s} rules={rules} compact />
         </div>
         <div className="mini-diff small">
@@ -261,12 +266,21 @@ function UpcomingCard({ s, records, rules, expand }) {
     .filter(([k, r]) => k > s.todayKey && r.leave && rules.leaveTypes[r.leave])
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .slice(0, 3)
-    .map(([k, r]) => ({ key: k, text: `${leaveText(rules, r)}${rules.leaveTypes[r.leave].kind === 'rest' ? ' · 필수 근무 시간 유지' : ''}${r.note ? ` · ${r.note}` : ''}`, tone: rules.leaveTypes[r.leave].kind === 'rest' ? 'accent' : 'leave', badge: rules.leaveTypes[r.leave].kind === 'rest' ? '쉼' : '휴가' }));
+    .map(([k, r]) => {
+      const rest = rules.leaveTypes[r.leave].kind === 'rest';
+      return {
+        key: k,
+        text: `${leaveText(rules, r)}${r.note ? ` · ${r.note}` : ''}`,
+        tone: rest ? 'accent' : 'leave',
+        badge: rest ? 'Family' : '휴가',
+        tip: rest ? '쉬어도 필수 근무 시간은 그대로라 다른 날에 채웁니다' : undefined,
+      };
+    });
   const warns = s.warnings.slice(0, 2).map((w) => ({ key: w.key, text: w.text, tone: 'warn' }));
   const fd = s.familyDay;
   const family =
     rules.familyDayOn && fd && fd.isWorkday && !fd.isPast && !fd.leave
-      ? [{ key: fd.key, text: '패밀리데이 후보 · 쉬려면 근무 계획에서 선택', tone: 'plan' }]
+      ? [{ key: fd.key, text: '패밀리데이 후보', tone: 'plan', badge: 'Family', tip: '21일이 있는 주 금요일. 쉬려면 근무 계획에서 선택하세요. 쉬어도 필수 근무 시간은 그대로입니다.' }]
       : [];
   const items = [...warns, ...[...family, ...leaves].sort((a, b) => (a.key < b.key ? -1 : 1)).slice(0, 3)];
 
@@ -283,7 +297,7 @@ function UpcomingCard({ s, records, rules, expand }) {
       ) : (
         <ul className="mini-list">
           {items.map((it, i) => (
-            <li key={i}>
+            <li key={i} title={it.tip}>
               <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
                 <Pill tone={it.tone}>{it.badge || (it.tone === 'warn' ? '확인' : it.tone === 'plan' ? '후보' : '휴가')}</Pill>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>

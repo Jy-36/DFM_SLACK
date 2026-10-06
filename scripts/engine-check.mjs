@@ -1,5 +1,5 @@
 // 정산 엔진 계산 확인: node scripts/engine-check.mjs
-import { evalDay, familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, otInfo, breakZone, projectedOf, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
+import { evalDay, familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, otInfo, distributeToTarget, breakZone, projectedOf, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
 import { DEFAULT_RULES as R, migrateRecord } from '../src/apps/worktime/lib/rules.js';
 import { parseAttendanceHtml } from '../src/apps/worktime/lib/sync.js';
 import { generateMockRecords } from '../src/apps/worktime/lib/mockData.js';
@@ -84,8 +84,7 @@ const maxPlans = distributeToMax(oct, R, {});
 const mx = summarizeMonth(2026, 9, recs, R, maxPlans, now);
 eq('Max 배분 후 월 예상 = Max', fmtDur(mx.projected), fmtDur(mx.possible));
 const ins = earlierStarts(oct, R, maxPlans, {});
-const todayOut = oct.today.inMin + grossForNet(maxPlans[oct.todayKey], R);
-eq('오늘 Max 계획이 22:00 안에 끝남', todayOut <= 22 * 60, true);
+eq('오늘은 Max 배분에서도 그대로', maxPlans[oct.todayKey], undefined);
 eq('출근을 앞당긴 날은 모두 22:00 이전 퇴근', Object.entries(ins).every(([k, t]) => { const [h, m] = t.split(':').map(Number); return h * 60 + m + grossForNet(maxPlans[k], R) <= 22 * 60; }), true);
 console.log('     앞당긴 출근:', [...new Set(Object.values(ins))].join(', '));
 console.log('     Max 배분: 날짜별', [...new Set(Object.values(maxPlans).map((v) => fmtDur(v)))].join(', '), '· 주별', mx.weeks.map((w) => fmtDur(w.projected)).join(' '));
@@ -137,4 +136,19 @@ eq('초과 10h → 호구왕', otInfo(600, R).zone.label, '호구왕');
 eq('초과 18h → 실질 단가 22%', Math.round(otInfo(1080, R).rate * 100), 22);
 eq('초과 28h → 50% 해피존', `${Math.round(otInfo(1680, R).rate * 100)} ${otInfo(1680, R).zone.label}`, '50 해피존');
 eq('초과 40h → 65% 부자존', `${Math.round(otInfo(2400, R).rate * 100)} ${otInfo(2400, R).zone.label}`, '65 부자존');
+// 주말 근무는 실질 단가 분자·분모에 모두
+eq('초과 18h + 주말 8h → (4+8)/26 = 46%', Math.round(otInfo(1080, R, 480).rate * 100), 46);
+// 목표 초과 근무로 배분: 최대 근무 시간을 넘지 않음
+{
+  const now = new Date(2026, 9, 6, 13, 0);
+  const recs = generateMockRecords(now);
+  const sm = summarizeMonth(2026, 9, recs, R, {}, now);
+  const r10 = distributeToTarget(sm, R, {}, {}, 600);
+  const s2 = summarizeMonth(2026, 9, recs, R, r10.plans, now);
+  eq('초과 10h 목표 배분 → 예상 초과 +10:00', fmtDur(s2.projectedDiff, { sign: true }), '+10:00');
+  eq('오늘은 배분에서 제외', r10.plans['2026-10-06'], undefined);
+  const rBig = distributeToTarget(sm, R, {}, {}, 200 * 60);
+  const s3 = summarizeMonth(2026, 9, recs, R, rBig.plans, now);
+  eq('초과 200h 목표 → 최대 근무 시간에서 멈춤', `${rBig.capped} ${s3.projected <= s3.possible}`, 'true true');
+}
 process.exit(fail ? 1 : 0);

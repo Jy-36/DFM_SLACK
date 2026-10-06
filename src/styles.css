@@ -968,3 +968,27 @@ html.tauri:not([data-mode='widget']) .shell {
 }
 .fixed-credit .stepper input { width: 64px; text-align: center; }
 .fixed-credit .stepper { padding-inline: 6px; }
+
+/* App Mode: 예상 초과 근무 시간 한 줄 */
+.mini-ot { flex-wrap: nowrap; gap: 8px; }
+.mini-ot > .muted { white-space: nowrap; font-size: 13px; }
+.mini-ot .month-end.compact { flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
+.mini-ot .month-end.compact > b { font-size: 18px; }
+.mini-ot .month-end-sub { font-size: 12.5px; }
+.mini-ot .ot-zone { font-size: 10.5px; padding: 1px 6px; }
+.fold-peek b { font-weight: 700; }
+
+/* 근무 계획: 방금 반영한 배분 방식 표시 + 목표 초과 배분 */
+.plan-actions { flex-wrap: wrap; justify-content: flex-end; }
+.btn.just { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.just-tag { margin-left: 7px; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
+.btn.primary .just-tag { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.target-wrap { position: relative; }
+.target-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 70; width: 320px; display: grid; gap: 10px; padding: 14px;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(10, 25, 60, 0.22);
+}
+.target-pop .seg { display: flex; }
+.target-pop .seg button { flex: 1; justify-content: center; }
+.target-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.target-row .input { width: 90px; }

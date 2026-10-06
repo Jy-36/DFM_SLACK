@@ -198,18 +198,20 @@ export function breakZone(rules) {
   return { from, to: from + second.minutes };
 }
 
-/** 예상 초과 근무 시간 → OT(포괄 14h 뺀 시간)와 구간 */
-export function otInfo(excess, rules) {
+/** 예상 초과 근무 시간 → OT(포괄 14h 뺀 시간)와 구간
+ *  실질 단가 = (OT + 주말 근무) ÷ (초과 근무 + 주말 근무) — 주말 근무는 분자·분모에 모두 넣는다 */
+export function otInfo(excess, rules, weekend = 0) {
   const inc = rules.inclusiveOtMin ?? 840;
   const ot = excess - inc;
-  const rate = excess > 0 ? Math.max(0, ot) / excess : 0; // 실질 단가 (정규 단가 대비)
+  const total = Math.max(0, excess) + Math.max(0, weekend); // 구간 판단 기준
+  const rate = total > 0 ? (Math.max(0, ot) + Math.max(0, weekend)) / total : 0; // 실질 단가 (정규 단가 대비)
   let zone;
-  if (excess <= 0) zone = { key: 'none', label: '초과 없음', desc: '필수 근무 시간 이하' };
-  else if (excess <= inc) zone = { key: 'king', label: '호구왕', desc: `무급 구간 · 포괄 ${Math.round(inc / 60)}h 이내라 일할수록 손해` };
-  else if (excess < 28 * 60) zone = { key: 'hogu', label: '호구존', desc: '실질 단가 최저 구간 (16~18h에서 정규 단가의 12~22%)' };
-  else if (excess < 40 * 60) zone = { key: 'happy', label: '해피존', desc: '28h에서 정규 단가 50% 회복' };
+  if (total <= 0) zone = { key: 'none', label: '초과 없음', desc: '필수 근무 시간 이하' };
+  else if (total <= inc && weekend <= 0) zone = { key: 'king', label: '호구왕', desc: `무급 구간 · 포괄 ${Math.round(inc / 60)}h 이내라 일할수록 손해` };
+  else if (total < 28 * 60) zone = { key: 'hogu', label: '호구존', desc: '실질 단가 최저 구간 (16~18h에서 정규 단가의 12~22%)' };
+  else if (total < 40 * 60) zone = { key: 'happy', label: '해피존', desc: '28h에서 정규 단가 50% 회복' };
   else zone = { key: 'rich', label: '부자존', desc: '40h 이상 · 정규 단가 65% 이상 회복' };
-  return { excess, ot, inc, rate, zone };
+  return { excess, ot, inc, weekend, total, rate, zone };
 }
 
 /** 그날 일할 수 있는 기본 계획(실근무, 분). 출장·교육 날은 8시간 고정이라 더 넣지 않음 */
@@ -222,7 +224,8 @@ export function projectedOf(day, plans, rules) {
   if (day.isPast) return day.recognized;
   if (day.workCredit > 0) return day.workCredit; // 출장·교육: 8시간 고정
   // 종일 비근무근태(연차 등)인 날은 계획이 남아 있어도 일하지 않는 것으로 본다
-  const planned = day.offCredit >= rules.dailyStdMin || day.isRest ? 0 : plans[day.key] ?? defaultPlanFor(day, rules);
+  // 오늘은 계획을 바꾸지 않는다: 기본 계획 그대로, 지금까지 일한 시간이 최소
+  const planned = day.offCredit >= rules.dailyStdMin || day.isRest ? 0 : day.isToday ? defaultPlanFor(day, rules) : plans[day.key] ?? defaultPlanFor(day, rules);
   const work = day.isToday ? Math.max(planned, day.actual) : planned;
   return capDay(work + day.workCredit, rules);
 }
@@ -391,17 +394,44 @@ function spread(days, need, rules, minOf = () => 0) {
 /** 그날 계획된 실근무 (출장·교육 인정 제외) */
 const plannedWork = (d, plans, rules) => projectedOf(d, plans, rules) - d.workCredit;
 
+/**
+ * 목표 초과 근무 시간으로 배분: 월말 평일 근무 = 필수 근무 시간 + excessTarget 이 되도록
+ * 고정하지 않은 남은 근무일(오늘 제외)에 고르게 나눈다. 최대 근무 시간은 넘지 않는다.
+ * → { plans, capped, reached } (reached = 실제로 맞춘 초과 근무 시간)
+ */
+export function distributeToTarget(summary, rules, plans = {}, locks = {}, excessTarget = 0) {
+  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
+  const fixed = summary.upcoming.filter((d) => !free.includes(d)).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
+  const need = Math.max(0, summary.workToGo + excessTarget - fixed);
+  let alloc = waterFill(need, free.map((d) => dailyCapOf(d, rules)));
+  // 최대 근무 시간: 주말·휴일 포함 월 전체 예상이 넘지 않게
+  const freeKeys = new Set(free.map((d) => d.key));
+  const others = summary.days.filter((d) => !freeKeys.has(d.key)).reduce((s, d) => s + projectedOf(d, plans, rules), 0);
+  const room = summary.possible - others;
+  let capped = false;
+  if (alloc.reduce((a, b) => a + b, 0) > room) {
+    alloc = waterFill(room, alloc);
+    capped = true;
+  }
+  const out = {};
+  free.forEach((d, i) => (out[d.key] = alloc[i]));
+  const projectedReq = summary.days
+    .filter((d) => d.isWorkday)
+    .reduce((s, d) => s + (freeKeys.has(d.key) ? out[d.key] + d.workCredit : projectedOf(d, plans, rules)), 0);
+  return { plans: out, capped, reached: projectedReq - summary.required };
+}
+
 /** 남은 필요시간을 오늘~월말 근무일에 균등 배분. locks로 고정한 날은 그대로 두고 나머지에만 나눈다 */
 export function distributeEvenly(summary, rules, plans = {}, locks = {}) {
-  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key]);
-  const fixed = summary.upcoming.filter((d) => locks[d.key]).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
+  const free = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
+  const fixed = summary.upcoming.filter((d) => locks[d.key] || d.isToday).reduce((s, d) => s + plannedWork(d, plans, rules), 0);
   return spread(free, Math.max(0, summary.workToGo - fixed), rules, (d) => (d.isToday ? d.actual : 0));
 }
 
 /** 선택한 날에만 남은 필요시간을 나눠 넣고, 나머지 날은 지금 계획을 유지 */
 export function distributeAmong(summary, rules, plans, keys, locks = {}) {
   const sel = new Set(keys);
-  const chosen = summary.upcoming.filter((d) => sel.has(d.key) && capacityOf(d, rules) > 0 && !locks[d.key]);
+  const chosen = summary.upcoming.filter((d) => sel.has(d.key) && capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday);
   const chosenKeys = new Set(chosen.map((d) => d.key));
   const others = summary.upcoming.filter((d) => !chosenKeys.has(d.key));
   const fixed = others.reduce((s, d) => s + plannedWork(d, plans, rules), 0);
@@ -443,7 +473,7 @@ function waterFill(room, caps) {
  */
 export function distributeToMax(summary, rules, plans = {}, keys = null, locks = {}) {
   const sel = keys ? new Set(keys) : null;
-  const targets = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && (!sel || sel.has(d.key)));
+  const targets = summary.upcoming.filter((d) => capacityOf(d, rules) > 0 && !locks[d.key] && !d.isToday && (!sel || sel.has(d.key)));
   if (!targets.length) return {};
   const tKeys = new Set(targets.map((d) => d.key));
   const dayCap = (d) => Math.max(d.isToday ? d.actual : 0, dailyCapOf(d, rules));

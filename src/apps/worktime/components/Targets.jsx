@@ -8,7 +8,7 @@ import { otInfo } from '../lib/engine.js';
 export function OtZone({ o }) {
   if (o.zone.key === 'none') return null;
   return (
-    <span className={`ot-zone ${o.zone.key}`} title={`${o.zone.desc} · 실질 단가 = OT ÷ 초과 근무 = ${Math.round(o.rate * 100)}%`}>
+    <span className={`ot-zone ${o.zone.key}`} title={`${o.zone.desc} · 실질 단가 = (OT + 주말) ÷ (초과 근무 + 주말) = ${Math.round(o.rate * 100)}%`}>
       {o.zone.label} <span className="num">{Math.round(o.rate * 100)}%</span>
     </span>
   );
@@ -16,7 +16,7 @@ export function OtZone({ o }) {
 
 /** 예상 초과 근무 시간: 평일 기준 필수 근무 시간 대비 ± (OT = 초과 − 포괄 14h · 주말 따로) */
 export function MonthEnd({ s, rules, compact = false }) {
-  const o = otInfo(s.projectedDiff, rules);
+  const o = otInfo(s.projectedDiff, rules, s.weekendTotal);
   const tone = (v) => (v < 0 ? 'tone-bad' : v > 0 ? 'tone-good' : '');
   return (
     <span className={`month-end ${compact ? 'compact' : ''}`}>
@@ -75,7 +75,7 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', rea
         <b>예상 초과 근무 시간</b> = 계획대로 일했을 때 월말 평일 근무 시간 − 필수 근무 시간
         <br /><b>OT</b> = 초과 근무 시간 − 포괄 {fmtDurKo(rules.inclusiveOtMin ?? 840)} (이미 급여에 들어 있는 시간)
         <br /><b>주말</b> = 주말·공휴일 근무 (실적 + 계획), 따로 표시
-        <br /><b>실질 단가</b> = OT ÷ 초과 근무 시간
+        <br /><b>실질 단가</b> = (OT + 주말 근무) ÷ (초과 근무 + 주말 근무)
         <br />~14h 호구왕(무급) · 16~18h 호구존(12~22%) · 28h 해피존(50%) · 40h+ 부자존(65%+)
       </>
     ),

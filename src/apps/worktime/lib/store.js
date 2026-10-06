@@ -32,6 +32,7 @@ function initialState() {
     plans: saved?.plans || {},
     planIns: saved?.planIns || {}, // 날짜별 계획 출근 시각
     planLocks: saved?.planLocks || {}, // 배분할 때 건드리지 않는(고정한) 날
+    planLast: saved?.planLast || null, // 마지막으로 반영한 배분 방식 {kind, at, target?}
     // 근태 매핑은 앱 기본값을 쓴다 (예전 반차 매핑 정리), 열 번호는 사용자가 바꾼 값 유지
     syncConfig: { ...DEFAULT_SYNC_CONFIG, ...(saved?.syncConfig || {}), typeMap: DEFAULT_SYNC_CONFIG.typeMap, cols: { ...DEFAULT_SYNC_CONFIG.cols, ...(saved?.syncConfig?.cols || {}) } },
     lastSync: saved?.lastSync || null,
@@ -126,6 +127,8 @@ function reducer(state, action) {
       }
       return { ...state, plans, planIns, records, planLocks };
     }
+    case 'plan/last':
+      return { ...state, planLast: action.last };
     case 'rules/set':
       return { ...state, rules: { ...state.rules, ...action.patch } };
     case 'rules/reset':
