@@ -11,6 +11,7 @@ const ORDER = [
   'src/apps/worktime/lib/store.js',
   'src/shared/prefs.js',
   'src/shared/ui.jsx',
+  'src/shared/Logo.jsx',
   'src/apps/worktime/components/Targets.jsx',
   'src/apps/worktime/pages/Mini.jsx',
   'src/apps/worktime/pages/Dashboard.jsx',

@@ -2,7 +2,8 @@
 // 설치형(Tauri)에서는 Windows 기본 제목 표시줄을 끄고 이 바를 잡아 창을 옮긴다.
 import { useEffect, useRef, useState } from 'react';
 import { isTauri } from '../shared/platform.js';
-import { BrandMark, Icon, ThemeCycle } from '../shared/ui.jsx';
+import { Icon, ThemeCycle } from '../shared/ui.jsx';
+import { DfmLogo } from '../shared/Logo.jsx';
 import { APPS, appById } from './apps.js';
 
 async function win(action) {
@@ -73,7 +74,7 @@ export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mo
   return (
     <header className={`shellbar ${compact ? 'compact' : 'full'}`} data-tauri-drag-region>
       <div className="sb-brand" data-tauri-drag-region>
-        <BrandMark size={compact ? 15 : 13} icon="apps" />
+        <DfmLogo size={compact ? 32 : 26} />
         <strong>DFM Slack</strong>
       </div>
 

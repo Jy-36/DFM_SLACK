@@ -544,7 +544,7 @@ textarea.input { font-family: Consolas, 'D2Coding', ui-monospace, monospace; fon
 }
 .sb-brand { display: flex; align-items: center; gap: 9px; height: 100%; }
 .sb-brand > * { pointer-events: none; }
-.sb-brand .brand-mark { width: 26px; height: 26px; border-radius: 8px; box-shadow: none; }
+.sb-brand .dfm-logo { display: block; border-radius: 8px; box-shadow: 0 2px 8px rgba(10, 20, 51, 0.25); }
 .sb-brand strong { font-size: 14px; letter-spacing: -0.02em; white-space: nowrap; }
 .sb-tabs { display: flex; align-items: center; gap: 4px; height: 100%; min-width: 0; }
 .sb-tab {
@@ -614,3 +614,8 @@ html[data-mode='compact'] .mini { padding-top: 4px; }
 /* 요약 화면에서는 앱 추가 메뉴를 바 폭에 맞춰 펼친다 */
 .shellbar.compact .sb-add-wrap { position: static; }
 .shellbar.compact .add-menu { left: 12px; right: 12px; width: auto; top: calc(100% + 2px); }
+/* 다크 테마에서 네이비 로고가 바탕에 묻히지 않게 얇은 테두리 */
+:root { --logo-ring: rgba(10, 20, 51, 0); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --logo-ring: rgba(150, 180, 255, 0.22); } }
+:root[data-theme='dark'] { --logo-ring: rgba(150, 180, 255, 0.22); }
+.sb-brand .dfm-logo { box-shadow: 0 0 0 1px var(--logo-ring), 0 2px 8px rgba(10, 20, 51, 0.25); }
