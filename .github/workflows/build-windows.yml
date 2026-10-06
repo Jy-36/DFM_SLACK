@@ -20,6 +20,9 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      CARGO_TERM_COLOR: never
+      NO_COLOR: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -49,13 +52,14 @@ jobs:
         run: |
           # 오류 줄과 그 뒤 몇 줄을 모아 annotation으로 남긴다 (로그 파일을 못 받는 환경에서도 원인을 볼 수 있게)
           if [ -f build.log ]; then
-            grep -n -E "error(\[E[0-9]+\])?:|^\s+--> |^\s+\|\s|warning: unused|Error|failed" build.log | head -120 > err.txt || true
+            sed 's/\x1b\[[0-9;]*m//g' build.log > clean.log
+            grep -n -E -A3 "^error|^warning: unused|^\s+--> " clean.log | head -120 > err.txt || true
             split -l 25 err.txt part_ || true
             for f in part_*; do
               msg=$(sed 's/%/%25/g' "$f" | sed ':a;N;$!ba;s/\n/%0A/g')
               echo "::error title=build log ($f)::$msg"
             done
-            tail -40 build.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g' | xargs -0 -I{} echo "::error title=build log tail::{}"
+            tail -40 clean.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g' | xargs -0 -I{} echo "::error title=build log tail::{}"
           fi
 
       - name: Release 올리기
