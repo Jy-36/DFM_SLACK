@@ -24,11 +24,10 @@ export const DEFAULT_RULES = {
   // kind: off  = 비근무근태 → 필요시간에서 차감
   //       work = 근무로 인정 → 인정시간에 더함
   //       rest = 쉬지만 필요시간은 그대로 → 다른 날 근무로 채움 (패밀리데이)
+  // variable: 날마다 시간을 고르는 근태 (시간 연차: step 단위, 최대 max)
   leaveTypes: {
     annual: { label: '연차', credit: 480, kind: 'off' },
-    half_am: { label: '오전반차', credit: 240, kind: 'off' },
-    half_pm: { label: '오후반차', credit: 240, kind: 'off' },
-    quarter: { label: '반반차', credit: 120, kind: 'off' },
+    hourly: { label: '시간 연차', credit: 120, kind: 'off', variable: true, step: 120, max: 360 },
     trip: { label: '출장', credit: 480, kind: 'work' },
     edu: { label: '교육', credit: 480, kind: 'work' },
     family: { label: '패밀리데이', credit: 0, kind: 'rest' },
@@ -36,12 +35,32 @@ export const DEFAULT_RULES = {
   familyDayOn: true, // 매달 21일이 있는 주 금요일을 패밀리데이 후보로 표시
 };
 
-export const LEAVE_ORDER = ['annual', 'half_am', 'half_pm', 'quarter', 'family', 'trip', 'edu'];
+export const LEAVE_ORDER = ['annual', 'hourly', 'family', 'trip', 'edu'];
+
+// 예전 반차·반반차 기록 → 시간 연차로 바꾸는 표
+export const LEGACY_LEAVES = { half_am: 240, half_pm: 240, quarter: 120 };
+
+/** 기록 하나를 지금 규칙에 맞게 바꾼다 (예전 반차 → 시간 연차 4h) */
+export function migrateRecord(rec) {
+  if (!rec || !rec.leave || !(rec.leave in LEGACY_LEAVES)) return rec;
+  return { ...rec, leave: 'hourly', leaveMin: LEGACY_LEAVES[rec.leave] };
+}
+
+/** 근태 이름 (시간 연차는 시간까지) */
+export function leaveText(rules, rec) {
+  const def = rec?.leave ? rules.leaveTypes[rec.leave] : null;
+  if (!def) return null;
+  if (def.variable) return `${def.label} ${Math.round((rec.leaveMin ?? def.credit) / 60)}h`;
+  return def.label;
+}
 
 export function mergeRules(saved) {
   const base = structuredClone(DEFAULT_RULES);
   if (!saved) return base;
   const leaveTypes = { ...base.leaveTypes };
-  for (const [k, v] of Object.entries(saved.leaveTypes || {})) leaveTypes[k] = { ...(base.leaveTypes[k] || {}), ...v };
+  for (const [k, v] of Object.entries(saved.leaveTypes || {})) {
+    if (k in LEGACY_LEAVES) continue; // 없앤 근태
+    leaveTypes[k] = { ...(base.leaveTypes[k] || {}), ...v };
+  }
   return { ...base, ...saved, leaveTypes };
 }

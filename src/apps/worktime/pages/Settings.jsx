@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fmtDur } from '../lib/time.js';
 import { LEAVE_ORDER } from '../lib/rules.js';
+import { TimeField, PRESETS } from '../../../shared/TimeField.jsx';
 
 const toH = (min) => Math.round((min / 60) * 100) / 100;
 const fromH = (h) => Math.round(Number(h) * 60);
@@ -79,19 +80,19 @@ export default function Settings({ state, dispatch, notify }) {
           {toggleField('familyDayOn', '패밀리데이 표시', '21일이 있는 주 금요일을 후보로 표시')}
           {toggleField('dailyLimitOn', '하루 최대 근무 제한', '끄면 제한 없음 (회사 기준)')}
           {r.dailyLimitOn && hoursField('maxDailyMin', '하루 최대 근무', '초과분은 인정하지 않음')}
-          <label className="field">
+          <div className="field">
             <span>계획 기본 출근 시각</span>
-            <input className="input num" type="time" id="rule-planin" value={r.planDefaultIn} onChange={(e) => set({ planDefaultIn: e.target.value })} />
-          </label>
-          <label className="field">
+            <TimeField id="rule-planin" value={r.planDefaultIn} presets={PRESETS.in} allowEmpty={false} ariaLabel="계획 기본 출근 시각" onChange={(v) => set({ planDefaultIn: v })} />
+          </div>
+          <div className="field">
             <span>근로 인정 시작</span>
-            <input className="input num" type="time" id="rule-from" value={r.recognizeFrom} onChange={(e) => set({ recognizeFrom: e.target.value })} />
-          </label>
-          <label className="field">
+            <TimeField id="rule-from" value={r.recognizeFrom} presets={['05:00', '06:00', '07:00', '08:00']} allowEmpty={false} ariaLabel="근로 인정 시작" onChange={(v) => set({ recognizeFrom: v })} />
+          </div>
+          <div className="field">
             <span>근로 인정 끝</span>
-            <input className="input num" type="time" id="rule-to" value={r.recognizeTo} onChange={(e) => set({ recognizeTo: e.target.value })} />
+            <TimeField id="rule-to" value={r.recognizeTo} presets={['20:00', '21:00', '22:00', '23:00']} allowEmpty={false} ariaLabel="근로 인정 끝" onChange={(v) => set({ recognizeTo: v })} />
             <small className="muted">이 시간대 밖의 체류는 근무로 치지 않음</small>
-          </label>
+          </div>
         </div>
       </section>
 
@@ -135,7 +136,11 @@ export default function Settings({ state, dispatch, notify }) {
                     </select>
                   </td>
                   <td>
-                    <input className="input num" style={{ width: 80 }} type="number" step="0.5" min="0" id={`leave-credit-${k}`} value={toH(r.leaveTypes[k].credit)} onChange={(e) => setLeave(k, { credit: fromH(e.target.value) })} aria-label={`${r.leaveTypes[k].label} 시간`} />
+                    {r.leaveTypes[k].variable ? (
+                      <span className="small muted">{toH(r.leaveTypes[k].step)}시간 단위 · 최대 {toH(r.leaveTypes[k].max)}시간 (날마다 고름)</span>
+                    ) : (
+                      <input className="input num" style={{ width: 80 }} type="number" step="0.5" min="0" id={`leave-credit-${k}`} value={toH(r.leaveTypes[k].credit)} onChange={(e) => setLeave(k, { credit: fromH(e.target.value) })} aria-label={`${r.leaveTypes[k].label} 시간`} />
+                    )}
                   </td>
                 </tr>
               ))}

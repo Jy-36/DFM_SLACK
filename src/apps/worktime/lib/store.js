@@ -1,7 +1,7 @@
 // 앱 상태. 프로토타입은 localStorage에 저장하고, 실제 앱에서는 Tauri SQLite 플러그인으로 교체한다.
 import { useReducer, useEffect } from 'react';
 import { generateMockRecords } from './mockData.js';
-import { mergeRules, DEFAULT_RULES } from './rules.js';
+import { mergeRules, DEFAULT_RULES, migrateRecord } from './rules.js';
 import { DEFAULT_SYNC_CONFIG } from './sync.js';
 
 const STORAGE_KEY = 'worktime.v1';
@@ -22,15 +22,18 @@ function saveState(state) {
   }
 }
 
+const migrateAll = (records) => Object.fromEntries(Object.entries(records).map(([k, r]) => [k, migrateRecord(r)]));
+
 function initialState() {
   const saved = loadState();
   return {
-    records: saved?.records || generateMockRecords(new Date()),
+    records: migrateAll(saved?.records || generateMockRecords(new Date())),
     rules: mergeRules(saved?.rules),
     plans: saved?.plans || {},
     planIns: saved?.planIns || {}, // 날짜별 계획 출근 시각
     planLocks: saved?.planLocks || {}, // 배분할 때 건드리지 않는(고정한) 날
-    syncConfig: { ...DEFAULT_SYNC_CONFIG, ...(saved?.syncConfig || {}) },
+    // 근태 매핑은 앱 기본값을 쓴다 (예전 반차 매핑 정리), 열 번호는 사용자가 바꾼 값 유지
+    syncConfig: { ...DEFAULT_SYNC_CONFIG, ...(saved?.syncConfig || {}), typeMap: DEFAULT_SYNC_CONFIG.typeMap, cols: { ...DEFAULT_SYNC_CONFIG.cols, ...(saved?.syncConfig?.cols || {}) } },
     lastSync: saved?.lastSync || null,
     dataMode: saved?.dataMode || 'mock',
   };
@@ -51,7 +54,7 @@ function reducer(state, action) {
     case 'records/merge':
       return {
         ...state,
-        records: { ...state.records, ...action.records },
+        records: { ...state.records, ...migrateAll(action.records) },
         lastSync: new Date().toISOString(),
         dataMode: action.mode,
       };
@@ -100,7 +103,12 @@ function reducer(state, action) {
           if (action.inTime == null) delete planIns[key];
           else planIns[key] = action.inTime;
         }
-        if (action.leave !== undefined) records[key] = { ...(records[key] || {}), leave: action.leave || null, edited: true };
+        if (action.leave !== undefined) {
+          const r = { ...(records[key] || {}), leave: action.leave || null, edited: true };
+          if (action.leave === 'hourly') r.leaveMin = action.leaveMin ?? r.leaveMin ?? 120;
+          else delete r.leaveMin;
+          records[key] = r;
+        }
       }
       return { ...state, plans, planIns, records, planLocks };
     }

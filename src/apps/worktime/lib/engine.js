@@ -50,13 +50,41 @@ export function earlierStarts(summary, rules, plans, planIns = {}) {
   const end = toMin(rules.recognizeTo);
   for (const d of summary.upcoming) {
     if (d.isToday || plans[d.key] == null) continue;
-    const gross = grossForNet(plans[d.key], rules);
+    const gross = grossForNet(plans[d.key], rules) + (d.plannedExclude || 0);
     const start = toMin(planIns[d.key] || rules.planDefaultIn);
     if (start + gross > end) out[d.key] = fmtClock(Math.max(toMin(rules.recognizeFrom), Math.floor((end - gross) / 5) * 5)); // 5분 단위로 당김
   }
   return out;
 }
 const capDay = (v, rules) => (rules.dailyLimitOn ? Math.min(v, rules.maxDailyMin) : v);
+
+/** 제외시간 한 건의 길이(분). 구간(from~to) 또는 분(min)으로 적는다 */
+export function excludeLen(x) {
+  if (x == null) return 0;
+  if (x.min != null) return Math.max(0, Number(x.min) || 0);
+  const a = toMin(x.from);
+  const b = toMin(x.to);
+  return a != null && b != null && b > a ? b - a : 0;
+}
+
+/** 그날 제외시간 합계 (계획용: 전체 길이) */
+export const excludeTotal = (rec) => (rec?.excludes || []).reduce((s, x) => s + excludeLen(x), 0);
+
+/** 실제 근무 구간 [start, end] 안에 들어간 제외시간 (구간은 겹친 만큼, 분 단위는 전부) */
+export function excludeWithin(rec, start, end) {
+  let sum = 0;
+  for (const x of rec?.excludes || []) {
+    if (x.min != null) {
+      sum += excludeLen(x);
+      continue;
+    }
+    const a = toMin(x.from);
+    const b = toMin(x.to);
+    if (a == null || b == null) continue;
+    sum += Math.max(0, Math.min(b, end) - Math.max(a, start));
+  }
+  return Math.min(sum, Math.max(0, end - start));
+}
 
 /** 하루 평가 */
 export function evalDay(date, rec, rules, ctx = {}) {
@@ -72,9 +100,10 @@ export function evalDay(date, rec, rules, ctx = {}) {
 
   const leaveDef = rec?.leave ? rules.leaveTypes[rec.leave] : null;
   // 비근무근태는 근무일에만 필요시간을 줄인다
-  const offCredit = leaveDef && leaveDef.kind === 'off' && isWorkday ? leaveDef.credit : 0;
+  const leaveMin = leaveDef ? (leaveDef.variable ? rec.leaveMin ?? leaveDef.credit : leaveDef.credit) : 0;
+  const offCredit = leaveDef && leaveDef.kind === 'off' && isWorkday ? leaveMin : 0;
   const isRest = !!leaveDef && leaveDef.kind === 'rest' && isWorkday; // 쉬지만 필요시간 유지
-  const workCredit = leaveDef && leaveDef.kind === 'work' ? leaveDef.credit : 0;
+  const workCredit = leaveDef && leaveDef.kind === 'work' ? leaveMin : 0;
   const credit = offCredit + workCredit;
 
   const inMin = toMin(rec?.in);
@@ -87,12 +116,16 @@ export function evalDay(date, rec, rules, ctx = {}) {
 
   let gross = 0;
   let actual = 0;
+  let excluded = 0;
   if (inMin != null && outMin != null && outMin > inMin) {
     const from = Math.max(inMin, toMin(rules.recognizeFrom));
     const to = Math.min(outMin, toMin(rules.recognizeTo));
     gross = Math.max(0, to - from);
-    actual = netFromGross(gross, rules);
+    // 제외시간(외출 등)은 체류시간에서 빼고, 남은 시간에 휴게 규칙을 적용한다
+    excluded = excludeWithin(rec, from, to);
+    actual = netFromGross(gross - excluded, rules);
   }
+  const plannedExclude = excludeTotal(rec);
   const recognized = capDay(actual + workCredit, rules);
   const dayRequired = isWorkday ? Math.max(0, rules.dailyStdMin - offCredit) : 0; // 그날 필수근무
 
@@ -121,7 +154,10 @@ export function evalDay(date, rec, rules, ctx = {}) {
     isPast,
     isFuture,
     leave: rec?.leave || null,
-    leaveLabel: leaveDef?.label || null,
+    leaveLabel: leaveDef ? (leaveDef.variable ? `${leaveDef.label} ${Math.round(leaveMin / 60)}h` : leaveDef.label) : null,
+    leaveMin,
+    excluded,
+    plannedExclude,
     leaveKind: leaveDef?.kind || null,
     isRest,
     credit,
@@ -290,7 +326,7 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
 /** 오늘 예상 퇴근 시각 (목표 실근무 net분 기준) */
 export function checkoutFor(day, targetNet, rules) {
   if (!day || day.inMin == null) return null;
-  return day.inMin + grossForNet(Math.max(0, targetNet), rules);
+  return day.inMin + grossForNet(Math.max(0, targetNet), rules) + (day.plannedExclude || 0);
 }
 
 /** need분을 days에 일할 수 있는 시간 비율로 나눠 담는다 (10분 단위, 마지막 날이 나머지) */

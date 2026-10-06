@@ -1,6 +1,6 @@
 [package]
 name = "dfm-slack"
-version = "0.9.2"
+version = "0.10.0"
 description = "DFM Slack — 업무 도구 모음 (WorkTime 등)"
 edition = "2021"
 

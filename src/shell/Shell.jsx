@@ -1,6 +1,6 @@
 // DFM Slack 본체: 상단 바와 탭을 관리하고, 고른 탭의 앱을 그린다.
-import { useEffect, useState } from 'react';
-import { useTheme, useWindowMode } from '../shared/prefs.js';
+import { useEffect, useRef, useState } from 'react';
+import { useTheme, useWindowMode, useWidgetPrefs } from '../shared/prefs.js';
 import { isTauri } from '../shared/platform.js';
 import { Icon } from '../shared/ui.jsx';
 import ShellBar from './ShellBar.jsx';
@@ -26,7 +26,10 @@ const write = (k, v) => {
 
 export default function Shell() {
   const [theme, setTheme] = useTheme();
-  const [mode, setMode] = useWindowMode();
+  const [widget, setWidget] = useWidgetPrefs();
+  const widgetRef = useRef(widget);
+  widgetRef.current = widget;
+  const [mode, setMode] = useWindowMode(() => widgetRef.current);
   const [tabs, setTabs] = useState(() => read(TABS_KEY, ['worktime']).filter((id) => appById(id)));
   const [active, setActive] = useState(() => {
     const a = read(ACTIVE_KEY, 'worktime');
@@ -39,6 +42,9 @@ export default function Shell() {
   useEffect(() => {
     document.documentElement.dataset.mode = mode;
   }, [mode]);
+  useEffect(() => {
+    document.documentElement.style.setProperty('--wg-opacity', String(widget.opacity));
+  }, [widget.opacity]);
   useEffect(() => write(TABS_KEY, tabs), [tabs]);
   useEffect(() => write(ACTIVE_KEY, active), [active]);
 
@@ -57,6 +63,10 @@ export default function Shell() {
   };
 
   const App = current?.component;
+  // 위젯: 상단 바 없이 앱의 위젯 화면만 (탭이 없으면 요약 화면으로)
+  if (mode === 'widget' && App) {
+    return <App mode="widget" setMode={setMode} widget={widget} setWidget={setWidget} />;
+  }
   return (
     <div className="shell">
       <ShellBar

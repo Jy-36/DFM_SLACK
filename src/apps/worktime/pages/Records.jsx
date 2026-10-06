@@ -3,6 +3,8 @@ import { fmtDur, fmtClock, monthLabel, dayLabel, WEEKDAY_KO, ymd, parseYmd } fro
 import { summarizeMonth, projectedOf, defaultPlanFor } from '../lib/engine.js';
 import { LEAVE_ORDER } from '../lib/rules.js';
 import { Icon, Pill, StatusPill } from '../../../shared/ui.jsx';
+import { TimeField, PRESETS } from '../../../shared/TimeField.jsx';
+import { LeaveSelect } from '../components/LeaveSelect.jsx';
 
 const HEAD = [1, 2, 3, 4, 5, 6, 0]; // 월요일 시작
 
@@ -137,6 +139,9 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
           {!d.live && <span className={d.outMin == null ? 'missing' : ''}>{d.outMin != null ? fmtClock(d.outMin) : '퇴근 ?'}</span>}
         </span>
       )}
+      {(d.excluded > 0 || (d.inMin == null && d.plannedExclude > 0)) && (
+        <span className="cd-ex num" title="제외시간">제외 −{fmtDur(d.inMin != null ? d.excluded : d.plannedExclude)}</span>
+      )}
       {foot && (
         <span className={`cd-foot ${foot.tone}`}>
           <span className="cd-label">{foot.label}</span>
@@ -149,7 +154,9 @@ function DayCell({ d, plans, rules, selected, onClick, family }) {
 
 function DayDetail({ d, rec, rules, plans, dispatch }) {
   const set = (patch) => dispatch({ type: 'record/set', key: d.key, patch });
-  const breakMin = d.gross - d.actual;
+  const breakMin = Math.max(0, d.gross - d.excluded - d.actual);
+  const excludes = rec.excludes || [];
+  const setEx = (list) => set({ excludes: list.length ? list : undefined });
   return (
     <aside className="panel detail">
       <div className="kv">
@@ -159,25 +166,69 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
       {d.holiday && <p className="muted" style={{ margin: 0 }}>{d.holiday} (공휴일)</p>}
 
       <div className="form">
-        <label className="field">
+        <div className="field">
           <span>출근</span>
-          <input className="input num" type="time" id={`in-${d.key}`} value={rec.in || ''} onChange={(e) => set({ in: e.target.value || null })} />
-        </label>
-        <label className="field">
+          <TimeField id={`in-${d.key}`} value={rec.in || ''} presets={PRESETS.in} showNow={d.isToday} ariaLabel="출근 시각" onChange={(v) => set({ in: v })} />
+        </div>
+        <div className="field">
           <span>퇴근</span>
-          <input className="input num" type="time" id={`out-${d.key}`} value={rec.out || ''} onChange={(e) => set({ out: e.target.value || null })} />
-        </label>
-        <label className="field wide">
+          <TimeField id={`out-${d.key}`} value={rec.out || ''} presets={PRESETS.out} showNow={d.isToday} ariaLabel="퇴근 시각" onChange={(v) => set({ out: v })} />
+        </div>
+        <div className="field wide">
           <span>근태 구분</span>
-          <select className="input" id={`leave-${d.key}`} value={rec.leave || ''} onChange={(e) => set({ leave: e.target.value || null })}>
-            <option value="">정상 근무</option>
-            {LEAVE_ORDER.map((k) => (
-              <option key={k} value={k}>
-                {rules.leaveTypes[k].label} ({rules.leaveTypes[k].kind === 'work' ? `근무 ${fmtDur(rules.leaveTypes[k].credit)}` : rules.leaveTypes[k].kind === 'rest' ? '필요시간 유지' : `필요 −${fmtDur(rules.leaveTypes[k].credit)}`})
-              </option>
-            ))}
-          </select>
-        </label>
+          <LeaveSelect
+            id={`leave-${d.key}`}
+            rules={rules}
+            leave={rec.leave || null}
+            leaveMin={rec.leaveMin}
+            width={150}
+            ariaLabel="근태 구분"
+            onChange={(leave, leaveMin) => set({ leave, leaveMin: leave === 'hourly' ? leaveMin : undefined })}
+          />
+        </div>
+
+        <div className="field wide">
+          <span className="ex-head">
+            제외시간 <small className="muted">외출 등 근무에서 뺄 시간</small>
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setEx([...excludes, { from: '12:00', to: '13:00', reason: '' }])}
+            >
+              <Icon name="plus" size={13} /> 추가
+            </button>
+          </span>
+          {excludes.length === 0 ? (
+            <span className="small muted">없음</span>
+          ) : (
+            <div className="ex-list">
+              {excludes.map((x, i) => (
+                <div className="ex-row" key={i}>
+                  {x.min != null ? (
+                    <span className="ex-min num">{fmtDur(x.min)}</span>
+                  ) : (
+                    <span className="ex-range">
+                      <TimeField id={`ex-from-${d.key}-${i}`} value={x.from} allowEmpty={false} presets={PRESETS.any} ariaLabel="제외 시작" onChange={(v) => setEx(excludes.map((y, j) => (j === i ? { ...y, from: v } : y)))} />
+                      <span className="muted">~</span>
+                      <TimeField id={`ex-to-${d.key}-${i}`} value={x.to} allowEmpty={false} presets={PRESETS.any} ariaLabel="제외 끝" onChange={(v) => setEx(excludes.map((y, j) => (j === i ? { ...y, to: v } : y)))} />
+                    </span>
+                  )}
+                  <input
+                    className="input"
+                    id={`ex-reason-${d.key}-${i}`}
+                    value={x.reason || ''}
+                    placeholder="사유 (외출, 병원 등)"
+                    onChange={(e) => setEx(excludes.map((y, j) => (j === i ? { ...y, reason: e.target.value } : y)))}
+                  />
+                  <button type="button" className="lock-btn" title="빼기" aria-label="제외시간 빼기" onClick={() => setEx(excludes.filter((_, j) => j !== i))}>
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <label className="field wide">
           <span>메모</span>
           <input className="input" id={`note-${d.key}`} value={rec.note || ''} placeholder="예: 출하 대응 야근" onChange={(e) => set({ note: e.target.value })} />
@@ -186,9 +237,12 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
 
       <div style={{ display: 'grid', gap: 6 }}>
         <div className="kv"><span className="muted">체류</span><span className="v">{fmtDur(d.gross)}</span></div>
+        {(d.excluded > 0 || excludes.length > 0) && (
+          <div className="kv"><span className="muted">제외시간</span><span className="v">−{fmtDur(d.inMin != null ? d.excluded : d.plannedExclude)}</span></div>
+        )}
         <div className="kv"><span className="muted">휴게 차감</span><span className="v">−{fmtDur(breakMin)}</span></div>
         <div className="kv"><span className="muted">실근무</span><span className="v">{fmtDur(d.actual)}</span></div>
-        {d.offCredit > 0 && <div className="kv"><span className="muted">비근무근태 (필요시간 차감)</span><span className="v">{fmtDur(d.offCredit)}</span></div>}
+        {d.offCredit > 0 && <div className="kv"><span className="muted">{d.leaveLabel} (필요시간 차감)</span><span className="v">{fmtDur(d.offCredit)}</span></div>}
         {d.workCredit > 0 && <div className="kv"><span className="muted">출장·교육 근무 인정</span><span className="v">+{fmtDur(d.workCredit)}</span></div>}
         {d.isRest && <div className="kv"><span className="muted">{d.leaveLabel} · 필요시간 유지</span><span className="v">다른 날에 채움</span></div>}
         {d.isWorkday && <div className="kv"><span className="muted">이날 필수근무</span><span className="v">{fmtDur(d.dayRequired)}</span></div>}
@@ -211,7 +265,7 @@ function DayDetail({ d, rec, rules, plans, dispatch }) {
         출처: {rec.source === 'portal' ? '사내 근태 사이트' : rec.source === 'mock' ? '가짜 데이터' : rec.in || rec.leave ? '직접 입력' : '기록 없음'}
         {rec.edited ? ' · 직접 보정함' : ''}
       </div>
-      {(rec.in || rec.out || rec.leave) && (
+      {(rec.in || rec.out || rec.leave || excludes.length > 0) && (
         <button className="btn" onClick={() => dispatch({ type: 'record/clear', key: d.key })}>이 날 기록 지우기</button>
       )}
     </aside>

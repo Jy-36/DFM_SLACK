@@ -8,12 +8,17 @@ import { pad2 } from './time.js';
 export const DEFAULT_SYNC_CONFIG = {
   portalUrl: 'https://attendance.internal.example/my/records',
   rowSelector: '#attTable tbody tr',
-  cols: { date: 0, in: 2, out: 3, type: 4 },
+  cols: { date: 0, in: 2, out: 3, type: 4, exclude: 5 }, // exclude: 제외시간 열 (없으면 -1)
+  // 근태구분 글자 → 앱 근태. 앞에서부터 먼저 맞는 것을 쓰므로 긴 이름을 위에 둔다.
+  // 'hourly'는 글자 안의 "2h", "2시간"에서 시간을 읽는다. 'hourly:240'처럼 시간을 고정할 수도 있다.
   typeMap: {
+    시간연차: 'hourly',
+    '시간 연차': 'hourly',
+    오전반차: 'hourly:240',
+    오후반차: 'hourly:240',
+    반반차: 'hourly:120',
+    패밀리데이: 'family',
     연차: 'annual',
-    오전반차: 'half_am',
-    오후반차: 'half_pm',
-    반반차: 'quarter',
     출장: 'trip',
     교육: 'edu',
   },
@@ -42,7 +47,20 @@ export function normalizeTime(text) {
   return null;
 }
 
-/** 표 HTML → { 'YYYY-MM-DD': { in, out, leave } } */
+/** "0:40", "40분", "1시간 30분", "1.5h", "90" → 분 */
+export function parseMinutes(text) {
+  const t = String(text || '').trim();
+  if (!t) return 0;
+  let m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  const h = t.match(/(\d+(?:\.\d+)?)\s*(?:시간|h)/i);
+  const mi = t.match(/(\d+)\s*(?:분|min|m(?![a-z]))/i);
+  if (h || mi) return Math.round((h ? Number(h[1]) * 60 : 0) + (mi ? Number(mi[1]) : 0));
+  m = t.match(/^\d+$/);
+  return m ? Number(t) : 0;
+}
+
+/** 표 HTML → { 'YYYY-MM-DD': { in, out, leave, leaveMin, excludes } } */
 export function parseAttendanceHtml(html, cfg = DEFAULT_SYNC_CONFIG) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const rows = [...doc.querySelectorAll(cfg.rowSelector)];
@@ -56,11 +74,20 @@ export function parseAttendanceHtml(html, cfg = DEFAULT_SYNC_CONFIG) {
       return;
     }
     const typeText = cells[cfg.cols.type] || '';
-    const leave = Object.entries(cfg.typeMap).find(([label]) => typeText.includes(label))?.[1] || null;
+    const mapped = Object.entries(cfg.typeMap).find(([label]) => typeText.includes(label))?.[1] || null;
+    let leave = mapped;
+    let leaveMin;
+    if (mapped && mapped.startsWith('hourly')) {
+      leave = 'hourly';
+      leaveMin = mapped.includes(':') ? Number(mapped.split(':')[1]) : parseMinutes(typeText) || 120;
+    }
+    const exMin = cfg.cols.exclude >= 0 ? parseMinutes(cells[cfg.cols.exclude]) : 0;
     out[date] = {
       in: normalizeTime(cells[cfg.cols.in]),
       out: normalizeTime(cells[cfg.cols.out]),
       leave,
+      ...(leaveMin != null ? { leaveMin } : {}),
+      ...(exMin ? { excludes: [{ min: exMin, reason: '사내 데이터', source: 'portal' }] } : {}),
       source: 'portal',
     };
   });

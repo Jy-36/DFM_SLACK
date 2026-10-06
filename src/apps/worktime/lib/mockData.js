@@ -34,7 +34,7 @@ export function generateMockRecords(now = new Date(), seed = 20261006) {
     recs[ymd(d)] = { in: fmtClock(inMin), out: fmtClock(inMin + gross), source: 'mock' };
   });
 
-  // 지난달 특수 케이스: 연차, 오후반차, 출장, 퇴근 누락
+  // 지난달 특수 케이스: 연차, 시간 연차(4h), 출장, 퇴근 누락, 외출(제외시간)
   const prevMonth = pastWorkdays.filter((d) => d.getMonth() !== today.getMonth());
   const setCase = (idx, patch) => {
     const d = prevMonth[idx];
@@ -43,7 +43,8 @@ export function generateMockRecords(now = new Date(), seed = 20261006) {
     recs[key] = { ...recs[key], ...patch };
   };
   setCase(4, { in: null, out: null, leave: 'annual', note: '개인 연차' });
-  setCase(9, { in: '08:05', out: '12:40', leave: 'half_pm' });
+  setCase(9, { in: '08:05', out: '12:40', leave: 'hourly', leaveMin: 240 });
+  setCase(6, { excludes: [{ from: '15:00', to: '15:40', reason: '외출' }] });
   setCase(12, { in: null, out: null, leave: 'trip', note: '기흥 캠퍼스 출장' });
   setCase(15, { out: null, note: '퇴근 태깅 누락' });
 
@@ -53,11 +54,11 @@ export function generateMockRecords(now = new Date(), seed = 20261006) {
     if (d.getDay() === 6 && !holidayName(ymd(d))) sat.push(new Date(d));
   if (sat[1]) recs[ymd(sat[1])] = { in: '10:00', out: '14:30', note: '마스크 출하 대응', source: 'mock' };
 
-  // 이번 달 지난 근무일 중 하나는 반반차
+  // 이번 달 지난 근무일 중 하나는 시간 연차 2h
   const thisMonthPast = pastWorkdays.filter((d) => d.getMonth() === today.getMonth());
   if (thisMonthPast.length >= 2) {
     const key = ymd(thisMonthPast[thisMonthPast.length - 1]);
-    recs[key] = { ...recs[key], leave: 'quarter', out: fmtClock(toMin(recs[key].in) + 6 * 60 + 30) };
+    recs[key] = { ...recs[key], leave: 'hourly', leaveMin: 120, out: fmtClock(toMin(recs[key].in) + 6 * 60 + 30) };
   }
 
   // 오늘: 출근만 찍힌 상태
@@ -67,31 +68,36 @@ export function generateMockRecords(now = new Date(), seed = 20261006) {
     recs[ymd(today)] = { in: fmtClock(inMin), out: null, source: 'mock' };
   }
 
-  // 앞으로: 8일 뒤 이후 첫 근무일에 연차 예정, 그다음 주에 오전반차 예정
+  // 앞으로: 8일 뒤 이후 첫 근무일에 연차 예정, 그다음 주에 시간 연차 4h 예정
   let f = addDays(today, 8);
   while (!isWorkday(f)) f = addDays(f, 1);
   recs[ymd(f)] = { leave: 'annual', note: '예정 연차', source: 'mock' };
   let g = addDays(f, 5);
   while (!isWorkday(g)) g = addDays(g, 1);
-  recs[ymd(g)] = { leave: 'half_am', note: '병원 예약', source: 'mock' };
+  recs[ymd(g)] = { leave: 'hourly', leaveMin: 240, note: '병원 예약', source: 'mock' };
 
   return recs;
 }
 
 /** 동기화 미리보기용 사내 근태 화면 HTML 샘플 */
 export function sampleAttendanceHtml(records, limit = 6) {
-  const typeLabel = { annual: '연차', half_am: '오전반차', half_pm: '오후반차', quarter: '반반차', trip: '출장', edu: '교육' };
+  const typeLabel = (r) =>
+    r.leave === 'hourly' ? `시간연차(${Math.round((r.leaveMin || 120) / 60)}h)` : { annual: '연차', trip: '출장', edu: '교육', family: '패밀리데이' }[r.leave] || '정상';
+  const exText = (r) => {
+    const m = (r.excludes || []).reduce((s, x) => s + (x.min ?? Math.max(0, toMin(x.to) - toMin(x.from))), 0);
+    return m ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : '';
+  };
   const rows = Object.entries(records)
     .filter(([, r]) => r.in || r.leave)
     .sort(([a], [b]) => (a < b ? 1 : -1))
     .slice(0, limit)
     .map(
       ([k, r]) =>
-        `    <tr><td>${k.replaceAll('-', '.')}</td><td>홍길동</td><td>${r.in || ''}</td><td>${r.out || ''}</td><td>${r.leave ? typeLabel[r.leave] : '정상'}</td></tr>`,
+        `    <tr><td>${k.replaceAll('-', '.')}</td><td>홍길동</td><td>${r.in || ''}</td><td>${r.out || ''}</td><td>${typeLabel(r)}</td><td>${exText(r)}</td></tr>`,
     )
     .join('\n');
   return `<table id="attTable">
-  <thead><tr><th>일자</th><th>성명</th><th>출근</th><th>퇴근</th><th>근태구분</th></tr></thead>
+  <thead><tr><th>일자</th><th>성명</th><th>출근</th><th>퇴근</th><th>근태구분</th><th>제외시간</th></tr></thead>
   <tbody>
 ${rows}
   </tbody>

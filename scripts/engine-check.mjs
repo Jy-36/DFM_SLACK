@@ -1,6 +1,7 @@
 // 정산 엔진 계산 확인: node scripts/engine-check.mjs
-import { familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
-import { DEFAULT_RULES as R } from '../src/apps/worktime/lib/rules.js';
+import { evalDay, familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
+import { DEFAULT_RULES as R, migrateRecord } from '../src/apps/worktime/lib/rules.js';
+import { parseAttendanceHtml } from '../src/apps/worktime/lib/sync.js';
 import { generateMockRecords } from '../src/apps/worktime/lib/mockData.js';
 import { fmtDur, fmtClock } from '../src/apps/worktime/lib/time.js';
 
@@ -15,7 +16,7 @@ const recs = generateMockRecords(now);
 const sep = summarizeMonth(2026, 8, recs, R, {}, now);
 eq('9월 Max (52/7×30 = 222.86h → 시간 버림)', fmtDur(sep.possible), '222:00');
 eq('9월 필요 기준 (근무일 19×8=152 vs 40/7×30=171:00 중 작은 값)', fmtDur(sep.targets.base), '152:00');
-eq('9월 비근무근태 (연차8 + 오후반차4)', fmtDur(sep.targets.offTotal), '12:00');
+eq('9월 비근무근태 (연차8 + 시간연차4h)', fmtDur(sep.targets.offTotal), '12:00');
 eq('9월 필요', fmtDur(sep.required), '140:00');
 
 const oct = summarizeMonth(2026, 9, recs, R, {}, now);
@@ -95,4 +96,27 @@ const mxL = summarizeMonth(2026, 9, recs, RL, distributeToMax(octL, RL, {}), now
 eq('[제한 켬] 주 52h 초과 없음', mxL.weeks.every((w) => w.projected <= RL.maxWeeklyMin), true);
 eq('[제한 켬] 1일 12h 초과 없음', Object.values(distributeToMax(octL, RL, {})).every((v) => v <= RL.maxDailyMin), true);
 eq('[제한 끔] 13시간 근무도 그대로 인정', summarizeMonth(2026, 9, { ...recs, '2026-10-01': { in: '07:00', out: '21:00' } }, R, {}, now).days[0].recognized, 780);
+// 시간 연차: 2시간 단위로 필요시간 차감
+const d1 = new Date(2026, 9, 7);
+eq('시간 연차 2h → 필요시간 −2h', evalDay(d1, { leave: 'hourly', leaveMin: 120 }, R).offCredit, 120);
+eq('시간 연차 6h → 그날 기본 계획 2h', evalDay(d1, { leave: 'hourly', leaveMin: 360 }, R, { todayKey: '2026-10-06' }).dayRequired, 120);
+eq('예전 오전반차 → 시간 연차 4h', JSON.stringify(migrateRecord({ leave: 'half_am' })), JSON.stringify({ leave: 'hourly', leaveMin: 240 }));
+eq('예전 반반차 → 시간 연차 2h', migrateRecord({ leave: 'quarter' }).leaveMin, 120);
+
+// 제외시간: 09:00~18:30 체류, 외출 14:00~15:00 → 체류 8:30 → 실근무 8:00
+const ex = evalDay(d1, { in: '09:00', out: '18:30', excludes: [{ from: '14:00', to: '15:00' }] }, R);
+eq('제외시간(구간) 빼고 실근무', fmtDur(ex.actual), '8:00');
+const ex2 = evalDay(d1, { in: '09:00', out: '18:30', excludes: [{ min: 30 }] }, R);
+eq('제외시간(분) 빼고 실근무 (체류 9:30 − 30분 = 9:00 → 휴게 1h)', fmtDur(ex2.actual), '8:00');
+const ex3 = evalDay(d1, { in: '09:00', out: '12:00', excludes: [{ from: '13:00', to: '14:00' }] }, R);
+eq('근무 구간 밖 제외시간은 안 뺌', fmtDur(ex3.actual), '3:00');
+eq('제외시간만큼 예상 퇴근 늦어짐', fmtClock(checkoutFor({ inMin: 540, plannedExclude: 60 }, 480, R)), '18:30');
+
+// 사내 표 읽기: 시간 연차 시간·제외시간 열
+if (typeof DOMParser !== 'undefined') {
+  const html = '<table id="attTable"><tbody><tr><td>2026.10.07</td><td>홍</td><td>09:00</td><td>13:00</td><td>시간연차(4h)</td><td>0:30</td></tr></tbody></table>';
+  const r = parseAttendanceHtml(html).records['2026-10-07'];
+  eq('표: 시간 연차 4h', r.leaveMin, 240);
+  eq('표: 제외시간 30분', r.excludes[0].min, 30);
+}
 process.exit(fail ? 1 : 0);

@@ -106,6 +106,9 @@ export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mo
 
       <div className="sb-actions">
         <ThemeCycle theme={theme} setTheme={setTheme} />
+        <button type="button" className="icon-btn" onClick={() => setMode('widget')} title="위젯으로 작게 (투명도·항상 위)" aria-label="위젯 모드">
+          <Icon name="widget" size={17} />
+        </button>
         <button
           type="button"
           className={`icon-btn ${compact ? 'accent' : ''}`}

@@ -45,17 +45,41 @@ export function useTheme() {
 }
 
 export const WINDOW_SIZES = {
+  widget: { width: 300, height: 184 },
   compact: { width: 420, height: 820 },
   full: { width: 1280, height: 860 },
 };
 
+const WIDGET_KEY = 'dfmslack.widget';
+const tauriWin = async () => {
+  if (!window.__TAURI_INTERNALS__) return null;
+  const mod = await import('@tauri-apps/api/window');
+  return { win: mod.getCurrentWindow(), LogicalSize: mod.LogicalSize };
+};
+
+/** 설치형에서만: 항상 위 켜기/끄기 */
+export async function setAlwaysOnTop(on) {
+  try {
+    const t = await tauriWin();
+    if (t) await t.win.setAlwaysOnTop(!!on);
+  } catch {
+    /* 지원하지 않는 환경 */
+  }
+}
+
 /** 실제 창 크기를 바꾼다. Tauri 창 → 창 API, Edge 앱 창 → resizeTo. 안 되면 화면 배치만 바뀐다. */
-export async function resizeWindow(mode) {
+export async function resizeWindow(mode, opts = {}) {
   const size = WINDOW_SIZES[mode];
   try {
-    if (window.__TAURI_INTERNALS__) {
-      const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().setSize(new LogicalSize(size.width, size.height));
+    const t = await tauriWin();
+    if (t) {
+      // 최소 크기를 먼저 바꿔야 위젯 크기로 줄어든다
+      const min = mode === 'widget' ? { width: 260, height: 150 } : { width: 380, height: 600 };
+      try { await t.win.setMinSize(new t.LogicalSize(min.width, min.height)); } catch { /* 권한 없음 */ }
+      await t.win.setSize(new t.LogicalSize(size.width, size.height));
+      // 위젯은 그림자 없는 투명 창 + (선택) 항상 위, 다른 화면은 보통 창
+      try { await t.win.setShadow(mode !== 'widget'); } catch { /* 권한 없음 */ }
+      await setAlwaysOnTop(mode === 'widget' && opts.onTop);
       return;
     }
     const dx = size.width - window.innerWidth;
@@ -69,14 +93,33 @@ export async function resizeWindow(mode) {
   }
 }
 
-/** mode: 'compact' | 'full' */
-export function useWindowMode() {
+/** 위젯 설정: 투명도(0.35~1)와 항상 위 */
+export function useWidgetPrefs() {
+  const [w, setW] = useState(() => {
+    try {
+      return { opacity: 0.92, onTop: true, ...JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}') };
+    } catch {
+      return { opacity: 0.92, onTop: true };
+    }
+  });
+  const update = (patch) =>
+    setW((prev) => {
+      const next = { ...prev, ...patch };
+      writePref(WIDGET_KEY, JSON.stringify(next));
+      if ('onTop' in patch) setAlwaysOnTop(next.onTop);
+      return next;
+    });
+  return [w, update];
+}
+
+/** mode: 'widget' | 'compact' | 'full' */
+export function useWindowMode(getWidget = () => ({})) {
   // 실행할 때는 항상 요약 화면으로 시작
   const [mode, setModeState] = useState('compact');
   const setMode = (next) => {
     setModeState(next);
     writePref(MODE_KEY, next);
-    resizeWindow(next);
+    resizeWindow(next, getWidget());
   };
   return [mode, setMode];
 }

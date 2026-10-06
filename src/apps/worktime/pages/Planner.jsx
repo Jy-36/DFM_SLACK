@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { fmtDur, fmtClock, toMin, dayLabel, monthLabel, weekKeyOf, parseYmd, parseDurInput } from '../lib/time.js';
 import { defaultPlanFor, projectedOf, distributeEvenly, distributeAmong, distributeToMax, summarizeMonth, grossForNet, netFromGross, capacityOf, dailyCapOf, earlierStarts } from '../lib/engine.js';
 import { LEAVE_ORDER } from '../lib/rules.js';
 import { Icon, Pill } from '../../../shared/ui.jsx';
+import { TimeField, PRESETS } from '../../../shared/TimeField.jsx';
+import { LeaveSelect } from '../components/LeaveSelect.jsx';
 import { TargetsPanel } from '../components/Targets.jsx';
 
 export default function Planner({ state, dispatch, summary, notify, now }) {
@@ -25,11 +27,23 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
   );
 
   const edited = rows.filter((d) => plans[d.key] != null || planIns[d.key]).length;
-  const toggle = (key) =>
+  // Shift를 누른 채 누르면 마지막으로 누른 날부터 여기까지 한 번에 선택(또는 해제)
+  const anchor = useRef(null);
+  const toggle = (key, shift) =>
     setSel((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      const turnOn = !prev.has(key);
+      const from = anchor.current ? rows.findIndex((d) => d.key === anchor.current) : -1;
+      const to = rows.findIndex((d) => d.key === key);
+      if (shift && from >= 0 && to >= 0) {
+        const [a, b] = from < to ? [from, to] : [to, from];
+        for (const d of rows.slice(a, b + 1)) {
+          if (turnOn) next.add(d.key);
+          else next.delete(d.key);
+        }
+      } else if (turnOn) next.add(key);
+      else next.delete(key);
+      anchor.current = key;
       return next;
     });
   const selectWhere = (fn) => setSel(new Set(rows.filter(fn).map((d) => d.key)));
@@ -183,7 +197,7 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
           </table>
         </div>
         <p className="small muted" style={{ marginBottom: 0 }}>
-          시간을 직접 바꾼 날은 자물쇠로 고정되어 균등 배분·Max 채우기에서 그대로 유지됩니다. 자물쇠를 누르면 고정을 풀 수 있습니다. 예상 퇴근 = 출근 시각(기본 {rules.planDefaultIn}, 오늘은 실제 출근) + 실근무 + 휴게.
+          Shift를 누른 채 체크하면 구간을 한 번에 고를 수 있습니다. 시간을 직접 바꾼 날은 자물쇠로 고정되어 균등 배분·Max 채우기에서 그대로 유지됩니다. 자물쇠를 누르면 고정을 풀 수 있습니다. 예상 퇴근 = 출근 시각(기본 {rules.planDefaultIn}, 오늘은 실제 출근) + 실근무 + 휴게.
         </p>
       </section>
 
@@ -204,14 +218,21 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
         const locked = !!locks[d.key];
         const planned = plans[d.key] ?? defaultPlanFor(d, rules);
         const inMin = d.isToday && d.inMin != null ? d.inMin : toMin(planIns[d.key] || rules.planDefaultIn);
-        const outMin = inMin + grossForNet(planned, rules);
+        const outMin = inMin + grossForNet(planned, rules) + (d.isToday ? 0 : d.plannedExclude);
         const fullOff = !isHoliday && capacityOf(d, rules) === 0 && d.workCredit === 0;
         const late = outMin > toMin(rules.recognizeTo);
         const checked = sel.has(d.key);
         return (
           <tr key={d.key} className={[d.isToday && 'today-row', checked && 'sel-row', isHoliday && 'holiday-row'].filter(Boolean).join(' ')}>
             <td>
-              <input type="checkbox" id={`pl-sel-${d.key}`} checked={checked} onChange={() => toggle(d.key)} aria-label={`${dayLabel(d.date)} 선택`} />
+              <input
+                type="checkbox"
+                id={`pl-sel-${d.key}`}
+                checked={checked}
+                readOnly
+                onClick={(e) => toggle(d.key, e.shiftKey)}
+                aria-label={`${dayLabel(d.date)} 선택 (Shift: 구간 선택)`}
+              />
             </td>
             <td className="num" style={{ whiteSpace: 'nowrap' }}>
               {dayLabel(d.date)} {d.isToday && <Pill tone="accent">오늘</Pill>}
@@ -220,19 +241,15 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
               {isHoliday ? (
                 <Pill tone="bad">휴일 근무{d.holiday ? ` · ${d.holiday}` : ''}</Pill>
               ) : (
-              <select
-                className="input"
-                style={{ width: 128 }}
+              <LeaveSelect
                 id={`pl-leave-${d.key}`}
-                value={records[d.key]?.leave || ''}
-                onChange={(e) => dispatch({ type: 'plan/bulk', keys: [d.key], leave: e.target.value || null })}
-                aria-label={`${dayLabel(d.date)} 근태`}
-              >
-                <option value="">근무</option>
-                {LEAVE_ORDER.map((k) => (
-                  <option key={k} value={k}>{rules.leaveTypes[k].label}</option>
-                ))}
-              </select>
+                rules={rules}
+                leave={records[d.key]?.leave || null}
+                leaveMin={records[d.key]?.leaveMin}
+                width={118}
+                ariaLabel={`${dayLabel(d.date)} 근태`}
+                onChange={(leave, leaveMin) => dispatch({ type: 'plan/bulk', keys: [d.key], leave: leave ?? null, leaveMin })}
+              />
               )}
             </td>
             <td>
@@ -291,6 +308,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             <td className="small">
               {d.isToday && d.actual > 0 && <span className="muted">지금까지 {fmtDur(d.actual)} </span>}
               {isHoliday && <span className="muted">Max에서 차감 · 필요시간은 그대로 </span>}
+              {d.plannedExclude > 0 && <span className="muted">제외 −{fmtDur(d.plannedExclude)} </span>}
               {d.isRest && <span className="muted">필요시간 유지 · 다른 날에 채움 </span>}
               {rules.familyDayOn && !d.leave && d.key === familyKey && <Pill tone="plan">패밀리데이 후보</Pill>}
               {d.leaveKind === 'off' && <span className="muted">필요시간 −{fmtDur(d.offCredit)} </span>}
@@ -378,7 +396,8 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
   const [inTime, setInTime] = useState('');
   const [clockIn, setClockIn] = useState(rules.planDefaultIn);
   const [clockOut, setClockOut] = useState('18:00');
-  const [leave, setLeave] = useState('__keep');
+  const [leave, setLeave] = useState(undefined); // undefined = 바꾸지 않음
+  const [leaveMin, setLeaveMin] = useState(undefined);
 
   const clockNet = (() => {
     const a = toMin(clockIn);
@@ -401,7 +420,10 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
       payload.minutes = clockNet;
       payload.inTime = clockIn;
     }
-    if (leave !== '__keep') payload.leave = leave || null;
+    if (leave !== undefined) {
+      payload.leave = leave || null;
+      payload.leaveMin = leaveMin;
+    }
     dispatch(payload);
     notify(`${keys.length}일에 적용하고 고정했습니다.`);
   };
@@ -445,18 +467,18 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
             </div>
             <label className="field">
               <span>출근 시각 (선택)</span>
-              <input className="input num" type="time" id="bulk-in" value={inTime} onChange={(e) => setInTime(e.target.value)} style={{ width: 130 }} />
+              <TimeField id="bulk-in" value={inTime} presets={PRESETS.in} ariaLabel="출근 시각" onChange={(v) => setInTime(v || '')} />
             </label>
           </>
         ) : (
           <>
             <label className="field">
               <span>출근</span>
-              <input className="input num" type="time" id="bulk-clock-in" value={clockIn} onChange={(e) => setClockIn(e.target.value)} style={{ width: 130 }} />
+              <TimeField id="bulk-clock-in" value={clockIn} presets={PRESETS.in} allowEmpty={false} ariaLabel="출근" onChange={(v) => setClockIn(v)} />
             </label>
             <label className="field">
               <span>퇴근</span>
-              <input className="input num" type="time" id="bulk-clock-out" value={clockOut} onChange={(e) => setClockOut(e.target.value)} style={{ width: 130 }} />
+              <TimeField id="bulk-clock-out" value={clockOut} presets={PRESETS.out} allowEmpty={false} ariaLabel="퇴근" onChange={(v) => setClockOut(v)} />
             </label>
             <div className="field">
               <span>= 실근무</span>
@@ -464,16 +486,19 @@ function BulkBar({ keys, s, rules, plans, planIns, locks, dispatch, notify, clea
             </div>
           </>
         )}
-        <label className="field">
+        <div className="field">
           <span>근태</span>
-          <select className="input" id="bulk-leave" value={leave} onChange={(e) => setLeave(e.target.value)} style={{ width: 140 }}>
-            <option value="__keep">바꾸지 않음</option>
-            <option value="">근무 (휴가 해제)</option>
-            {LEAVE_ORDER.map((k) => (
-              <option key={k} value={k}>{rules.leaveTypes[k].label}</option>
-            ))}
-          </select>
-        </label>
+          <LeaveSelect
+            id="bulk-leave"
+            rules={rules}
+            allowKeep
+            leave={leave}
+            leaveMin={leaveMin}
+            width={140}
+            ariaLabel="근태 일괄 변경"
+            onChange={(l, m) => { setLeave(l); setLeaveMin(m); }}
+          />
+        </div>
       </div>
 
       <div className="bulk-actions">

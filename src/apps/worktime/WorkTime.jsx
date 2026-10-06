@@ -5,13 +5,14 @@ import { summarizeMonth } from './lib/engine.js';
 import { fmtClock, minutesOfDay } from './lib/time.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
 import Mini from './pages/Mini.jsx';
+import Widget from './pages/Widget.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Records from './pages/Records.jsx';
 import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.9.2';
+export const WORKTIME_VERSION = '0.10.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -21,7 +22,7 @@ const NAV = [
   ['settings', '설정'],
 ];
 
-export default function WorkTime({ mode, setMode }) {
+export default function WorkTime({ mode, setMode, widget, setWidget }) {
   const [state, dispatch] = useAppStore();
   const [tab, setTab] = useState('dashboard');
   const [now, setNow] = useState(() => new Date());
@@ -58,6 +59,10 @@ export default function WorkTime({ mode, setMode }) {
 
   const props = { state, dispatch, summary, now, go, notify: setToast };
   const toastEl = toast && <div className="toast" role="status">{toast}</div>;
+
+  if (mode === 'widget') {
+    return <Widget {...props} setMode={setMode} widget={widget} setWidget={setWidget} />;
+  }
 
   if (mode === 'compact') {
     return (

@@ -2,6 +2,7 @@
 import { fmtDur, fmtClock, fmtDurKo, dayLabel, monthLabel, ymd, addDays, parseYmd, WEEKDAY_KO } from '../lib/time.js';
 import { evalDay, projectedOf, checkoutFor, grossForNet } from '../lib/engine.js';
 import { Icon, MonthMeter, Pill } from '../../../shared/ui.jsx';
+import { leaveText } from '../lib/rules.js';
 
 export default function Mini({ state, summary, now, expand }) {
   const { rules, plans, records } = state;
@@ -187,7 +188,7 @@ function UpcomingCard({ s, records, rules, expand }) {
     .filter(([k, r]) => k > s.todayKey && r.leave && rules.leaveTypes[r.leave])
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .slice(0, 3)
-    .map(([k, r]) => ({ key: k, text: `${rules.leaveTypes[r.leave].label}${rules.leaveTypes[r.leave].kind === 'rest' ? ' · 필요시간 유지' : ''}${r.note ? ` · ${r.note}` : ''}`, tone: rules.leaveTypes[r.leave].kind === 'rest' ? 'accent' : 'leave', badge: rules.leaveTypes[r.leave].kind === 'rest' ? '쉼' : '휴가' }));
+    .map(([k, r]) => ({ key: k, text: `${leaveText(rules, r)}${rules.leaveTypes[r.leave].kind === 'rest' ? ' · 필요시간 유지' : ''}${r.note ? ` · ${r.note}` : ''}`, tone: rules.leaveTypes[r.leave].kind === 'rest' ? 'accent' : 'leave', badge: rules.leaveTypes[r.leave].kind === 'rest' ? '쉼' : '휴가' }));
   const warns = s.warnings.slice(0, 2).map((w) => ({ key: w.key, text: w.text, tone: 'warn' }));
   const fd = s.familyDay;
   const family =
