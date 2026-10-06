@@ -17,12 +17,15 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -36,32 +39,43 @@ jobs:
       - name: 정산 계산 테스트
         run: node scripts/engine-check.mjs
 
-      - name: 같은 버전의 이전 Release 지우기
-        shell: bash
+      - name: Tauri 빌드
+        run: |
+          set -o pipefail
+          npm run tauri build 2>&1 | tee build.log
+
+      - name: 빌드 오류 요약 (실패했을 때)
+        if: failure()
+        run: |
+          # 오류 줄과 그 뒤 몇 줄을 모아 annotation으로 남긴다 (로그 파일을 못 받는 환경에서도 원인을 볼 수 있게)
+          if [ -f build.log ]; then
+            grep -n -E "error(\[E[0-9]+\])?:|^\s+--> |^\s+\|\s|warning: unused|Error|failed" build.log | head -120 > err.txt || true
+            split -l 25 err.txt part_ || true
+            for f in part_*; do
+              msg=$(sed 's/%/%25/g' "$f" | sed ':a;N;$!ba;s/\n/%0A/g')
+              echo "::error title=build log ($f)::$msg"
+            done
+            tail -40 build.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g' | xargs -0 -I{} echo "::error title=build log tail::{}"
+          fi
+
+      - name: Release 올리기
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           gh release delete "v$VERSION" --cleanup-tag -y || true
-
-      - name: Tauri 빌드 및 Release 업로드
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: 'DFM Slack v__VERSION__'
-          releaseBody: |
-            설치: 아래 Assets에서 `.msi`(또는 `-setup.exe`)를 받아 실행하세요.
-            커밋: ${{ github.sha }}
-          releaseDraft: false
-          prerelease: false
+          shopt -s nullglob
+          FILES=(src-tauri/target/release/bundle/msi/*.msi src-tauri/target/release/bundle/nsis/*.exe)
+          gh release create "v$VERSION" "${FILES[@]}" \
+            --title "DFM Slack v$VERSION" \
+            --notes "설치: 아래 Assets에서 .msi (또는 -setup.exe)를 받아 실행하세요. 커밋 ${GITHUB_SHA::7}" \
+            --target "$GITHUB_SHA"
 
       - name: 빌드 결과 보관 (Actions 탭에서도 받을 수 있게)
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: DFM-Slack-windows
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
