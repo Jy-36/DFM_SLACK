@@ -99,7 +99,7 @@ export async function resizeWindow(mode, opts = {}) {
       try { await win.setMinSize(new mod.LogicalSize(min.width, min.height)); } catch { /* 권한 없음 */ }
       try { if (await win.isMaximized()) await win.unmaximize(); } catch { /* 무시 */ }
       // 위젯·요약은 모서리가 둥근 투명 창(그림자 없음), 확장은 보통 창
-      try { await win.setShadow(mode === 'full'); } catch { /* 권한 없음 */ }
+      try { await win.setShadow(false); } catch { /* 권한 없음 */ } // 모든 모드: 둥근 모서리 투명 창
       const mon = (await mod.currentMonitor()) || (await mod.primaryMonitor());
       if (mon) {
         const wa = mon.workArea || { position: mon.position, size: mon.size };

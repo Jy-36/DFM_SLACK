@@ -276,6 +276,11 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             <td>
               {fullOff ? (
                 <span className="muted">—</span>
+              ) : d.workCredit > 0 ? (
+                <span className="plan-cell fixed-credit" title={`${d.leaveLabel}은 그날 ${fmtDur(d.workCredit)}로 고정되어 더 넣거나 배분하지 않습니다`}>
+                  <span className="stepper locked"><input value={fmtDur(d.workCredit)} readOnly aria-label={`${d.leaveLabel} 인정 시간 (고정)`} id={`pl-${d.key}`} /></span>
+                  <span className="lock-btn on" aria-hidden="true"><Icon name="lock" size={15} /></span>
+                </span>
               ) : (
                 <span className="plan-cell">
                   <PlanStepper
@@ -313,7 +318,7 @@ function WeekGroup({ g, rules, plans, planIns, records, dispatch, sel, toggle, w
             </td>
             <td className="r num">{fmtDur(projectedOf(d, plans, rules))}</td>
             <td className="num" style={{ whiteSpace: 'nowrap' }}>
-              {fullOff || planned === 0 ? (
+              {fullOff || planned === 0 || d.workCredit > 0 ? (
                 <span className="muted">—</span>
               ) : (
                 <>

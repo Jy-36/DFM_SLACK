@@ -1,5 +1,5 @@
 // 정산 엔진 계산 확인: node scripts/engine-check.mjs
-import { evalDay, familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
+import { evalDay, familyDayKey, netFromGross, grossForNet, summarizeMonth, checkoutFor, otInfo, breakZone, projectedOf, distributeEvenly, distributeAmong, distributeToMax, earlierStarts } from '../src/apps/worktime/lib/engine.js';
 import { DEFAULT_RULES as R, migrateRecord } from '../src/apps/worktime/lib/rules.js';
 import { parseAttendanceHtml } from '../src/apps/worktime/lib/sync.js';
 import { generateMockRecords } from '../src/apps/worktime/lib/mockData.js';
@@ -121,4 +121,20 @@ if (typeof DOMParser !== 'undefined') {
   eq('표: 시간 연차 4h', r.leaveMin, 240);
   eq('표: 제외시간 30분', r.excludes[0].min, 30);
 }
+// 출장·교육: 8시간 고정
+const pastD = new Date(2026, 8, 7);
+const trip = evalDay(pastD, { leave: 'trip', in: '08:00', out: '20:00' }, R, { todayKey: '2026-10-06' });
+eq('출장: 체류와 상관없이 8:00', fmtDur(trip.recognized), '8:00');
+const tripF = evalDay(new Date(2026, 9, 20), { leave: 'edu' }, R, { todayKey: '2026-10-06' });
+eq('교육 계획: 계획이 있어도 8:00', fmtDur(projectedOf(tripF, { '2026-10-20': 480 }, R)), '8:00');
+// 휴게 조정 추천: 체류 8:30 초과 ~ 9:00 미만
+eq('휴게 구간', JSON.stringify(breakZone(R)), JSON.stringify({ from: 510, to: 540 }));
+eq('8:45 체류 → 휴게 조정 추천', evalDay(pastD, { in: '09:00', out: '17:45' }, R, { todayKey: '2026-10-06' }).breakAlert, true);
+eq('9:00 체류 → 알림 없음', evalDay(pastD, { in: '09:00', out: '18:00' }, R, { todayKey: '2026-10-06' }).breakAlert, false);
+eq('8:30 체류 → 알림 없음', evalDay(pastD, { in: '09:00', out: '17:30' }, R, { todayKey: '2026-10-06' }).breakAlert, false);
+// OT = 초과 − 14h, 구간
+eq('초과 10h → 호구왕', otInfo(600, R).zone.label, '호구왕');
+eq('초과 18h → 실질 단가 22%', Math.round(otInfo(1080, R).rate * 100), 22);
+eq('초과 28h → 50% 해피존', `${Math.round(otInfo(1680, R).rate * 100)} ${otInfo(1680, R).zone.label}`, '50 해피존');
+eq('초과 40h → 65% 부자존', `${Math.round(otInfo(2400, R).rate * 100)} ${otInfo(2400, R).zone.label}`, '65 부자존');
 process.exit(fail ? 1 : 0);

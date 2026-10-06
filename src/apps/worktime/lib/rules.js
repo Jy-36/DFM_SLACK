@@ -21,6 +21,8 @@ export const DEFAULT_RULES = {
     { at: 480, minutes: 30 },
   ],
   planDefaultIn: '08:30',
+  breakAlertOn: true, // 체류 8:30~9:00 사이면 휴게 조정 추천 알림
+  inclusiveOtMin: 840, // 포괄로 이미 반영된 초과 근무 14h → OT = 초과 근무 − 이 값
   // kind: off  = 비근무근태 → 필요시간에서 차감
   //       work = 근무로 인정 → 인정시간에 더함
   //       rest = 쉬지만 필요시간은 그대로 → 다른 날 근무로 채움 (패밀리데이)

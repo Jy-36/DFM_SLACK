@@ -33,12 +33,12 @@ export default function Dashboard({ state, summary, now, go }) {
 
       <section className="panel stats" aria-label="이번 달 진행">
         <Stat
-          label="현재까지 인정"
+          label="실제 근무 시간"
           value={fmtDur(s.recognizedReq)}
           unit="h"
           foot={s.holidayDone > 0 ? `주말 근무 +${fmtDur(s.holidayDone)} 별도` : '근무일 기준 · 오늘 포함'}
         />
-        <Stat label="필요 시간" value={fmtDur(s.needLeft)} unit="h" foot={`필수 ${fmtDur(s.required)} − 현재`} />
+        <Stat label="필요 시간" value={fmtDur(s.needLeft)} unit="h" foot={`필수 ${fmtDur(s.required)} − 실제 근무`} />
         <Stat label="최대까지 남은" value={fmtDur(s.remainingPossible)} unit="h" foot={`최대 ${fmtDur(s.possible)} 기준`} />
         <Stat
           label="평일 누적초과"
@@ -167,7 +167,7 @@ function TodayCard({ s, t, rules, plans }) {
 }
 
 function WeekBars({ weeks, rules }) {
-  const scale = Math.max(rules.maxWeeklyMin + 8 * 60, ...weeks.map((w) => Math.max(w.projected, w.recognized) + 60));
+  const scale = Math.max(5 * rules.dailyStdMin + 8 * 60, ...weeks.map((w) => Math.max(w.projected, w.recognized, w.std) + 60));
   const pct = (v) => `${Math.min(100, (v / scale) * 100)}%`;
   return (
     <div className="weeks">
@@ -175,11 +175,11 @@ function WeekBars({ weeks, rules }) {
         const mon = parseYmd(w.key);
         return (
           <div className="week-row" key={w.key}>
-            <span className="small muted num">{mon.getMonth() + 1}/{mon.getDate()} 주</span>
+            <span className="small muted num">{mon.getMonth() + 1}/{mon.getDate()} 주 <span style={{ opacity: 0.75 }}>· {Math.round(w.std / 60)}h</span></span>
             <div className="week-track" aria-label={`인정 ${fmtDur(w.recognized)}, 예상 ${fmtDur(w.projected)}`}>
               <i className="proj" style={{ width: pct(w.projected) }} />
               <i className="done" style={{ width: pct(w.recognized) }} />
-              <span className="std" style={{ left: pct(rules.dailyStdMin * 5) }} />
+              {w.std > 0 && <span className="std" style={{ left: pct(w.std) }} title={`근무일 ${w.workdays}일 × ${Math.round(rules.dailyStdMin / 60)}h = ${fmtDur(w.std)}`} />}
               {rules.weeklyLimitOn && <span className="limit" style={{ left: pct(rules.maxWeeklyMin) }} />}
             </div>
             <span className={`small num ${w.over ? 'tone-bad' : ''}`} style={{ textAlign: 'right' }}>
@@ -192,7 +192,7 @@ function WeekBars({ weeks, rules }) {
       <div className="legend">
         <span><i style={{ background: 'var(--accent)' }} />인정</span>
         <span><i style={{ background: 'var(--sky)' }} />계획 포함 예상</span>
-        <span><i style={{ background: 'var(--muted)', width: 2 }} />40h</span>
+        <span><i style={{ background: 'var(--muted)', width: 2 }} />주 기준 = 근무일 수 × {Math.round(rules.dailyStdMin / 60)}h</span>
         {rules.weeklyLimitOn && <span><i style={{ background: 'var(--bad)', width: 2 }} />{Math.round(rules.maxWeeklyMin / 60)}h</span>}
       </div>
     </div>

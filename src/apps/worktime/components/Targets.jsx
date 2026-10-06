@@ -2,15 +2,27 @@
 // 설명 문구는 화면에 늘어놓지 않고 각 항목의 (i)에 넣는다.
 import { fmtDur, fmtDurKo } from '../lib/time.js';
 import { MonthMeter, InfoTip } from '../../../shared/ui.jsx';
+import { otInfo } from '../lib/engine.js';
 
-/** 월말 예상: 필수 근무 시간 대비 ± (OT · 주말) */
-export function MonthEnd({ s, compact = false }) {
+/** OT 구간 배지: 호구왕 · 호구존 · 해피존 · 부자존 (실질 단가 %) */
+export function OtZone({ o }) {
+  if (o.zone.key === 'none') return null;
+  return (
+    <span className={`ot-zone ${o.zone.key}`} title={`${o.zone.desc} · 실질 단가 = OT ÷ 초과 근무 = ${Math.round(o.rate * 100)}%`}>
+      {o.zone.label} <span className="num">{Math.round(o.rate * 100)}%</span>
+    </span>
+  );
+}
+
+/** 예상 초과 근무 시간: 평일 기준 필수 근무 시간 대비 ± (OT = 초과 − 포괄 14h · 주말 따로) */
+export function MonthEnd({ s, rules, compact = false }) {
+  const o = otInfo(s.projectedDiff, rules);
   const tone = (v) => (v < 0 ? 'tone-bad' : v > 0 ? 'tone-good' : '');
   return (
     <span className={`month-end ${compact ? 'compact' : ''}`}>
-      <b className={`num ${tone(s.projectedTotalDiff)}`}>{fmtDur(s.projectedTotalDiff, { sign: true })}</b>
+      <b className={`num ${tone(o.excess)}`}>{fmtDur(o.excess, { sign: true })}</b>
       <span className="month-end-sub num">
-        (OT <b className={tone(s.projectedDiff)}>{fmtDur(s.projectedDiff, { sign: true })}</b>
+        (OT <b className={o.ot < 0 ? 'tone-warn' : 'tone-good'}>{fmtDur(o.ot, { sign: true })}</b>
         {s.weekendTotal > 0 && (
           <>
             {' · '}주말 <b className="tone-hw">+{fmtDur(s.weekendTotal)}</b>
@@ -18,6 +30,7 @@ export function MonthEnd({ s, compact = false }) {
         )}
         )
       </span>
+      <OtZone o={o} />
     </span>
   );
 }
@@ -47,7 +60,7 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', rea
     ),
     need: (
       <>
-        <b>필요 시간</b> = 필수 근무 시간 {fmtDur(s.required)} − 현재 근무 시간 {fmtDur(s.recognizedReq)}
+        <b>필요 시간</b> = 필수 근무 시간 {fmtDur(s.required)} − 실제 근무 시간 {fmtDur(s.recognizedReq)}
         <br />이번 달 근무일에 앞으로 더 일해야 하는 시간입니다 (오늘 일한 시간 포함, 주말 근무 제외).
       </>
     ),
@@ -59,9 +72,11 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', rea
     ),
     end: (
       <>
-        <b>월말 예상</b> = 지금 계획대로 일했을 때 월말 근무 시간 − 필수 근무 시간
-        <br /><b>OT</b> = 평일(근무일)만 계산한 초과·부족
-        <br /><b>주말</b> = 주말·공휴일 근무 (실적 + 계획), OT와 따로 표시
+        <b>예상 초과 근무 시간</b> = 계획대로 일했을 때 월말 평일 근무 시간 − 필수 근무 시간
+        <br /><b>OT</b> = 초과 근무 시간 − 포괄 {fmtDurKo(rules.inclusiveOtMin ?? 840)} (이미 급여에 들어 있는 시간)
+        <br /><b>주말</b> = 주말·공휴일 근무 (실적 + 계획), 따로 표시
+        <br /><b>실질 단가</b> = OT ÷ 초과 근무 시간
+        <br />~14h 호구왕(무급) · 16~18h 호구존(12~22%) · 28h 해피존(50%) · 40h+ 부자존(65%+)
       </>
     ),
   };
@@ -93,8 +108,8 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', rea
           <b className={`num ${s.weekdayOvertime < 0 ? 'tone-bad' : s.weekdayOvertime > 0 ? 'tone-good' : ''}`}>{fmtDur(s.weekdayOvertime, { sign: true })}</b>
         </div>
         <div className="target">
-          <span className="label">월말 예상 <InfoTip text={tips.end} align="right" /></span>
-          <MonthEnd s={s} />
+          <span className="label">예상 초과 근무 시간 <InfoTip text={tips.end} align="right" /></span>
+          <MonthEnd s={s} rules={rules} />
         </div>
       </div>
       <div style={{ paddingTop: 22 }}>
@@ -102,7 +117,7 @@ export function TargetsPanel({ s, rules, title = '이번 달 기준 시간', rea
       </div>
       <div className="legend" style={{ justifyContent: 'space-between' }}>
         <span style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-          <span><i style={{ background: 'var(--accent)' }} />현재 근무 {fmtDur(pastPart)}</span>
+          <span><i style={{ background: 'var(--accent)' }} />실제 근무 시간 {fmtDur(pastPart)}</span>
           <span><i style={{ background: 'var(--sky)' }} />남은 계획 {fmtDur(planPart)}</span>
           {holidayPart > 0 && <span><i style={{ background: 'var(--leave)' }} />주말 근무 {fmtDur(holidayPart)}</span>}
         </span>

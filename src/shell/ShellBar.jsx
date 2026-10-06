@@ -68,6 +68,12 @@ function AddMenu({ tabs, addTab, closeTab, onClose }) {
   );
 }
 
+const MODES = [
+  { id: 'widget', name: 'Widget Mode', icon: 'widget', desc: '모니터 오른쪽 위 작은 창 · 투명도 · 항상 위' },
+  { id: 'compact', name: 'App Mode', icon: 'appMode', desc: '모니터 오른쪽 끝에 붙는 요약 화면' },
+  { id: 'full', name: 'Window Mode', icon: 'windowMode', desc: '넓은 창 · 전체 메뉴 (현황·근무기록·계획)' },
+];
+
 export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mode, setMode, theme, setTheme }) {
   const [menu, setMenu] = useState(false);
   const compact = mode === 'compact';
@@ -106,18 +112,22 @@ export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mo
 
       <div className="sb-actions">
         <ThemeCycle theme={theme} setTheme={setTheme} />
-        <button type="button" className="icon-btn" onClick={() => setMode('widget')} title="위젯으로 작게 (투명도·항상 위)" aria-label="위젯 모드">
-          <Icon name="widget" size={17} />
-        </button>
-        <button
-          type="button"
-          className={`icon-btn ${compact ? 'accent' : ''}`}
-          onClick={() => setMode(compact ? 'full' : 'compact')}
-          title={compact ? '전체 화면으로 확장' : '휴대폰 크기 요약 화면으로'}
-          aria-label={compact ? '전체 화면으로 확장' : '요약 화면으로'}
-        >
-          <Icon name={compact ? 'expand' : 'compress'} size={17} />
-        </button>
+        <span className="mode-switch" role="group" aria-label="화면 모드">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="mode-btn"
+              aria-pressed={mode === m.id}
+              aria-label={m.name}
+              data-tip={m.name}
+              data-desc={m.desc}
+              onClick={() => mode !== m.id && setMode(m.id)}
+            >
+              <Icon name={m.icon} size={16} />
+            </button>
+          ))}
+        </span>
         <WindowControls />
       </div>
     </header>

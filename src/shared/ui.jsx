@@ -101,6 +101,8 @@ const ICONS = {
   unlock: 'M12 2a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zM6 12h12v8H6v-8z',
   plus: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z',
   minimize: 'M5 11h14v2H5z',
+  appMode: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h4V5h-4zM3 5h8v2H3zm0 4h8v2H3zm0 4h8v2H3zm0 4h8v2H3z',
+  windowMode: 'M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 3v9h4V9H5zm6 0v9h8V9h-8z',
   navClose: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v12h4V6H5zm6 0v12h8V6h-8zm5.6 2.6L13.2 12l3.4 3.4-1.4 1.4L10.4 12l4.8-4.8 1.4 1.4z',
   navOpen: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v12h4V6H5zm6 0v12h8V6h-8zm2.4 2.6 1.4-1.4 4.8 4.8-4.8 4.8-1.4-1.4L16.8 12l-3.4-3.4z',
   widget: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm2 0v14h14V5H5zm7 6h6v6h-6v-6z',

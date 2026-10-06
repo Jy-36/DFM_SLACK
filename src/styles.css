@@ -881,3 +881,90 @@ html.tauri[data-mode='compact'] .shell {
 .ex-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .ex-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .ex-row .ex-range, .ex-row .ex-min { grid-column: 1 / -1; }
+
+/* ── 계획(예정) 막대: 빗금 대신 옅은 단색 + 은은한 결 → 숫자·경계가 잘 보이게 ── */
+.meter .seg-plan, .week-track .proj, .wk-bar .plan {
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 9px),
+    color-mix(in srgb, var(--sky) 62%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky) 70%, transparent);
+}
+:root[data-theme='dark'] .meter .seg-plan, :root[data-theme='dark'] .week-track .proj, :root[data-theme='dark'] .wk-bar .plan {
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.10) 0 2px, transparent 2px 9px),
+    color-mix(in srgb, var(--sky) 48%, var(--surface));
+}
+
+/* ── OT 구간 배지 ── */
+.ot-zone { display: inline-flex; align-items: center; gap: 4px; width: fit-content; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+.ot-zone .num { font-weight: 600; opacity: 0.85; }
+.ot-zone.king { color: #c2410c; background: color-mix(in srgb, #f97316 16%, transparent); }
+.ot-zone.hogu { color: #b45309; background: color-mix(in srgb, #f59e0b 18%, transparent); }
+.ot-zone.happy { color: #047857; background: color-mix(in srgb, #10b981 18%, transparent); }
+.ot-zone.rich { color: #1d4ed8; background: color-mix(in srgb, #3b82f6 18%, transparent); }
+:root[data-theme='dark'] .ot-zone.king { color: #fdba74; } :root[data-theme='dark'] .ot-zone.hogu { color: #fcd34d; }
+:root[data-theme='dark'] .ot-zone.happy { color: #6ee7b7; } :root[data-theme='dark'] .ot-zone.rich { color: #93c5fd; }
+.month-end { justify-items: start; }
+.month-end .ot-zone { margin-top: 3px; }
+.month-end.compact { flex-wrap: wrap; row-gap: 2px; }
+.month-end.compact .ot-zone { margin-top: 0; }
+.mini-ot { align-items: center; }
+.mini-ot .month-end.compact > b { font-size: 15px; }
+
+/* ── 휴게 조정 알림 ── */
+.break-alert { display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.5;
+  background: color-mix(in srgb, var(--warn) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+.break-alert b { color: var(--warn); font-size: 13px; }
+.break-alert.mini { margin-top: -2px; }
+.wg-alert { font-size: 10px; font-weight: 800; color: #1a1300; background: #fbbf24; border-radius: 999px; padding: 0 6px; line-height: 15px; }
+
+/* ── 화면 모드 버튼 (Widget / App / Window Mode) + 설명 풍선 ── */
+.mode-switch { display: inline-flex; gap: 2px; padding: 2px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line); }
+.mode-btn { position: relative; width: 30px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.mode-btn:hover { color: var(--fg); background: var(--surface); }
+.mode-btn[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+.mode-btn::after {
+  content: attr(data-tip) '\A' attr(data-desc); white-space: pre; position: absolute; top: calc(100% + 8px); right: -6px; z-index: 80;
+  padding: 7px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.45; font-weight: 500; text-align: left; color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(10, 25, 60, 0.18);
+  opacity: 0; transform: translateY(-3px); pointer-events: none; transition: opacity 0.12s, transform 0.12s;
+}
+.mode-btn::first-line { font-weight: 700; }
+.mode-btn:hover::after, .mode-btn:focus-visible::after { opacity: 1; transform: none; }
+
+/* ── 왼쪽 메뉴 접기 버튼: 위쪽에 작게 ── */
+.nav-toggle { display: none; }
+.nav { position: sticky; }
+.nav-collapse {
+  position: absolute; top: 24px; right: 10px; width: 26px; height: 26px; border-radius: 8px; border: 1px solid transparent;
+  background: none; color: var(--faint); display: grid; place-items: center; cursor: pointer;
+}
+.nav-collapse:hover { color: var(--fg); background: var(--surface-2); border-color: var(--line); }
+.app.nav-mini .nav-collapse { position: static; margin: -10px auto 10px; }
+.app:not(.nav-mini) .brand { padding-right: 30px; }
+.app:not(.nav-mini) .nav-foot { margin-top: auto; }
+@media (max-width: 900px) { .nav-collapse { display: none; } }
+
+/* ── App Mode: 접는 카드 · 오늘 현황 조금 작게 ── */
+.fold-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 2px 0; color: inherit; cursor: pointer; min-width: 0; }
+.fold-btn svg { transform: rotate(90deg); transition: transform 0.15s; color: var(--muted); flex: none; }
+.fold-btn[aria-expanded='false'] svg { transform: rotate(0deg); }
+.fold-peek { font-size: 12px; color: var(--muted); margin-left: 4px; }
+.mini-hero { padding: 16px 18px; gap: 12px; }
+.mini-clock { font-size: 40px; }
+.ring { width: 88px; height: 88px; }
+.ring .ring-label b { font-size: 18px; }
+.ring .ring-label span { font-size: 10px; }
+.mini-facts div { padding: 8px 11px; }
+.mini-facts b { font-size: 14.5px; }
+
+/* ── 모든 모드: 설치형에서 둥근 모서리 창 ── */
+html.tauri, html.tauri body { background: transparent !important; background-image: none !important; }
+html.tauri body { overflow: hidden; }
+html.tauri:not([data-mode='widget']) .shell {
+  height: 100vh; overflow: hidden auto; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--bg); background-image: radial-gradient(900px 400px at 0% -10%, var(--bg-glow), transparent 60%);
+  scrollbar-width: thin;
+}
+.fixed-credit .stepper input { width: 64px; text-align: center; }
+.fixed-credit .stepper { padding-inline: 6px; }

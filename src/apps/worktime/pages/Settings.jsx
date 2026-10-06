@@ -77,6 +77,8 @@ export default function Settings({ state, dispatch, notify }) {
             </select>
           </label>
           {hoursField('minDailyMin', '근무일 최소 인정', '0이면 검사하지 않음')}
+          {hoursField('inclusiveOtMin', '포괄 초과 근무 시간', 'OT = 예상 초과 근무 시간 − 이 값 (기본 14h)')}
+          {toggleField('breakAlertOn', '휴게 조정 추천 알림', '체류 8:30~9:00 사이 퇴근이면 알림')}
           {toggleField('familyDayOn', '패밀리데이 표시', '21일이 있는 주 금요일을 후보로 표시')}
           {toggleField('dailyLimitOn', '하루 최대 근무 제한', '끄면 제한 없음 (회사 기준)')}
           {r.dailyLimitOn && hoursField('maxDailyMin', '하루 최대 근무', '초과분은 인정하지 않음')}

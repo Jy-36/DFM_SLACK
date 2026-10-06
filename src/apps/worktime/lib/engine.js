@@ -39,6 +39,7 @@ export function dailyCapOf(day, rules) {
   const from = toMin(rules.recognizeFrom);
   // 오늘은 이미 출근한 시각부터 인정 시간대 끝까지만 가능
   const start = day?.isToday && day.inMin != null ? Math.max(from, day.inMin) : from;
+  if (day?.workCredit > 0) return 0; // 출장·교육 날은 계획을 더 넣지 않음
   const windowNet = netFromGross(Math.max(0, toMin(rules.recognizeTo) - start), rules);
   if (rules.dailyLimitOn) return Math.min(windowNet, Math.max(0, rules.maxDailyMin - (day?.workCredit || 0)));
   return windowNet;
@@ -127,7 +128,8 @@ export function evalDay(date, rec, rules, ctx = {}) {
   }
   // 제외시간은 출근 기록이 있는(근무한) 날에만 반영
   const plannedExclude = inMin != null ? excludeTotal(rec) : 0;
-  const recognized = capDay(actual + workCredit, rules);
+  // 출장·교육은 그날 8시간으로 고정 (실제 체류와 상관없이, 더 얹지 않음)
+  const recognized = workCredit > 0 ? workCredit : capDay(actual, rules);
   const dayRequired = isWorkday ? Math.max(0, rules.dailyStdMin - offCredit) : 0; // 그날 필수근무
 
   const warnings = [];
@@ -136,6 +138,11 @@ export function evalDay(date, rec, rules, ctx = {}) {
   if (isPast && isWorkday && rules.minDailyMin > 0 && actual > 0 && actual + credit < rules.minDailyMin)
     warnings.push('최소 근무 미달');
   if (rules.dailyLimitOn && actual + workCredit > rules.maxDailyMin) warnings.push('1일 최대 초과');
+  // 휴게 조정 추천: 체류가 (8h + 첫 휴게) ~ (8h + 휴게 1시간) 사이면 회사 기록은 휴게 30분·8시간 초과로 잡힐 수 있다
+  const zone = breakZone(rules);
+  const stay = gross - excluded;
+  const breakAlert = !!zone && workCredit === 0 && inMin != null && stay > zone.from && stay < zone.to;
+  if (breakAlert) warnings.push('휴게 조정 추천');
 
   let status = 'work';
   if (holiday && !actual) status = 'holiday';
@@ -173,19 +180,47 @@ export function evalDay(date, rec, rules, ctx = {}) {
     recognized,
     live,
     warnings,
+    breakAlert,
+    breakWindow: zone && inMin != null ? { from: inMin + excluded + zone.from, to: inMin + excluded + zone.to } : null,
     status,
     note: rec?.note || '',
   };
 }
 
-/** 그날 일할 수 있는 기본 계획(실근무, 분) */
+/** 휴게 조정이 필요한 체류시간 구간 (분). 기본: 8:30 초과 ~ 9:00 미만
+ *  = 실근무 8시간 + 앞선 휴게(30분)를 넘었지만 두 번째 휴게(30분)를 다 채우지 못한 구간 */
+export function breakZone(rules) {
+  if (rules.breakAlertOn === false) return null;
+  const std = rules.dailyStdMin;
+  const second = sortedBreaks(rules).find((b) => b.at >= std);
+  if (!second) return null;
+  const from = grossForNet(std, rules); // 8:00 + 30분 = 8:30
+  return { from, to: from + second.minutes };
+}
+
+/** 예상 초과 근무 시간 → OT(포괄 14h 뺀 시간)와 구간 */
+export function otInfo(excess, rules) {
+  const inc = rules.inclusiveOtMin ?? 840;
+  const ot = excess - inc;
+  const rate = excess > 0 ? Math.max(0, ot) / excess : 0; // 실질 단가 (정규 단가 대비)
+  let zone;
+  if (excess <= 0) zone = { key: 'none', label: '초과 없음', desc: '필수 근무 시간 이하' };
+  else if (excess <= inc) zone = { key: 'king', label: '호구왕', desc: `무급 구간 · 포괄 ${Math.round(inc / 60)}h 이내라 일할수록 손해` };
+  else if (excess < 28 * 60) zone = { key: 'hogu', label: '호구존', desc: '실질 단가 최저 구간 (16~18h에서 정규 단가의 12~22%)' };
+  else if (excess < 40 * 60) zone = { key: 'happy', label: '해피존', desc: '28h에서 정규 단가 50% 회복' };
+  else zone = { key: 'rich', label: '부자존', desc: '40h 이상 · 정규 단가 65% 이상 회복' };
+  return { excess, ot, inc, rate, zone };
+}
+
+/** 그날 일할 수 있는 기본 계획(실근무, 분). 출장·교육 날은 8시간 고정이라 더 넣지 않음 */
 export const capacityOf = (day, rules) =>
-  day.isWorkday && !day.isRest ? Math.max(0, rules.dailyStdMin - day.offCredit - day.workCredit) : 0;
+  day.isWorkday && !day.isRest && !day.workCredit ? Math.max(0, rules.dailyStdMin - day.offCredit) : 0;
 export const defaultPlanFor = capacityOf;
 
 /** 그날 예상 인정시간: 지난 날은 실적, 오늘·미래는 계획 */
 export function projectedOf(day, plans, rules) {
   if (day.isPast) return day.recognized;
+  if (day.workCredit > 0) return day.workCredit; // 출장·교육: 8시간 고정
   // 종일 비근무근태(연차 등)인 날은 계획이 남아 있어도 일하지 않는 것으로 본다
   const planned = day.offCredit >= rules.dailyStdMin || day.isRest ? 0 : plans[day.key] ?? defaultPlanFor(day, rules);
   const work = day.isToday ? Math.max(planned, day.actual) : planned;
@@ -251,7 +286,7 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
   for (const d of days) {
     const wk = weekKeyOf(d.date);
     if (!byKey.has(wk)) {
-      const w = { key: wk, days: [], recognized: 0, projected: 0 };
+      const w = { key: wk, days: [], recognized: 0, projected: 0, workdays: 0, std: 0 };
       byKey.set(wk, w);
       weeks.push(w);
     }
@@ -264,6 +299,10 @@ export function summarizeMonth(year, month, records, rules, plans = {}, now = ne
       const ev = w.days.find((x) => x.key === ymd(d)) || evalDay(d, records[ymd(d)], rules, { todayKey, nowMin });
       w.recognized += ev.isPast || ev.isToday ? ev.recognized : 0;
       w.projected += projectedOf(ev, plans, rules);
+      if (ev.isWorkday) {
+        w.workdays += 1;
+        w.std += rules.dailyStdMin; // 주 기준 = 근무일 수 × 8h
+      }
     }
     w.over = !!rules.weeklyLimitOn && w.projected > rules.maxWeeklyMin;
   }

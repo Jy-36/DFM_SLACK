@@ -115,10 +115,10 @@ export default function Records({ state, dispatch, now, view, setView, draft, se
           </div>
           <div className="month-total">
             <span>필수 <b>{fmtDur(s.required)}</b></span>
-            <span>{isCurrent ? '현재까지 인정' : '인정'} <b>{fmtDur(monthDone)}</b></span>
+            <span>실제 근무 시간 <b>{fmtDur(monthDone)}</b></span>
             {holidayDone > 0 && <span>휴일 근무 <b>{fmtDur(holidayDone)}</b> <InfoTip text="주말·공휴일 근무는 최대 근무 시간에서만 빠지고 필수 근무 시간은 줄여주지 않습니다." /></span>}
             {isCurrent ? (
-              <span className="month-end-line">월말 예상 <MonthEnd s={s} compact /></span>
+              <span className="month-end-line">예상 초과 근무 시간 <MonthEnd s={s} rules={rules} compact /></span>
             ) : (
               <span>정산 <b className={monthDone - s.required < 0 ? 'tone-bad' : 'tone-good'}>{fmtDur(monthDone - s.required, { sign: true })}</b></span>
             )}
@@ -352,6 +352,15 @@ function DayDetail({ d, rec, orig, dirty, rules, plans, set, clear, revert }) {
         )}
       </div>
 
+      {d.breakAlert && d.breakWindow && (
+        <div className="break-alert" role="alert">
+          <b>휴게 시간 조정 추천</b>
+          <span>
+            체류 {fmtDur(d.gross - d.excluded)} → 회사 기록은 휴게 30분 · 근무 {fmtDur(d.gross - d.excluded - 30)}로 잡혀 8시간을 넘깁니다.
+            8시간 넘게 일하면 휴게 1시간이 필요하니 휴게를 1시간으로 조정하거나, 퇴근을 {fmtClock(d.breakWindow.from)}까지 또는 {fmtClock(d.breakWindow.to)} 이후로 맞추세요.
+          </span>
+        </div>
+      )}
       {d.warnings.length > 0 && (
         <div className="banner" style={{ background: 'var(--warn-soft)' }}>
           <span>{d.warnings.join(' · ')}</span>

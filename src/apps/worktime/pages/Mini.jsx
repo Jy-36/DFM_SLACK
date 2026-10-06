@@ -1,55 +1,114 @@
 // 요약 모드: 휴대폰 폭 창에서 오늘·이번 달·이번 주만 한눈에
 import { fmtDur, fmtClock, fmtDurKo, dayLabel, monthLabel, ymd, addDays, parseYmd, WEEKDAY_KO } from '../lib/time.js';
 import { evalDay, projectedOf, checkoutFor, grossForNet } from '../lib/engine.js';
+import { useState } from 'react';
 import { Icon, MonthMeter, Pill } from '../../../shared/ui.jsx';
+import { MonthEnd } from '../components/Targets.jsx';
+
+// 카드 접힘 상태 (월 정산 · 이번 주)
+const FOLD_KEY = 'worktime.mini.fold';
+function useFold() {
+  const [fold, setFold] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const toggle = (k) =>
+    setFold((f) => {
+      const next = { ...f, [k]: !f[k] };
+      try {
+        localStorage.setItem(FOLD_KEY, JSON.stringify(next));
+      } catch {
+        /* 저장 불가 */
+      }
+      return next;
+    });
+  return [fold, toggle];
+}
+
+/** 접었다 펼 수 있는 카드 머리 */
+function FoldHead({ title, open, onToggle, extra, children }) {
+  return (
+    <div className="mini-card-head">
+      <button type="button" className="fold-btn" onClick={onToggle} aria-expanded={open}>
+        <Icon name="chevron" size={14} />
+        <h3>{title}</h3>
+        {!open && extra}
+      </button>
+      {children}
+    </div>
+  );
+}
+
+/** 오늘 휴게 조정 알림: 체류 8:30~9:00 사이 퇴근이면 회사 기록이 휴게 30분 · 8시간 초과로 잡힌다 */
+export function breakNotice(t, nowMin) {
+  if (!t || t.inMin == null || !t.breakWindow) return null;
+  const { from, to } = t.breakWindow;
+  if (t.breakAlert) return { now: true, from, to };
+  if (t.live && nowMin >= from - 30 && nowMin < to) return { now: false, from, to };
+  return null;
+}
 import { leaveText } from '../lib/rules.js';
 
 export default function Mini({ state, summary, now, expand }) {
   const { rules, plans, records } = state;
   const s = summary;
   const t = s.today;
+  const [fold, toggle] = useFold();
 
 
   return (
     <div className="mini fade-in">
       <Hero t={t} s={s} rules={rules} plans={plans} records={records} now={now} />
+      <BreakAlert t={t} now={now} />
 
       <section className="mini-card" aria-label="이번 달 정산">
-        <div className="mini-card-head">
-          <h3>{monthLabel(s.year, s.month).replace(/^\d+년 /, '')} 정산</h3>
+        <FoldHead
+          title={`${monthLabel(s.year, s.month).replace(/^\d+년 /, '')} 정산`}
+          open={!fold.month}
+          onToggle={() => toggle('month')}
+          extra={<span className="fold-peek num">필요 {fmtDur(s.needLeft)}</span>}
+        >
           <button className="link-btn" onClick={() => expand('plan')}>
             근무 계획 <Icon name="chevron" size={14} />
           </button>
-        </div>
+        </FoldHead>
+        {!fold.month && (<>
         <div style={{ paddingTop: 18 }}>
           <MonthMeter work={s.recognizedReq} leave={s.holidayDone + s.holidayPlanned} plan={Math.max(0, s.projectedReq - s.recognizedReq)} total={s.possible} marker={s.required} markerLabel="필수" />
         </div>
         <div className="mini-nums">
           <div><span>필수</span><b>{fmtDur(s.required)}</b></div>
           <div><span>최대</span><b>{fmtDur(s.possible)}</b></div>
-          <div><span>인정</span><b>{fmtDur(s.recognizedReq)}</b></div>
+          <div><span>근무 시간</span><b>{fmtDur(s.recognizedReq)}</b></div>
         </div>
         <div className="mini-diff">
           <span className="muted">
             평일 누적초과{' '}
             <b className={`num ${s.weekdayOvertime < 0 ? 'tone-bad' : 'tone-good'}`}>{fmtDur(s.weekdayOvertime, { sign: true })}</b>
           </span>
-          <Pill tone={s.projectedTotalDiff < 0 ? 'bad' : 'good'}>월말 {fmtDur(s.projectedTotalDiff, { sign: true })} (OT {fmtDur(s.projectedDiff, { sign: true })}{s.weekendTotal > 0 ? ` · 주말 +${fmtDur(s.weekendTotal)}` : ''})</Pill>
+        </div>
+        <div className="mini-diff mini-ot">
+          <span className="muted">예상 초과 근무</span>
+          <MonthEnd s={s} rules={rules} compact />
         </div>
         <div className="mini-diff small">
           <span className="muted">
-            필요 <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.remainingNeed)}</b> · {s.daysToWork}일 · 하루 평균{' '}
+            필요 <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.needLeft)}</b> · {s.daysToWork}일 · 하루 평균{' '}
             <b className="num" style={{ color: 'var(--fg)' }}>{fmtDur(s.avgPerDay)}</b>
           </span>
         </div>
+        </>)}
       </section>
 
-      <WeekCard s={s} rules={rules} plans={plans} records={records} now={now} expand={expand} />
+      <WeekCard s={s} rules={rules} plans={plans} records={records} now={now} expand={expand} open={!fold.week} onToggle={() => toggle('week')} />
 
       <UpcomingCard s={s} records={records} rules={rules} now={now} expand={expand} />
 
       <button className="btn primary expand-cta" onClick={() => expand('dashboard')}>
-        <Icon name="expand" size={16} /> 전체 화면으로 보기
+        <Icon name="expand" size={16} /> Window Mode로 보기
       </button>
       <div className="mini-foot">
         <span>
@@ -58,6 +117,19 @@ export default function Mini({ state, summary, now, expand }) {
         </span>
         <button className="link-btn" onClick={() => expand('sync')}>동기화하기</button>
       </div>
+    </div>
+  );
+}
+
+function BreakAlert({ t, now }) {
+  const n = breakNotice(t, now.getHours() * 60 + now.getMinutes());
+  if (!n) return null;
+  return (
+    <div className="break-alert mini" role="alert">
+      <b>휴게 시간 조정 추천</b>
+      <span>
+        {fmtClock(n.from)}~{fmtClock(n.to)} 사이에 퇴근하면 휴게 30분으로 8시간 넘게 일한 것으로 잡혀요. 휴게를 1시간으로 조정하거나 {fmtClock(n.from)}까지 또는 {fmtClock(n.to)} 이후에 퇴근하세요.
+      </span>
     </div>
   );
 }
@@ -108,7 +180,7 @@ function Hero({ t, s, rules, plans }) {
           </div>
         </div>
         <div className="ring" role="img" aria-label={`오늘 목표의 ${Math.round(pct * 100)}% 근무`}>
-          <svg width="112" height="112" viewBox="0 0 112 112">
+          <svg width="88" height="88" viewBox="0 0 112 112">
             <circle cx="56" cy="56" r={R} fill="none" stroke="var(--hero-track)" strokeWidth="10" />
             <circle cx="56" cy="56" r={R} fill="none" stroke="#ffffff" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${C * pct} ${C}`} />
           </svg>
@@ -128,7 +200,7 @@ function Hero({ t, s, rules, plans }) {
   );
 }
 
-function WeekCard({ s, rules, plans, records, now, expand }) {
+function WeekCard({ s, rules, plans, records, now, expand, open, onToggle }) {
   const todayKey = s.todayKey;
   const base = parseYmd(todayKey);
   const mon = addDays(base, base.getDay() === 0 ? -6 : 1 - base.getDay());
@@ -141,13 +213,13 @@ function WeekCard({ s, rules, plans, records, now, expand }) {
 
   return (
     <section className="mini-card" aria-label="이번 주">
-      <div className="mini-card-head">
-        <h3>이번 주</h3>
+      <FoldHead title="이번 주" open={open} onToggle={onToggle}>
         <span className="small muted">
           예상 <b className={`num ${rules.weeklyLimitOn && total > rules.maxWeeklyMin ? 'tone-bad' : ''}`} style={{ color: rules.weeklyLimitOn && total > rules.maxWeeklyMin ? undefined : 'var(--fg)' }}>{fmtDur(total)}</b>
-          {rules.weeklyLimitOn && ` / ${Math.round(rules.maxWeeklyMin / 60)}h`}
+          {week && week.std > 0 ? ` / ${Math.round(week.std / 60)}h` : ''}
         </span>
-      </div>
+      </FoldHead>
+      {open && (<>
       <div className="wk">
         {days.map((d) => {
           const proj = projectedOf(d, plans, rules);
@@ -179,6 +251,7 @@ function WeekCard({ s, rules, plans, records, now, expand }) {
         <span><i style={{ background: 'var(--leave)' }} />휴가</span>
         <span><i style={{ background: 'var(--sky)' }} />계획</span>
       </div>
+          </>)}
     </section>
   );
 }

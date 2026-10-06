@@ -2,6 +2,7 @@
 // 설치형에서는 투명 창이라 투명도만큼 뒤가 비치고, 항상 위를 켤 수 있다.
 import { fmtDur, fmtClock, dayLabel } from '../lib/time.js';
 import { checkoutFor } from '../lib/engine.js';
+import { breakNotice } from './Mini.jsx';
 import { Icon } from '../../../shared/ui.jsx';
 import { DfmLogo } from '../../../shared/Logo.jsx';
 import { isTauri } from '../../../shared/platform.js';
@@ -25,6 +26,7 @@ export default function Widget({ state, summary, now, setMode, widget, setWidget
   const pct = working && targetNet ? Math.min(1, t.actual / targetNet) : 0;
   const left = working ? Math.max(0, targetNet - t.actual) : 0;
   const tauri = isTauri();
+  const brk = breakNotice(t, now.getHours() * 60 + now.getMinutes());
 
   return (
     <div className="widget" data-tauri-drag-region>
@@ -33,6 +35,9 @@ export default function Widget({ state, summary, now, setMode, widget, setWidget
           <DfmLogo size={18} />
           <span>WorkTime</span>
           <span className="wg-date num">{dayLabel(now)}</span>
+          {brk && (
+            <span className="wg-alert" title={`휴게 시간 조정 추천: ${fmtClock(brk.from)}~${fmtClock(brk.to)} 퇴근은 휴게 30분으로 8시간 넘게 일한 것으로 잡힘`}>휴게</span>
+          )}
         </span>
         <span className="wg-actions">
           <button
@@ -46,8 +51,11 @@ export default function Widget({ state, summary, now, setMode, widget, setWidget
           >
             <Icon name="pin" size={13} />
           </button>
-          <button type="button" className="wg-btn" onClick={() => setMode('compact')} title="요약 화면으로" aria-label="요약 화면으로">
-            <Icon name="expand" size={13} />
+          <button type="button" className="wg-btn" onClick={() => setMode('compact')} title="App Mode · 오른쪽에 붙는 요약 화면" aria-label="App Mode">
+            <Icon name="appMode" size={13} />
+          </button>
+          <button type="button" className="wg-btn" onClick={() => setMode('full')} title="Window Mode · 넓은 창, 전체 메뉴" aria-label="Window Mode">
+            <Icon name="windowMode" size={13} />
           </button>
           {tauri && (
             <button type="button" className="wg-btn close" onClick={() => win('close')} title="닫기" aria-label="닫기">
@@ -82,7 +90,7 @@ export default function Widget({ state, summary, now, setMode, widget, setWidget
       </div>
 
       <div className="wg-foot">
-        <span className={`num ${s.projectedTotalDiff < 0 ? 'tone-bad' : 'tone-good'}`} title={`OT ${fmtDur(s.projectedDiff, { sign: true })} · 주말 +${fmtDur(s.weekendTotal)}`}>월말 {fmtDur(s.projectedTotalDiff, { sign: true })}</span>
+        <span className={`num ${s.projectedDiff < 0 ? 'tone-bad' : 'tone-good'}`} title={`예상 초과 근무 시간 · OT ${fmtDur(s.projectedDiff - (state.rules.inclusiveOtMin ?? 840), { sign: true })}${s.weekendTotal > 0 ? ` · 주말 +${fmtDur(s.weekendTotal)}` : ''}`}>초과 {fmtDur(s.projectedDiff, { sign: true })}</span>
         <label className="wg-opacity" title="투명도">
           <Icon name="drop" size={12} />
           <input

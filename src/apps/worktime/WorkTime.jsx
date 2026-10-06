@@ -12,7 +12,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.12.0';
+export const WORKTIME_VERSION = '0.13.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -103,6 +103,9 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
             <div className="brand-sub">선택근무제 근무시간 · v{WORKTIME_VERSION}</div>
           </div>
         </div>
+        <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
+          <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
+        </button>
         {NAV.map(([key, label]) => (
           <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
             <Icon name={key} />
@@ -110,10 +113,6 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
             {key === 'records' && draftCount > 0 && <span className="nav-dot" title={`반영 안 한 수정 ${draftCount}건`}>{draftCount}</span>}
           </button>
         ))}
-        <button type="button" className="nav-btn nav-toggle" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
-          <Icon name={navMini ? 'navOpen' : 'navClose'} />
-          <span className="nav-label">메뉴 접기</span>
-        </button>
         <div className="nav-foot">
           <span>
             <Pill tone={state.dataMode === 'portal' ? 'accent' : 'plan'}>
