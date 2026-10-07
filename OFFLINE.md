@@ -27,3 +27,4 @@ crates.io·npm에 접속할 수 없는 사내 PC에서 DFM Slack을 빌드하기
   이 폴더의 `.cargo\config.toml`(vendor 사용, offline)이 우선합니다.
 - `src-tauri\Cargo.toml`이나 `package.json`의 의존성을 바꾸면 새 패키지가 필요합니다
   (GitHub Actions → "오프라인 빌드 패키지" → Run workflow). 화면 코드(`src\`)만 고치는 건 그대로 빌드됩니다.
+
