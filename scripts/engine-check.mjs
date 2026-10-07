@@ -15,9 +15,9 @@ const now = new Date(2026, 9, 6, 10, 5);
 const recs = generateMockRecords(now);
 const sep = summarizeMonth(2026, 8, recs, R, {}, now);
 eq('9월 Max (52/7×30 = 222.86h → 시간 버림)', fmtDur(sep.possible), '222:00');
-eq('9월 필요 기준 (근무일 19×8=152 vs 40/7×30=171:00 중 작은 값)', fmtDur(sep.targets.base), '152:00');
+eq('9월 필요 기준 (근무일 20×8=160 vs 40/7×30=171:00 중 작은 값, 9/28은 근무일)', fmtDur(sep.targets.base), '160:00');
 eq('9월 비근무근태 (연차8 + 시간연차4h)', fmtDur(sep.targets.offTotal), '12:00');
-eq('9월 필요', fmtDur(sep.required), '140:00');
+eq('9월 필요', fmtDur(sep.required), '148:00');
 
 const oct = summarizeMonth(2026, 9, recs, R, {}, now);
 eq('10월 Max (52/7×31 = 230.29h → 시간 버림)', fmtDur(oct.possible), '230:00');
@@ -155,4 +155,9 @@ eq('초과 18h + 주말 8h → (4+8)/26 = 46%', Math.round(otInfo(1080, R, 480).
   const s3 = summarizeMonth(2026, 9, recs, R, rBig.plans, now);
   eq('초과 200h 목표 → 최대 근무 시간에서 멈춤', `${rBig.capped} ${s3.projected <= s3.possible}`, 'true true');
 }
-process.exit(fail ? 1 : 0);
+// MTO 일정 엔진 테스트도 같이 돌린다 (CI의 '정산 계산 테스트' 단계에서 함께 확인)
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+console.log('\n── MTO 일정 엔진 (scripts/mto-check.mjs)');
+const mto = spawnSync(process.execPath, [fileURLToPath(new URL('./mto-check.mjs', import.meta.url))], { stdio: 'inherit' });
+process.exit(fail || mto.status ? 1 : 0);
