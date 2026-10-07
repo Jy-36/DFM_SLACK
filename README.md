@@ -1,7 +1,7 @@
 # DFM Slack
 
 업무용 도구를 탭으로 모아 쓰는 Windows 데스크톱 앱입니다 (Tauri 2 + React 18).
-첫 번째 탭은 선택근무제 근무시간을 관리하는 **WorkTime**입니다.
+탭: 선택근무제 근무시간을 관리하는 **WorkTime**, Mask STEP2·MTO 일정을 계산하는 **MTO**.
 
 - 상단 바의 **+** 로 앱을 탭으로 추가하거나 닫습니다.
 - 처음에는 **요약 화면**(모니터 오른쪽 끝, 위아래 꽉 차게, 둥근 모서리)으로 열리고, 상단 바 버튼으로 **확장 화면**(1440×940, 모니터보다 크면 줄임)으로 바꿉니다.
@@ -19,7 +19,8 @@ src/
     apps.js       탭으로 넣을 수 있는 앱 목록 ← 새 앱은 여기에 한 줄 추가
   apps/
     worktime/     WorkTime 앱 (정산 엔진 lib/, 화면 pages/)
-  shared/         여러 앱이 같이 쓰는 UI·테마·창 크기
+    mto/          MTO 일정 앱 (규칙 엔진 lib/, 화면 pages/, 간트 components/)
+  shared/         여러 앱이 같이 쓰는 UI·테마·창 크기·공휴일 표
 src-tauri/        데스크톱 앱 (창, 사내 사이트 수집 커맨드)
 ```
 
@@ -63,6 +64,7 @@ npm run dev            # 브라우저에서 화면만 확인 (http://localhost:1
 npm run tauri dev      # 데스크톱 창으로 실행
 npm run tauri build    # 설치 파일 생성 → src-tauri/target/release/bundle/{msi,nsis}
 npm run test:engine    # 정산 엔진 계산 확인 (Node만 있으면 됨)
+npm run test:mto       # MTO 일정 엔진 확인
 ```
 
 회사 PC에서 npm·crates 설치가 막혀 있으면, 개발 가능한 PC에서 `npm run tauri build`로 만든 `.msi`만 옮겨 설치하면 됩니다.
@@ -146,3 +148,65 @@ src-tauri/
 - 화면·정산 엔진: 가짜 데이터로 동작 확인
 - Tauri(Rust) 쪽: GitHub Actions의 Windows 빌드로 확인
 - 저장: localStorage (Tauri 창에서도 동작). 다음 단계에서 `tauri-plugin-sql`(SQLite)로 교체 예정
+
+# MTO
+
+Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 **MTO 날짜**를 계산하고 병목을 분석합니다.
+`mto-scheduling-agent`(Python)의 규칙 엔진을 JS로 옮겨 앱 안에서 바로 계산합니다 — Python·서버·인터넷 없이 동작.
+
+## 화면
+
+| 모드 · 메뉴 | 하는 일 |
+|---|---|
+| 일정 현황 | GDS 입고일·하루 MTO 수·STEP2 동시 수 빠른 변경, 최종 MTO, 대기 요약, 병목 분석(최종 MTO 경로 · 원인별 누적 대기), 추천 일정(조건 변경·Layer 순서 재배열·GDS 조정 효과), 리스크, 시나리오 비교(2·3장 × 4·5장, 누르면 적용), 간트 |
+| Layer List | 직접 편집, 엑셀 붙여넣기(머리줄이 있으면 열 순서 무관), CSV 열기, 예시 30장, No 다시 매기기·위아래 이동 |
+| Layer별 일정표 | 날짜별 MTO 묶음, Layer별 표, 엑셀용 복사, CSV 저장 |
+| 규칙 | STEP1 TAT(Part), STEP2 TAT(Type 추가·삭제), Part B GDS 간격, 하루 MTO 수, STEP2 동시 수, MTO 가능 간격, 주말·회사 휴무일 |
+| App Mode | 최종 MTO · 빠른 조건 변경 · 다음 MTO · 병목 · 시나리오 |
+| Widget Mode | 최종 MTO · 리드타임 · 다음 MTO · 진행 |
+
+입력이 바뀌면 바로 다시 계산하고, 입력·규칙은 localStorage(`mto.v1`)에 저장합니다.
+
+## 규칙 (기본값)
+
+| # | 규칙 | 구현 |
+|---|------|------|
+| 1 | Part B GDS = Part A GDS + 2주 | `partBOffsetDays = 14` |
+| 2·3 | STEP1은 Part(GDS) 단위, STEP2는 Layer 단위 | Part별 STEP1 1회 |
+| 4 | GDS → STEP1 → STEP2 | STEP2는 STEP1 끝난 다음 날부터 |
+| 5 | STEP2 + 1일 후 MTO, No 순서대로 | `mtoGapDays = 1`, 앞 번호를 앞지르지 않음 |
+| 6 | STEP1/2는 휴일 시작 불가, 시작 후엔 휴일에도 진행 | 시작일만 근무일로, TAT는 달력일 |
+| 7 | STEP1 TAT A 5 / B 3, STEP2 TAT X 3 / Y 5 / Z 7 | `step1Tat`, `step2Tat` |
+| 8·9 | MTO는 휴일 불가, 대한민국 공휴일 | `src/shared/holidays.js` (WorkTime과 공유) + 주말 + 회사 휴무 |
+| 10 | 하루 MTO 2~3장 | `mtoPerDay` (기본 2) |
+| 11 | STEP2 동시 4~5장 | `step2Concurrency` (기본 4), No 순서로 슬롯이 비는 첫 근무일에 투입, 진행 중이면 휴일에도 슬롯 점유 |
+
+- TAT: S일 시작, TAT n이면 S ~ S+n-1일 진행, 다음 단계는 S+n일부터.
+- GDS 입고일이 휴일이면 STEP1은 다음 근무일에 시작.
+- 공휴일 표는 2026·2027년만 들어 있습니다. 다른 해는 주말만 휴일로 계산하고 화면에 알려 줍니다(규칙 → 회사 휴무일로 보완).
+
+## 분석
+
+원본의 LLM 분석(병목·추천·리스크)을 규칙 기반으로 바꿨습니다. 날짜는 엔진 결과만 쓰고, 추천은 엔진을 다시 돌려 비교한 값입니다.
+- **최종 MTO 경로**: 마지막 MTO Layer가 GDS 대기·STEP1·휴일·STEP2 슬롯 대기·STEP2·MTO 대기에 각각 며칠을 썼는지
+- **병목**: STEP2 슬롯 대기 / 앞 번호 Layer 때문에 생긴 순서 대기 / 하루 MTO 장수 제한 / 휴일 밀림 — Layer별 대기를 더한 누적 일수와 비중
+- **추천**: 시나리오 중 가장 빠른 조합, Part 안 Layer 순서 재배열(짧은 Type 먼저/긴 Type 먼저 중 나은 쪽, [순서 적용]·되돌리기), GDS를 1~3일 당겼을 때 그 이상 당겨지는 경우
+- **리스크**: STEP2가 꽉 찬 구간, 대기 0일인 Layer, MTO 앞뒤 공휴일, 공휴일 표가 없는 해
+
+## MTO 구조
+
+```
+src/apps/mto/
+  Mto.jsx          탭 진입점 (모드 전환, 메뉴)
+  lib/
+    scheduler.js   규칙 엔진 (buildSchedule, scenarioGrid, makeCalendar) ← 규칙이 바뀌면 DEFAULT_CONFIG
+    insights.js    병목·추천·리스크 분석
+    report.js      요약 수치, CSV·엑셀용 텍스트
+    layers.js      예시 Layer, 붙여넣기 파서, 입력 확인
+    dates.js       'YYYY-MM-DD' 날짜 계산
+    store.js       상태 (localStorage)
+  components/      Gantt(SVG), Insights, Controls
+  pages/           Overview, LayerList, ScheduleTable, Rules, Mini, Widget
+scripts/mto-check.mjs        규칙 테스트 + Python 엔진 결과와 날짜 비교 (npm run test:mto, test:engine·CI에서도 함께 실행)
+scripts/fixtures/mto-golden.json   Python 엔진 결과 (같은 공휴일 표로 생성)
+```

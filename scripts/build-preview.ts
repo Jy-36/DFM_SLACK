@@ -3,7 +3,7 @@
 const ORDER = [
   'src/shared/platform.js',
   'src/apps/worktime/lib/time.js',
-  'src/apps/worktime/lib/holidays.js',
+  'src/shared/holidays.js',
   'src/apps/worktime/lib/rules.js',
   'src/apps/worktime/lib/mockData.js',
   'src/apps/worktime/lib/sync.js',
@@ -38,6 +38,8 @@ let js = 'const { useState, useEffect, useMemo, useReducer, useRef, useCallback 
 for (const f of ORDER) {
   const src = await Bun.file(f).text();
   let out = tr.transformSync(src);
+  // 이 미리보기는 WorkTime만 묶는다 (MTO 탭은 모듈이 많아 이어 붙이기 방식으로는 이름이 겹침 → npm run dev로 확인)
+  if (f === 'src/shell/apps.js') out = out.replace(/\{\s*id: "mto"[\s\S]*?component: Mto\s*\},?/, '');
   out = out
     .split('\n')
     .filter((l) => !/^import\s.+from\s.+;?\s*$/.test(l) && !/^import\s+['"].+['"];?\s*$/.test(l))
