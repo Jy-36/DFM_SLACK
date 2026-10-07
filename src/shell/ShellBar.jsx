@@ -63,7 +63,7 @@ function AddMenu({ tabs, addTab, closeTab, onClose }) {
           </div>
         );
       })}
-      <p className="add-foot">다른 앱은 준비되는 대로 여기에 추가됩니다.</p>
+      <p className="add-foot">새 앱은 업데이트되면 탭에 자동으로 한 번 추가됩니다. 닫은 탭은 여기서 다시 열 수 있어요.</p>
     </div>
   );
 }
@@ -74,7 +74,7 @@ const MODES = [
   { id: 'full', name: 'Window Mode', icon: 'windowMode', desc: '넓은 창 · 전체 메뉴 (현황·근무기록·계획)' },
 ];
 
-export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mode, setMode, theme, setTheme }) {
+export default function ShellBar({ tabs, active, setActive, fresh = [], addTab, closeTab, mode, setMode, theme, setTheme }) {
   const [menu, setMenu] = useState(false);
   const compact = mode === 'compact';
   return (
@@ -99,6 +99,7 @@ export default function ShellBar({ tabs, active, setActive, addTab, closeTab, mo
             >
               <Icon name={app.icon} size={14} />
               {app.name}
+              {fresh.includes(id) && <span className="sb-new" title="새로 추가된 앱">NEW</span>}
             </button>
           );
         })}

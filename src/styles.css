@@ -992,3 +992,6 @@ html.tauri:not([data-mode='widget']) .shell {
 .target-pop .seg button { flex: 1; justify-content: center; }
 .target-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .target-row .input { width: 90px; }
+
+/* 업데이트로 새로 생긴 탭 표시 */
+.sb-new { margin-left: 2px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; line-height: 15px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; }

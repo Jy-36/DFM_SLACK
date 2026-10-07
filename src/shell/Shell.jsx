@@ -8,6 +8,8 @@ import { APPS, appById } from './apps.js';
 
 const TABS_KEY = 'dfmslack.tabs';
 const ACTIVE_KEY = 'dfmslack.active';
+const SEEN_KEY = 'dfmslack.seenApps'; // 지금까지 알려 준 앱 (닫은 탭을 다시 열지 않게)
+const LEGACY_APPS = ['worktime']; // 앱 목록 기록이 생기기 전(0.15.0 이하)부터 있던 앱
 const read = (k, fallback) => {
   try {
     const v = localStorage.getItem(k);
@@ -24,13 +26,26 @@ const write = (k, v) => {
   }
 };
 
+function initialTabs() {
+  const saved = read(TABS_KEY, null);
+  const seen = read(SEEN_KEY, null);
+  const all = APPS.map((a) => a.id);
+  const tabs = (saved || all).filter((id) => appById(id));
+  const known = seen || (saved ? LEGACY_APPS : all);
+  const added = all.filter((id) => !known.includes(id) && !tabs.includes(id));
+  return { tabs: [...tabs, ...added], added };
+}
+
 export default function Shell() {
   const [theme, setTheme] = useTheme();
   const [widget, setWidget] = useWidgetPrefs();
   const widgetRef = useRef(widget);
   widgetRef.current = widget;
   const [mode, setMode] = useWindowMode(() => widgetRef.current);
-  const [tabs, setTabs] = useState(() => read(TABS_KEY, ['worktime']).filter((id) => appById(id)));
+  // 업데이트로 새로 생긴 앱은 한 번 자동으로 탭에 넣는다 (예전 PC에는 탭 목록이 WorkTime만 저장돼 있음)
+  const [init] = useState(initialTabs);
+  const [tabs, setTabs] = useState(init.tabs);
+  const [fresh, setFresh] = useState(init.added);
   const [active, setActive] = useState(() => {
     const a = read(ACTIVE_KEY, 'worktime');
     return appById(a) ? a : null;
@@ -46,6 +61,7 @@ export default function Shell() {
     document.documentElement.style.setProperty('--wg-opacity', String(widget.opacity));
   }, [widget.opacity]);
   useEffect(() => write(TABS_KEY, tabs), [tabs]);
+  useEffect(() => write(SEEN_KEY, APPS.map((a) => a.id)), []);
   useEffect(() => write(ACTIVE_KEY, active), [active]);
 
   const current = active && tabs.includes(active) ? appById(active) : appById(tabs[0]);
@@ -72,7 +88,11 @@ export default function Shell() {
       <ShellBar
         tabs={tabs}
         active={current?.id}
-        setActive={setActive}
+        setActive={(id) => {
+          setActive(id);
+          setFresh((f) => f.filter((x) => x !== id));
+        }}
+        fresh={fresh}
         addTab={addTab}
         closeTab={closeTab}
         mode={mode}
