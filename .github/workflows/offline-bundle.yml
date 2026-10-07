@@ -1,0 +1,79 @@
+# 사내 PC처럼 crates.io·npm에 접속할 수 없는 곳에서 빌드할 수 있도록
+# 소스 + node_modules + Rust 의존성(vendor) + Tauri 번들 도구를 한 zip으로 묶어 Release에 올린다.
+# Actions 탭에서 "오프라인 빌드 패키지" → Run workflow 로 실행.
+name: 오프라인 빌드 패키지
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  bundle:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: npm 의존성 (package-lock 생성)
+        run: npm install
+
+      - name: Rust 의존성 내려받기 (Cargo.lock + vendor)
+        shell: pwsh
+        run: |
+          cd src-tauri
+          cargo generate-lockfile
+          cargo vendor --locked ../offline/vendor | Out-Null
+          cd ..
+          New-Item -ItemType Directory -Force .cargo | Out-Null
+          @"
+          # 오프라인 빌드: crates.io 대신 같이 들어 있는 offline/vendor 폴더를 쓴다
+          [source.crates-io]
+          replace-with = "vendored-sources"
+
+          [source.vendored-sources]
+          directory = "offline/vendor"
+
+          [net]
+          offline = true
+          "@ | Set-Content -Encoding utf8 .cargo/config.toml
+
+      - name: 오프라인으로 실제 빌드되는지 확인 (네트워크 없이 cargo)
+        shell: pwsh
+        env:
+          CARGO_NET_OFFLINE: 'true'
+        run: npm run tauri build
+
+      - name: Tauri 번들 도구(WiX·NSIS) 같이 넣기
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:LOCALAPPDATA 'tauri'
+          if (Test-Path $src) { Copy-Item -Recurse $src offline/tauri-tools }
+          Get-ChildItem offline -Directory | Select-Object Name
+
+      - name: zip 만들기
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          echo "VERSION=$v" >> $env:GITHUB_ENV
+          Remove-Item -Recurse -Force src-tauri/target, dist -ErrorAction SilentlyContinue
+          7z a -tzip -mx=5 "../dfm-slack-offline-$v.zip" . "-xr!.git" | Select-Object -Last 3
+          Get-Item "../dfm-slack-offline-$v.zip" | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB)}}
+
+      - name: Release에 올리기
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "offline-v$env:VERSION"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag "../dfm-slack-offline-$env:VERSION.zip" --title "오프라인 빌드 패키지 v$env:VERSION" --notes-file OFFLINE.md --prerelease
