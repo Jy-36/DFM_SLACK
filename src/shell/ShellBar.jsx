@@ -5,6 +5,7 @@ import { isTauri } from '../shared/platform.js';
 import { Icon, ThemeCycle } from '../shared/ui.jsx';
 import { DfmLogo } from '../shared/Logo.jsx';
 import { APPS, appById } from './apps.js';
+import { EDITION } from '../shared/edition.js';
 
 async function win(action) {
   try {
@@ -82,6 +83,7 @@ export default function ShellBar({ tabs, active, setActive, fresh = [], addTab, 
       <div className="sb-brand" data-tauri-drag-region>
         <DfmLogo size={compact ? 32 : 26} />
         <strong>DFM Slack</strong>
+        {EDITION && <span className="sb-edition">{EDITION}</span>}
       </div>
 
       <div className="sb-tabs" role="tablist" aria-label="앱 탭" data-tauri-drag-region>

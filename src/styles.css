@@ -995,3 +995,6 @@ html.tauri:not([data-mode='widget']) .shell {
 
 /* 업데이트로 새로 생긴 탭 표시 */
 .sb-new { margin-left: 2px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; line-height: 15px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; }
+
+/* Prototype 판 표시 */
+.sb-edition { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 16px; padding: 0 6px; border-radius: 6px; color: var(--warn); background: var(--warn-soft); white-space: nowrap; }

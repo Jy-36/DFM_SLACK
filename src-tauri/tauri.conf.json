@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DFM Slack",
+  "productName": "DFM Slack Prototype",
   "version": "0.15.1",
-  "identifier": "com.dfmslack.desktop",
+  "identifier": "com.dfmslack.prototype",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DFM Slack",
+        "title": "DFM Slack Prototype",
         "width": 420,
         "height": 820,
         "minWidth": 380,
@@ -47,6 +47,6 @@
         "type": "embedBootstrapper"
       }
     },
-    "shortDescription": "DFM Slack"
+    "shortDescription": "DFM Slack Prototype"
   }
 }

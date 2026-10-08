@@ -5,6 +5,7 @@ import { isTauri } from '../shared/platform.js';
 import { Icon } from '../shared/ui.jsx';
 import ShellBar from './ShellBar.jsx';
 import { APPS, appById } from './apps.js';
+import { APP_NAME } from '../shared/edition.js';
 
 const TABS_KEY = 'dfmslack.tabs';
 const ACTIVE_KEY = 'dfmslack.active';
@@ -66,7 +67,7 @@ export default function Shell() {
 
   const current = active && tabs.includes(active) ? appById(active) : appById(tabs[0]);
   useEffect(() => {
-    document.title = current ? `DFM Slack - ${current.name}` : 'DFM Slack';
+    document.title = current ? `${APP_NAME} - ${current.name}` : APP_NAME;
   }, [current]);
 
   const addTab = (id) => {

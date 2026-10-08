@@ -2,6 +2,7 @@
 // React는 CDN UMD 전역을 쓰고, 각 모듈의 import/export만 걷어내 이어 붙인다.
 const ORDER = [
   'src/shared/platform.js',
+  'src/shared/edition.js',
   'src/apps/worktime/lib/time.js',
   'src/shared/holidays.js',
   'src/apps/worktime/lib/rules.js',
