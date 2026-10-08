@@ -14,6 +14,8 @@ import { parseLayerText } from '../src/apps/mto/lib/layers.js';
 import { analyze } from '../src/apps/mto/lib/insights.js';
 import { toCsv } from '../src/apps/mto/lib/report.js';
 import { computeProject, newProject, effectiveConfig } from '../src/apps/mto/lib/projects.js';
+import * as OPS from '../src/apps/mto/lib/processOps.js';
+import { modulesOf, activeFeolOptionsOf, chosenModOpt, porOf } from '../src/apps/mto/lib/process.js';
 import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows, setRowsOf, beolOptionsOf, migrateProcess, feolOptionsOf, feolRowsOf, beolRowsOf, layerKind } from '../src/apps/mto/lib/process.js';
 
 let fail = 0;
@@ -208,6 +210,31 @@ ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part
 // ── Python 엔진과 비교
 const golden = JSON.parse(readFileSync(new URL('./fixtures/mto-golden.json', import.meta.url), 'utf8'));
 let diffs = 0;
+{
+  // Module 순서 · POR Module Option · BEOL Option 복사 · Concept 비활성
+  const ex = exampleProcess([]);
+  eq('Module 기본 순서', modulesOf(ex).join(), 'FEOL,MOL');
+  const mv = OPS.moveModule(ex, 'MOL', -1);
+  eq('Module 순서 바꾸기', modulesOf(mv).join(), 'MOL,FEOL');
+  const feolOrder = mv.rows.filter((r) => r.part === 'FEOL').map((r) => r.module);
+  ok('시트 FEOL Layer도 Module 순서대로', feolOrder.indexOf('FEOL') > feolOrder.lastIndexOf('MOL'));
+  eq('BEOL 자리는 그대로', mv.rows.filter((r) => r.part === 'BEOL').map((r) => r.id).join(), ex.rows.filter((r) => r.part === 'BEOL').map((r) => r.id).join());
+  const df = OPS.setDefaultModOpt(ex, 'MOL', 'HD');
+  eq('POR Module Option 바꾸기', chosenModOpt(df, porOf(df), 'MOL'), 'HD');
+  eq('POR Option이 목록 맨 앞', df.moduleOptions.MOL[0], 'HD');
+  const ch = OPS.modOptChange(ex, porOf(ex).id, 'MOL', 'HD');
+  eq('Module Option 바꿀 때 빠지고 들어오는 Layer', `${ch.out.map((r) => r.layer)}>${ch.in.map((r) => r.layer)}`, 'A-13>A-13H');
+  const bo = OPS.addBeolOption(ex, '13M', { copyFrom: '15M', concept: 'x' });
+  eq('BEOL Option Reference Copy', beolRowsOf(bo, '13M').length, beolRowsOf(ex, '15M').length);
+  ok('복사한 Layer는 새 id', !beolRowsOf(bo, '13M').some((r) => ex.rows.some((x) => x.id === r.id)));
+  const hd = feolOptionsOf(ex).find((o) => !o.por);
+  const off = OPS.updateFeolOption(ex, hd.id, { active: false });
+  eq('비활성 Concept은 Product 선택에서 빠짐', activeFeolOptionsOf(off).length, 1);
+  eq('지금 쓰는 비활성 Concept은 남김', activeFeolOptionsOf(off, hd.id).length, 2);
+  const nm = OPS.addModule(ex, 'Gate', ['Base', 'LP']);
+  eq('Module 추가는 맨 뒤 + Module Option', `${modulesOf(nm).join()}|${nm.moduleOptions.Gate.join()}`, 'FEOL,MOL,Gate|Base,LP');
+}
+
 for (const [key, g] of Object.entries(golden)) {
   const [gds, m, c] = key.split('|');
   const res = buildSchedule(gds, EXAMPLE_LAYERS, { mtoPerDay: Number(m), step2Concurrency: c === 'None' ? null : Number(c) });

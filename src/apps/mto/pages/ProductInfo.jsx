@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
-import { beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
+import { activeFeolOptionsOf, beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
 
 export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
   const products = state.projects.filter((p) => p.kind === 'product');
@@ -100,7 +100,7 @@ export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
                             dispatch({ type: 'setFeolOption', id: p.id, option: e.target.value });
                             notify(`${p.name}: FEOL ${o?.name}로 바꿨어요 · BEOL은 그대로, FEOL Layer만 바뀌었어요${its.length ? ` · ITEM ${its.length}개 확인 필요` : ''}`);
                           }} aria-label="FEOL Concept">
-                            {feolOptionsOf(proc).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
+                            {activeFeolOptionsOf(proc, feolOptionOf(proc, p.feolOption).id).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
                           </select>
                         ) : <span className="muted small">-</span>}
                       </td>

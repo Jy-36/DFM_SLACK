@@ -503,3 +503,45 @@ button.tree-group .num { margin-left: auto; padding-right: 10px; font-weight: 50
 .moc-table td.strong { font-weight: 700; }
 .moc-table td.diff { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .moc-table td.none { color: var(--faint); font-style: italic; }
+/* v0.22: 뒤로 · 앞으로, 추가 버튼, Concept 활성, Module 순서 */
+.nav-hist { display: flex; align-items: center; gap: 4px; padding: 0 8px 10px; }
+.nav-hist.mini { justify-content: center; padding-inline: 0; }
+.nav-hist .icon-btn.back svg { transform: rotate(180deg); }
+.nav-hist .icon-btn:disabled { opacity: 0.35; cursor: default; }
+.nav-hist .small { margin-left: 4px; }
+.fo-chip.add { width: 32px; padding: 0; justify-content: center; border-style: dashed; color: var(--accent); }
+.fo-chip.off { opacity: 0.6; border-style: dashed; }
+.off-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: var(--surface-3); color: var(--muted); }
+.strike-off { opacity: 0.7; }
+.mod-order { display: inline-flex; flex-direction: column; gap: 0; }
+.mod-order .icon-btn.sm { width: 22px; height: 15px; min-height: 0; padding: 0; }
+.mod-order .icon-btn.up svg { transform: rotate(-90deg); }
+.mod-order .icon-btn.down svg { transform: rotate(90deg); }
+.mod-order .icon-btn:disabled { opacity: 0.3; }
+button.mod-row.add { width: 100%; border: 0; border-top: 1px dashed var(--line-strong); background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; justify-content: center; }
+button.mod-row.add:hover { background: var(--accent-soft); }
+button.bo-card.add { align-items: center; justify-content: center; cursor: pointer; color: var(--accent); min-height: 76px; }
+button.bo-card.add:hover { background: var(--accent-soft); }
+.tree-group-row { display: flex; align-items: center; }
+.tree-group-row .tree-group { flex: 1; }
+.tree-add { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 4px; border: 1px dashed var(--line-strong); border-radius: 6px; background: none; color: var(--accent); cursor: pointer; flex: none; }
+.tree-add:hover { background: var(--accent-soft); border-color: var(--accent); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle-track { width: 32px; height: 18px; border-radius: 999px; background: var(--line-strong); position: relative; transition: background 0.15s; }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 0.15s; }
+.toggle input:checked + .toggle-track { background: var(--good); }
+.toggle input:checked + .toggle-track .toggle-knob { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.mo-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-sm); margin-top: 10px; overflow: hidden; }
+.mo-tr { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr) minmax(120px, 1.2fr) 110px; gap: 10px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+.mo-tr:first-child { border-top: 0; }
+.mo-tr.head { background: var(--surface-2); padding-block: 6px; }
+.mo-tr.por { background: var(--warn-soft); }
+.mo-change { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.mo-arrow { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 6px; }
+.mo-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.stack-chip.out { background: var(--bad-soft); color: var(--bad); border-color: transparent; text-decoration: line-through; }
+.stack-chip.in { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.check { display: flex; align-items: flex-start; gap: 6px; cursor: pointer; }
+.check input { margin-top: 2px; }
