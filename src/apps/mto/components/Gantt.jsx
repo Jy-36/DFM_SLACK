@@ -1,6 +1,6 @@
 // 일정 간트 (SVG): STEP1(Part) · STEP2 슬롯 대기 · STEP2 · MTO 대기 · MTO, 휴일 열, 위쪽에 일자별 STEP2 동시 진행 수
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { makeCalendar } from '../lib/scheduler.js';
+import { makeCalendar, partLabel } from '../lib/scheduler.js';
 import { addDays, diffDays, fmtShort, fromDay, toDay, todayIso, weekdayOf } from '../lib/dates.js';
 
 const LOAD_H = 30;
@@ -103,13 +103,13 @@ export default function Gantt({ result, highlight }) {
   const bh = ROW - 9;
   for (const part of parts) {
     const s1 = result.step1[part];
-    const gds = part === 'A' ? result.partAGds : result.partBGds;
+    const gds = s1.gds;
     rows.push(<rect key={`pb${part}`} className="rowband" x={0} y={y} width={W} height={ROW} />);
-    rows.push(<text key={`pl${part}`} className="lbl strong" x={10} y={y + ROW / 2 + 4}>{`Part ${part}`}</text>);
-    rows.push(<text key={`pg${part}`} className="lbl sub" x={60} y={y + ROW / 2 + 4}>{`GDS ${fmtShort(gds)}`}</text>);
+    rows.push(<text key={`pl${part}`} className="lbl strong" x={10} y={y + ROW / 2 + 4}>{partLabel(part)}</text>);
+    rows.push(<text key={`pg${part}`} className="lbl sub" x={part === "R" ? 76 : 60} y={y + ROW / 2 + 4}>{`GDS ${fmtShort(gds)}`}</text>);
     rows.push(<path key={`pa${part}`} className="gds-mark" d={`M${x(gds) + colW / 2 - 5},${y + 3} l5,7 l5,-7 z`} />);
     rows.push(bar(`s1${part}`, 'step1', x(s1.start), y + 4, xEnd(s1.end) - x(s1.start), bh, {
-      cls: 'step1', title: `Part ${part} · STEP1 (TAT ${cfg.step1Tat[part]}일)`, rows: [['GDS 입고', fmtShort(gds)], ['시작', fmtShort(s1.start)], ['종료', fmtShort(s1.end)]],
+      cls: 'step1', title: `${partLabel(part)} · STEP1 (TAT ${cfg.step1Tat[part]}일)`, rows: [['GDS 입고', fmtShort(gds)], ['시작', fmtShort(s1.start)], ['종료', fmtShort(s1.end)]],
     }));
     y += ROW;
     for (const l of result.layers.filter((v) => v.part === part)) {

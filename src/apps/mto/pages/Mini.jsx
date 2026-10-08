@@ -1,13 +1,15 @@
-// App Mode (휴대폰 폭 요약): 최종 MTO · 빠른 조건 변경 · 다음 MTO · 병목 · 시나리오
+// App Mode (휴대폰 폭 요약): 묶음 고르기 · 최종 MTO · 빠른 조건 변경 · 전체 묶음 · 다음 MTO · 병목 · 시나리오
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { QuickControls } from '../components/Controls.jsx';
 import { Scenarios } from '../components/Insights.jsx';
+import { KindTag, projectStatus } from '../components/ProjectBar.jsx';
 import { diffDays, fmtLong, fmtShort, todayIso } from '../lib/dates.js';
 import { mtoByDate } from '../lib/report.js';
 import { loadExample } from './Overview.jsx';
 
-export default function Mini({ state, dispatch, calc, notify, expand }) {
+export default function Mini({ state, dispatch, project, calc, calcs, notify, expand }) {
   const { result, analysis: an } = calc;
+  const rev = project.kind === 'revision';
   const today = todayIso();
   const days = result ? mtoByDate(result) : [];
   const upcoming = days.filter((d) => d.date >= today).slice(0, 4);
@@ -15,11 +17,21 @@ export default function Mini({ state, dispatch, calc, notify, expand }) {
 
   return (
     <div className="mini mto-mini fade-in">
+      <div className="mini-pick" role="tablist" aria-label="Product · Revision">
+        {state.projects.map((p) => (
+          <button key={p.id} type="button" role="tab" aria-selected={p.id === project.id} className="pb-chip" onClick={() => dispatch({ type: 'select', id: p.id })}>
+            <KindTag kind={p.kind} />
+            <span className="pb-name">{p.name}</span>
+          </button>
+        ))}
+        <button type="button" className="pb-chip add" onClick={() => expand('all')} title="Product · Revision 추가는 Window Mode에서" aria-label="추가"><Icon name="plus" size={14} /></button>
+      </div>
+
       {result && an ? (
         <section className="mini-hero">
           <div className="mini-hero-row">
             <div style={{ display: 'grid', gap: 6 }}>
-              <span className="label">최종 MTO</span>
+              <span className="label">{project.name} · 최종 MTO</span>
               <b className="mini-clock num">{fmtShort(result.finalMto).replace(/\(.\)/, '')}</b>
               <span className="muted small">{fmtLong(result.finalMto)}</span>
             </div>
@@ -30,29 +42,58 @@ export default function Mini({ state, dispatch, calc, notify, expand }) {
             </div>
           </div>
           <div className="mini-facts">
-            <div><span>Part A GDS</span><b className="num">{fmtShort(result.partAGds)}</b></div>
-            <div><span>Part B GDS</span><b className="num">{fmtShort(result.partBGds)}</b></div>
+            {rev ? (
+              <>
+                <div><span>GDS</span><b className="num">{fmtShort(result.partAGds)}</b></div>
+                <div><span>STEP1</span><b className="num">{result.config.step1Tat.R}일</b></div>
+              </>
+            ) : (
+              <>
+                <div><span>Part A GDS</span><b className="num">{fmtShort(result.partAGds)}</b></div>
+                <div><span>Part B GDS</span><b className="num">{fmtShort(result.partBGds)}</b></div>
+              </>
+            )}
             <div><span>MTO 완료</span><b className="num">{done}/{result.layers.length}</b></div>
           </div>
         </section>
       ) : (
         <section className="mini-card">
-          <div className="mini-card-head"><h3>MTO 일정</h3></div>
+          <div className="mini-card-head"><h3>{project.name}</h3><KindTag kind={project.kind} /></div>
           {calc.issues ? (
             <p className="small tone-warn">입력 확인 {calc.issues.length}건 · {calc.issues[0].msg}</p>
           ) : (
-            <p className="small muted">Part A GDS 입고일과 Layer List를 넣으면 최종 MTO와 병목을 보여 줘요.</p>
+            <p className="small muted">{rev ? 'GDS 입고일과 다시 만들 Layer를' : 'Part A GDS 입고일과 Layer List를'} 넣으면 최종 MTO와 병목을 보여 줘요.</p>
           )}
           <div className="mini-btns">
             <button type="button" className="btn primary" onClick={() => expand('layers')}><Icon name="layers" size={15} /> Layer List 입력</button>
-            <button type="button" className="btn" onClick={() => loadExample(state, dispatch, notify)}>예시 30장</button>
+            <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>예시 {rev ? 5 : 30}장</button>
           </div>
         </section>
       )}
 
       <section className="mini-card">
-        <QuickControls state={state} dispatch={dispatch} compact />
+        <QuickControls project={project} cfg={calc.config} dispatch={dispatch} compact />
       </section>
+
+      {state.projects.length > 1 && (
+        <section className="mini-card">
+          <div className="mini-card-head">
+            <h3>전체 {state.projects.length}개</h3>
+            <button type="button" className="link-btn" onClick={() => expand('all')}>전체 일정 <Icon name="chevron" size={14} /></button>
+          </div>
+          <ul className="mini-list">
+            {state.projects.map((p) => {
+              const st = projectStatus(calcs[p.id]);
+              return (
+                <li key={p.id} className={p.id === project.id ? 'cur' : ''} onClick={() => dispatch({ type: 'select', id: p.id })}>
+                  <span className="pf-name"><KindTag kind={p.kind} /> {p.name}</span>
+                  <span className={`when pb-st ${st.tone}`}>{st.text}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {result && an && (
         <>
@@ -65,7 +106,7 @@ export default function Mini({ state, dispatch, calc, notify, expand }) {
               <ul className="mini-list">
                 {upcoming.map((d) => (
                   <li key={d.date}>
-                    <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'A' ? 'accent' : 'leave'}>{l.layer}</Pill>)}</span>
+                    <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'B' ? 'leave' : 'accent'}>{l.layer}</Pill>)}</span>
                     <span className="when">{d.date === today ? '오늘' : `${fmtShort(d.date)} · D-${diffDays(d.date, today)}`}</span>
                   </li>
                 ))}
@@ -105,12 +146,12 @@ export default function Mini({ state, dispatch, calc, notify, expand }) {
               <h3>시나리오</h3>
               <span className="small muted">누르면 그 조건으로</span>
             </div>
-            <Scenarios compact grid={an.grid} result={result} onPick={(g) => dispatch({ type: 'config', patch: { mtoPerDay: g.mtoPerDay, step2Concurrency: g.step2Concurrency } })} />
+            <Scenarios compact grid={an.grid} result={result} onPick={(g) => dispatch({ type: 'override', patch: { mtoPerDay: g.mtoPerDay, step2Concurrency: g.step2Concurrency } })} />
           </section>
         </>
       )}
 
-      <button className="btn primary expand-cta" onClick={() => expand('overview')}>
+      <button className="btn primary expand-cta" onClick={() => expand(state.projects.length > 1 ? 'all' : 'overview')}>
         <Icon name="expand" size={16} /> Window Mode에서 간트 보기
       </button>
     </div>

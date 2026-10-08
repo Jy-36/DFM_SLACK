@@ -2,7 +2,7 @@
 // 날짜는 다시 계산하지 않고 엔진 결과만 해석한다. 대안 일정은 엔진을 다시 돌려 비교한다.
 import { HOLIDAY_YEARS } from '../../../shared/holidays.js';
 import { addDays, diffDays, fmtShort } from './dates.js';
-import { buildSchedule, normalizeConfig, scenarioGrid } from './scheduler.js';
+import { buildSchedule, normalizeConfig, partLabel, REVISION_PART, scenarioGrid } from './scheduler.js';
 import { summarize } from './report.js';
 
 /** 최종 MTO Layer가 거친 경로: GDS → STEP1 → (휴일) → STEP2 대기 → STEP2 → (휴일) → MTO 대기 */
@@ -13,7 +13,7 @@ function criticalPath(result) {
   const s2Hold = diffDays(last.step2Ready, addDays(last.step1End, 1));
   const mtoHold = diffDays(last.mtoEarliest, addDays(last.step2End, cfg.mtoGapDays));
   const steps = [
-    { key: 'step1', label: 'STEP1', days: diffDays(last.step1End, last.step1Start) + 1 + s1Hold, note: s1Hold ? `GDS 휴일로 ${s1Hold}일 늦게 시작` : `Part ${last.part} TAT ${cfg.step1Tat[last.part]}일` },
+    { key: 'step1', label: 'STEP1', days: diffDays(last.step1End, last.step1Start) + 1 + s1Hold, note: s1Hold ? `GDS 휴일로 ${s1Hold}일 늦게 시작` : `${partLabel(last.part)} TAT ${cfg.step1Tat[last.part]}일` },
     { key: 'hold', label: '휴일 대기', days: s2Hold, note: 'STEP2는 휴일에 시작 불가' },
     { key: 's2wait', label: 'STEP2 슬롯 대기', days: last.step2WaitDays, note: `동시 ${cfg.step2Concurrency ?? '무제한'}장` },
     { key: 'step2', label: 'STEP2', days: last.step2Tat, note: `Type ${last.type} TAT ${last.step2Tat}일` },
@@ -22,7 +22,7 @@ function criticalPath(result) {
   ].filter((s) => s.days > 0);
   // Part B면 GDS 자체가 늦게 들어온다
   const gdsLag = diffDays(last.gds, result.partAGds);
-  if (gdsLag > 0) steps.unshift({ key: 'gds', label: `Part ${last.part} GDS`, days: gdsLag, note: `Part A + ${gdsLag}일` });
+  if (gdsLag > 0) steps.unshift({ key: 'gds', label: `${partLabel(last.part)} GDS`, days: gdsLag, note: `Part A + ${gdsLag}일` });
   return { layer: last, steps };
 }
 
@@ -186,7 +186,7 @@ export function analyze(result, layersInput) {
     if (g > k) {
       recs.push({
         key: 'gds',
-        title: `Part A GDS ${k}일 앞당기기 (${fmtShort(addDays(result.partAGds, -k))})`,
+        title: `${result.step1[REVISION_PART] ? '' : 'Part A '}GDS ${k}일 앞당기기 (${fmtShort(addDays(result.partAGds, -k))})`,
         gainDays: g,
         detail: `휴일을 피해 최종 MTO가 ${g}일 당겨짐 (${fmtShort(r.finalMto)}) — 앞당긴 일수보다 효과가 큼`,
         agreement: true,

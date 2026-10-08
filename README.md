@@ -152,20 +152,24 @@ src-tauri/
 # MTO
 
 Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 **MTO 날짜**를 계산하고 병목을 분석합니다.
+여러 **Product**(Part A/B)와 **Revision**(Product와 별개로 몇 장만, Part 없이 GDS → STEP1 → STEP2 → MTO)을 한꺼번에 관리하고,
+묶음마다 따로 계산합니다 (STEP2 동시 진행·하루 MTO 장수는 묶음별 설정, 서로 공유하지 않음).
 `mto-scheduling-agent`(Python)의 규칙 엔진을 JS로 옮겨 앱 안에서 바로 계산합니다 — Python·서버·인터넷 없이 동작.
 
 ## 화면
 
 | 모드 · 메뉴 | 하는 일 |
 |---|---|
-| 일정 현황 | GDS 입고일·하루 MTO 수·STEP2 동시 수 빠른 변경, 최종 MTO, 대기 요약, 병목 분석(최종 MTO 경로 · 원인별 누적 대기), 추천 일정(조건 변경·Layer 순서 재배열·GDS 조정 효과), 리스크, 시나리오 비교(2·3장 × 4·5장, 누르면 적용), 간트 |
+| 전체 일정 | Product·Revision 요약 표(GDS·조건·최종 MTO·가장 큰 대기, 순서 바꾸기), 묶음별 간트, 날짜별 MTO(전체), 전체 엑셀용 복사 |
+| 일정 현황 | 위쪽 칩으로 묶음 고르기·추가(Product/Revision)·이름·복제·삭제, Revision은 원래 Product(참고용)·STEP1 TAT, GDS 입고일·하루 MTO 수·STEP2 동시 수 빠른 변경, 최종 MTO, 대기 요약, 병목 분석(최종 MTO 경로 · 원인별 누적 대기), 추천 일정(조건 변경·Layer 순서 재배열·GDS 조정 효과), 리스크, 시나리오 비교(2·3장 × 4·5장, 누르면 적용), 간트 |
 | Layer List | 직접 편집, 엑셀 붙여넣기(머리줄이 있으면 열 순서 무관), CSV 열기, 예시 30장, No 다시 매기기·위아래 이동 |
 | Layer별 일정표 | 날짜별 MTO 묶음, Layer별 표, 엑셀용 복사, CSV 저장 |
 | 규칙 | STEP1 TAT(Part), STEP2 TAT(Type 추가·삭제), Part B GDS 간격, 하루 MTO 수, STEP2 동시 수, MTO 가능 간격, 주말·회사 휴무일 |
-| App Mode | 최종 MTO · 빠른 조건 변경 · 다음 MTO · 병목 · 시나리오 |
-| Widget Mode | 최종 MTO · 리드타임 · 다음 MTO · 진행 |
+| App Mode | 묶음 고르기 · 최종 MTO · 빠른 조건 변경 · 전체 묶음 목록 · 다음 MTO · 병목 · 시나리오 |
+| Widget Mode | 선택한 묶음의 최종 MTO · 모든 묶음 중 가장 가까운 MTO · 진행 |
 
-입력이 바뀌면 바로 다시 계산하고, 입력·규칙은 localStorage(`mto.v1`)에 저장합니다.
+입력이 바뀌면 바로 다시 계산하고, 묶음·규칙은 localStorage(`mto.v2`)에 저장합니다. 예전(`mto.v1`) 입력은 Product 1로 옮겨집니다.
+[규칙]은 모든 묶음의 기본값이고, 하루 MTO 수·STEP2 동시 수는 묶음마다 [일정 현황]에서 따로 바꿀 수 있습니다. Revision STEP1 TAT 기본값은 3일.
 
 ## 규칙 (기본값)
 
@@ -204,9 +208,10 @@ src/apps/mto/
     report.js      요약 수치, CSV·엑셀용 텍스트
     layers.js      예시 Layer, 붙여넣기 파서, 입력 확인
     dates.js       'YYYY-MM-DD' 날짜 계산
-    store.js       상태 (localStorage)
-  components/      Gantt(SVG), Insights, Controls
-  pages/           Overview, LayerList, ScheduleTable, Rules, Mini, Widget
+    projects.js    Product·Revision 묶음 (묶음별 설정 · 계산)
+    store.js       상태 (localStorage, 묶음 목록)
+  components/      Gantt(SVG), PortfolioGantt(전체), ProjectBar(묶음 고르기), Insights, Controls
+  pages/           Portfolio(전체 일정), Overview, LayerList, ScheduleTable, Rules, Mini, Widget
 scripts/mto-check.mjs        규칙 테스트 + Python 엔진 결과와 날짜 비교 (npm run test:mto, test:engine·CI에서도 함께 실행)
 scripts/fixtures/mto-golden.json   Python 엔진 결과 (같은 공휴일 표로 생성)
 ```

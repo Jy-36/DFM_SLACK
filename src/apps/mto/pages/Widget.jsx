@@ -14,11 +14,16 @@ async function win(action) {
   }
 }
 
-export default function Widget({ calc, setMode, widget, setWidget }) {
+export default function Widget({ state, project, calc, calcs, setMode, widget, setWidget }) {
   const { result } = calc;
   const tauri = isTauri();
   const today = todayIso();
-  const next = result ? mtoByDate(result).find((d) => d.date >= today) : null;
+  // 다음 MTO: 모든 묶음 중 가장 가까운 날
+  const next = Object.values(calcs)
+    .filter((c) => c.result)
+    .map((c) => mtoByDate(c.result).find((d) => d.date >= today))
+    .filter(Boolean)
+    .reduce((m, d) => (!m || d.date < m.date ? { ...d } : d.date === m.date ? { ...m, layers: [...m.layers, ...d.layers] } : m), null);
   const done = result ? result.layers.filter((l) => l.mtoDate < today).length : 0;
   const pct = result ? Math.min(1, Math.max(0, diffDays(today, result.partAGds) / Math.max(1, result.leadTimeDays))) : 0;
 
@@ -28,7 +33,7 @@ export default function Widget({ calc, setMode, widget, setWidget }) {
         <span className="wg-brand" data-tauri-drag-region>
           <DfmLogo size={18} />
           <span>MTO</span>
-          {result && <span className="wg-date num">Layer {result.layers.length}장</span>}
+          <span className="wg-date">{project.name}{state.projects.length > 1 ? ` 외 ${state.projects.length - 1}` : ''}</span>
         </span>
         <span className="wg-actions">
           <button type="button" className={`wg-btn ${widget.onTop ? 'on' : ''}`} onClick={() => setWidget({ onTop: !widget.onTop })} disabled={!tauri}

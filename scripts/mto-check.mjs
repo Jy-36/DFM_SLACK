@@ -7,6 +7,7 @@ import { EXAMPLE_LAYERS } from '../src/apps/mto/lib/layers.js';
 import { parseLayerText } from '../src/apps/mto/lib/layers.js';
 import { analyze } from '../src/apps/mto/lib/insights.js';
 import { toCsv } from '../src/apps/mto/lib/report.js';
+import { computeProject, newProject, effectiveConfig } from '../src/apps/mto/lib/projects.js';
 
 let fail = 0;
 let pass = 0;
@@ -109,6 +110,19 @@ ok('분석: 최종 경로 Layer', !!an.critical.layer);
 console.log('     ', an.headline);
 an.recs.forEach((x) => console.log(`      추천 +${x.gainDays}일 ${x.title} — ${x.detail}`));
 ok('CSV 줄 수', toCsv(r).trim().split('\n').length === 31);
+
+// ── Revision (Part 없이 GDS → STEP1 → STEP2 → MTO) · 여러 묶음
+const revP = newProject('revision', [], { gds: '2026-11-02', step1Tat: 3, layers: [{ no: 1, part: '', layer: 'M1', type: 'X' }, { no: 2, part: '', layer: 'V1', type: 'X' }, { no: 3, part: '', layer: 'M2', type: 'X' }] });
+const rc = computeProject(revP, DEFAULT_CONFIG);
+ok('Revision 계산됨 (Part 입력 없어도)', !!rc.result);
+eq('Revision STEP1 (TAT 3, Part 없음)', [rc.result.step1.R.start, rc.result.step1.R.end, Object.keys(rc.result.step1)], ['2026-11-02', '2026-11-04', ['R']]);
+eq('Revision STEP2 → MTO (주말 넘김, 하루 2장)', rc.result.layers.map((x) => [x.step2Start, x.step2End, x.mtoDate]), [['2026-11-05', '2026-11-07', '2026-11-09'], ['2026-11-05', '2026-11-07', '2026-11-09'], ['2026-11-05', '2026-11-07', '2026-11-10']]);
+eq('Revision STEP1 비우면 규칙 기본값', effectiveConfig(DEFAULT_CONFIG, { ...revP, step1Tat: null }).step1Tat, { R: 3 });
+const pA = newProject('product', [], { gds: '2026-09-21', layers: EXAMPLE_LAYERS, override: { mtoPerDay: 3, step2Concurrency: 5 } });
+const pB = newProject('product', [pA], { gds: '2026-09-21', layers: EXAMPLE_LAYERS });
+eq('Product마다 따로 계산 (조건 다르면 결과 다름)', [computeProject(pA, DEFAULT_CONFIG).result.finalMto, computeProject(pB, DEFAULT_CONFIG).result.finalMto], ['2026-11-03', '2026-11-13']);
+eq('묶음 이름 자동', [pA.name, pB.name, revP.name], ['Product 1', 'Product 2', 'Revision 1']);
+ok('Product에 Part 빠지면 입력 확인', computeProject({ ...pB, layers: [{ no: 1, part: '', layer: 'x', type: 'X' }] }, DEFAULT_CONFIG).issues?.length > 0);
 
 // ── Python 엔진과 비교
 const golden = JSON.parse(readFileSync(new URL('./fixtures/mto-golden.json', import.meta.url), 'utf8'));
