@@ -1,5 +1,6 @@
-// 공정(Process) 마스터: Process → Part → Module → Layer, Layer마다 Type(STEP2 TAT)과 SPEC 값.
-// Product는 공정 하나를 고르고 그 공정의 Layer를 골라 담는다 (Layer 이름·Part·Type은 공정 시트를 따라감).
+// 공정(Process) 마스터: Process → Part(FEOL · BEOL) → Module / BEOL Option → Layer, Layer마다 Type(STEP2 TAT)과 SPEC 값.
+// FEOL은 Module로 나누고, BEOL은 여러 Option(예: 15M, 11M) 중 Product가 하나를 고른다.
+// Product Set List = FEOL Layer 전체 + 고른 BEOL Option의 Layer (중간부터 나가면 시작 Layer부터).
 import { EXAMPLE_LAYERS } from './layers.js';
 
 let seq = 0;
@@ -14,23 +15,64 @@ export function newProcess(processes = [], patch = {}) {
     name: `Process ${processes.length + 1}`,
     desc: '',
     parts: [
-      { name: 'A', gdsOffset: 0, step1Tat: 5 },
-      { name: 'B', gdsOffset: 14, step1Tat: 3 },
+      { name: 'FEOL', gdsOffset: 0, step1Tat: 5 },
+      { name: 'BEOL', gdsOffset: 14, step1Tat: 3 },
     ],
+    beolOptions: ['기본'],
     columns: [...DEFAULT_SPEC_COLUMNS],
     rows: [], // { id, part, module, layer, type, spec: { [column]: value } }
     ...patch,
   };
 }
 
-/** 예시 공정: mto-scheduling-agent 예시 30장을 Part · Module로 나눔 */
+/** 예시 공정: mto-scheduling-agent 예시 30장 — FEOL(FEOL·MOL Module) 15장 + BEOL Option 15M(15장) / 11M(11장) */
 export function exampleProcess(processes = []) {
-  const mod = (l) => (l.part === 'A' ? (l.no <= 8 ? 'FEOL' : 'MOL') : l.no <= 23 ? 'BEOL-1' : 'BEOL-2');
+  const feol = EXAMPLE_LAYERS.filter((l) => l.part === 'FEOL').map((l) => ({ id: uid('ly'), part: 'FEOL', module: l.no <= 8 ? 'FEOL' : 'MOL', layer: l.layer, type: l.type, spec: {} }));
+  const beol = EXAMPLE_LAYERS.filter((l) => l.part === 'BEOL');
+  const opt = (name, n) => beol.slice(0, n).map((l) => ({ id: uid('ly'), part: 'BEOL', module: name, layer: l.layer, type: l.type, spec: {} }));
   return newProcess(processes, {
     name: '예시 공정',
-    desc: 'mto-scheduling-agent 예시 30장 (Part A: FEOL·MOL / Part B: BEOL)',
-    rows: EXAMPLE_LAYERS.map((l) => ({ id: uid('ly'), part: l.part, module: mod(l), layer: l.layer, type: l.type, spec: {} })),
+    desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL) / BEOL Option 15M · 11M',
+    beolOptions: ['15M', '11M'],
+    rows: [...feol, ...opt('15M', 15), ...opt('11M', 11)],
   });
+}
+
+const PART_MAP = { A: 'FEOL', B: 'BEOL' };
+export const isBeol = (r) => r.part === 'BEOL';
+
+/** BEOL Option 목록 (정해 둔 순서 + 시트에만 있는 Option) */
+export function beolOptionsOf(proc) {
+  const out = [...(proc?.beolOptions || [])];
+  for (const r of proc?.rows || []) if (isBeol(r) && r.module && !out.includes(r.module)) out.push(r.module);
+  return out;
+}
+
+/** Product Set List에 들어갈 공정 Layer: FEOL 전체 + 고른 BEOL Option (공정 시트 순서) */
+export function setRowsOf(proc, option) {
+  if (!proc) return [];
+  const opt = option ?? beolOptionsOf(proc)[0];
+  return proc.rows.filter((r) => !isBeol(r) || r.module === opt);
+}
+
+/** 예전 공정(Part A/B) → FEOL/BEOL, BEOL Module → BEOL Option */
+export function migrateProcess(proc) { // eslint-disable-line no-param-reassign
+  const rename = (n) => PART_MAP[n] || n;
+  const parts = (proc.parts || []).map((p) => ({ ...p, name: rename(p.name) }));
+  if (!parts.some((p) => p.name === 'FEOL')) parts.unshift({ name: 'FEOL', gdsOffset: 0, step1Tat: 5 });
+  if (!parts.some((p) => p.name === 'BEOL')) parts.push({ name: 'BEOL', gdsOffset: 14, step1Tat: 3 });
+  // 0.17~0.18의 예시 공정은 BEOL을 BEOL-1 · BEOL-2 Module로 나눠 둠 → 한 Option(15M)으로 합친다
+  const oldExample = proc.name === '예시 공정' && !proc.beolOptions && (proc.rows || []).some((r) => r.module === 'BEOL-1');
+  const rows = (proc.rows || []).map((r) => {
+    const part = rename(r.part);
+    const module = part === 'BEOL' && oldExample && /^BEOL-[12]$/.test(r.module) ? '15M' : r.module;
+    return { ...r, part, module: part === 'BEOL' && !module ? '기본' : module };
+  });
+  if (oldExample) proc = { ...proc, desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL) / BEOL Option 15M' };
+  const out = { ...proc, parts, rows };
+  out.beolOptions = beolOptionsOf({ ...out, beolOptions: proc.beolOptions || [] });
+  if (!out.beolOptions.length) out.beolOptions = ['기본'];
+  return out;
 }
 
 /** Part → Module → rows 트리 (시트 순서 유지) */
@@ -47,6 +89,13 @@ export function processTree(proc) {
     let m = p.modules.find((x) => x.name === (r.module || ''));
     if (!m) p.modules.push((m = { name: r.module || '', rows: [] }));
     m.rows.push(r);
+  }
+  // BEOL은 Option 순서대로, 아직 Layer가 없는 Option도 보여 준다
+  const beol = byName.get('BEOL');
+  if (beol) {
+    const opts = beolOptionsOf(proc);
+    for (const o of opts) if (!beol.modules.some((m) => m.name === o)) beol.modules.push({ name: o, rows: [] });
+    beol.modules.sort((x, y) => opts.indexOf(x.name) - opts.indexOf(y.name));
   }
   return parts;
 }
@@ -79,7 +128,7 @@ export function layersFromRows(rows, startNo = 1) {
   return rows.map((r, i) => ({ no: startNo + i, ref: r.id }));
 }
 
-const HEAD = { part: /^(part|파트)$/i, module: /^(module|모듈)$/i, layer: /^(layer|레이어|name)$/i, type: /^(type|타입)$/i };
+const HEAD = { part: /^(part|파트)$/i, module: /^(module|모듈|option|beol ?option|옵션)$/i, layer: /^(layer|레이어|name)$/i, type: /^(type|타입)$/i };
 
 /** 엑셀 붙여넣기: 머리줄이 있으면 열 이름으로(SPEC 열 포함), 없으면 Part · Module · Layer · Type · SPEC… 순서 */
 export function parseProcessRows(text, columns) {
@@ -105,7 +154,7 @@ export function parseProcessRows(text, columns) {
     .map(split)
     .map((c) => ({
       id: uid('ly'),
-      part: String(c[idx.part] ?? '').toUpperCase().trim(),
+      part: (() => { const v = String(c[idx.part] ?? '').toUpperCase().trim(); return PART_MAP[v] || v; })(),
       module: c[idx.module] ?? '',
       layer: c[idx.layer] ?? '',
       type: String(c[idx.type] ?? '').toUpperCase().trim(),

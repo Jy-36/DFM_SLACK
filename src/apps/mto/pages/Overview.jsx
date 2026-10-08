@@ -30,7 +30,7 @@ export function EmptyCard({ project, dispatch, notify, go }) {
       <p className="muted">
         {rev
           ? 'Product의 Layer 중 이번 ITEM에 들어오는 Layer(보통 1~5장)를 고르고 GDS 입고일을 넣으면 STEP1 → STEP2 → MTO 일정을 계산합니다. Part 구분은 없습니다.'
-          : 'Part A GDS 입고일과 Layer(No · Part · Layer · Type)를 넣으면 Layer별 STEP2 시작일과 MTO 날짜, 병목을 보여 줍니다.'}{' '}
+          : 'GDS 입고일과 Set List(No · Part · Layer · Type)를 넣으면 Layer별 STEP2 시작일과 MTO 날짜, 병목을 보여 줍니다.'}{' '}
         {!rev && '엑셀에서 표를 복사해 붙여 넣어도 됩니다.'}
       </p>
       <div className="head-actions">
@@ -99,7 +99,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
       <div className="page-head">
         <div>
           <h1>{project.name} 일정 현황</h1>
-          <p>{rev ? 'Revision · GDS → STEP1 → STEP2 → MTO (Part 구분 없음)' : 'Product · Part A GDS + Layer List → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>
+          <p>{rev ? 'Revision · GDS → STEP1 → STEP2 → MTO (Part 구분 없음)' : 'Product · GDS + Set List(FEOL + BEOL Option) → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>
         </div>
       </div>
 
@@ -110,9 +110,9 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
         <div className="mto-bar-rules small muted">
           {rev
             ? <>STEP1 {cfg.step1Tat.R}일</>
-            : <>STEP1 A {cfg.step1Tat.A}일 · B {cfg.step1Tat.B}일</>}
+            : <>STEP1 FEOL {cfg.step1Tat.FEOL}일 · BEOL {cfg.step1Tat.BEOL}일</>}
           {' '}/ STEP2 {Object.entries(cfg.step2Tat).map(([k, v]) => `${k} ${v}일`).join(' · ')}
-          {!rev && <> / Part B = A + {cfg.partBOffsetDays}일</>}
+          {!rev && <> / BEOL GDS = FEOL + {cfg.partOffsets?.BEOL ?? cfg.partBOffsetDays}일</>}
           <span> · 이 {rev ? 'Revision' : 'Product'}만 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)</span>
           <button type="button" className="link-btn" onClick={() => go('rules')}>규칙 바꾸기</button>
         </div>

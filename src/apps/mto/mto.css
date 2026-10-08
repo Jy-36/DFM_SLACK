@@ -372,3 +372,26 @@ tr.missing td { background: var(--warn-soft); }
 .panel .input.start-sel { width: auto; min-width: 260px; max-width: 420px; height: 32px; padding-block: 4px; }
 .pick-mod.flat { padding-left: 0; border-top: 0; margin-top: 0; }
 .pick-mod.flat + .pick-mod.flat { border-top: 1px dashed var(--line); padding-top: 10px; }
+
+/* ── Product · Revision · Common ── */
+.sec-switch { grid-template-columns: repeat(3, 1fr); }
+.sec-switch button { padding: 8px 4px; font-size: 12.5px; gap: 4px; }
+.sec-switch button[aria-selected='true'].common { background: var(--surface); color: var(--good); box-shadow: 0 1px 3px rgba(16, 38, 84, 0.14); }
+.pb-settings .pb-opt { min-width: 140px; }
+.pb-settings .pb-opt select.input { height: 34px; padding-block: 5px; }
+.pb-settings .pb-proc { order: 1; }
+.pb-settings .pb-opt { order: 2; }
+.pb-settings .pb-ro, .pb-settings .pb-num { order: 3; }
+.pb-settings .pb-tools { order: 5; }
+.pb-settings .pb-hint { order: 6; }
+.opt-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 10px; background: var(--leave-soft); border: 1px solid color-mix(in srgb, var(--leave) 30%, transparent); }
+.opt-chip .col-name { width: 90px; color: var(--leave); }
+.opt-chip.add { background: var(--surface-2); border-style: dashed; border-color: var(--line-strong); }
+.opt-chip.add .col-name { width: 150px; color: var(--muted); }
+.col-del.show { opacity: 1; }
+.col-del:disabled { opacity: 0.25; cursor: default; background: none; color: var(--faint); }
+.opt-tag { font-size: 9.5px; font-weight: 800; color: var(--leave); background: var(--leave-soft); border-radius: 5px; padding: 0 5px; margin-right: 6px; }
+.sheet .opt-sel { width: 100px; color: var(--leave); font-weight: 700; }
+.pinfo .input.cell { min-width: 90px; }
+.pinfo select.input.cell { width: 130px; }

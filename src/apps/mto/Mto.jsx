@@ -12,12 +12,13 @@ import Rules from './pages/Rules.jsx';
 import ProcessSheet from './pages/ProcessSheet.jsx';
 import ProcessLayerList from './pages/ProcessLayerList.jsx';
 import ItemLayerList from './pages/ItemLayerList.jsx';
+import ProductInfo from './pages/ProductInfo.jsx';
 import { NoneCard } from './pages/Overview.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.4.0';
+export const MTO_VERSION = '0.5.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -34,10 +35,13 @@ const NAV = {
     ['table', 'Layer별 일정표', 'table'],
   ],
 };
-const SHARED_NAV = [
+// Common: Product 정보 · 공정 · 규칙 (Product · Revision이 같이 쓰는 기준 정보)
+const COMMON_NAV = [
+  ['products', 'Product 정보', 'table'],
   ['process', '공정 · Layer SPEC', 'apps'],
   ['rules', '규칙', 'settings'],
 ];
+const COMMON_TABS = COMMON_NAV.map(([k]) => k);
 
 /** 모든 묶음의 계산 결과: { [id]: calc } */
 export function useCalcs(state) {
@@ -128,6 +132,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   const items = state.projects.filter((p) => p.kind === 'revision');
   const nav = NAV[section];
   const perProject = ['overview', 'layers', 'table'].includes(tab);
+  const area = COMMON_TABS.includes(tab) ? 'common' : section;
   return (
     <div className={`app mto fade-in ${navMini ? 'nav-mini' : ''}`}>
       <nav className="nav" aria-label="MTO 메뉴">
@@ -141,40 +146,46 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
           <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
         </button>
-        <div className={`sec-switch ${navMini ? 'mini' : ''}`} role="tablist" aria-label="Product · Revision">
-          {[['product', 'Product', products.length], ['revision', 'Revision', items.length]].map(([k, label, n]) => (
-            <button key={k} type="button" role="tab" aria-selected={section === k} className={k} onClick={() => { dispatch({ type: 'section', section: k }); if (tab === 'process' || tab === 'rules') setTab('all'); }} title={label}>
+        <div className={`sec-switch ${navMini ? 'mini' : ''}`} role="tablist" aria-label="Product · Revision · Common">
+          {[['product', 'Product', products.length], ['revision', 'Revision', items.length], ['common', 'Common', null]].map(([k, label, n]) => (
+            <button key={k} type="button" role="tab" aria-selected={area === k} className={k}
+              onClick={() => {
+                if (k === 'common') return setTab(COMMON_TABS.includes(tab) ? tab : 'products');
+                dispatch({ type: 'section', section: k });
+                if (COMMON_TABS.includes(tab)) setTab('all');
+              }} title={label}>
               {navMini ? label[0] : label}
-              {!navMini && <span className="num">{n}</span>}
             </button>
           ))}
         </div>
-        {nav.map(([key, label, icon], i) => (
-          <div key={key} className="nav-item-wrap">
-            {i === 1 && !navMini && <div className="nav-sec">선택 · {project ? project.name : '없음'}</div>}
-            <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
-              <Icon name={icon} />
-              <span className="nav-label">{label}</span>
-              {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
-              {key === 'all' && <span className="nav-count num">{ofKind.length}</span>}
-            </button>
-          </div>
-        ))}
-        {SHARED_NAV.map(([key, label, icon], i) => (
-          <div key={key} className="nav-item-wrap">
-            {i === 0 && !navMini && <div className="nav-sec">기준 정보 (Product · Revision 공통)</div>}
-            <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
-              <Icon name={icon} />
-              <span className="nav-label">{label}</span>
-              {key === 'process' && <span className="nav-count num">{state.processes.length}</span>}
-            </button>
-          </div>
-        ))}
+        {area === 'common'
+          ? COMMON_NAV.map(([key, label, icon], i) => (
+            <div key={key} className="nav-item-wrap">
+              {i === 0 && !navMini && <div className="nav-sec">기준 정보 · Product · Revision 공통</div>}
+              <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+                <Icon name={icon} />
+                <span className="nav-label">{label}</span>
+                {key === 'products' && <span className="nav-count num">{products.length}</span>}
+                {key === 'process' && <span className="nav-count num">{state.processes.length}</span>}
+              </button>
+            </div>
+          ))
+          : nav.map(([key, label, icon], i) => (
+            <div key={key} className="nav-item-wrap">
+              {i === 1 && !navMini && <div className="nav-sec">선택 · {project ? project.name : '없음'}</div>}
+              <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+                <Icon name={icon} />
+                <span className="nav-label">{label}</span>
+                {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
+                {key === 'all' && <span className="nav-count num">{ofKind.length}</span>}
+              </button>
+            </div>
+          ))}
         <div className="nav-foot">
           <span>
             <Pill tone="accent">Product {products.length} · ITEM {items.length}</Pill>
           </span>
-          <span className="num">{section === 'product' ? 'Product' : 'ITEM'} 계산 완료 {done.length}/{ofKind.length}</span>
+          {area !== 'common' && <span className="num">{section === 'product' ? 'Product' : 'ITEM'} 계산 완료 {done.length}/{ofKind.length}</span>}
         </div>
       </nav>
 
@@ -184,6 +195,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         {project && tab === 'overview' && <Overview {...props} />}
         {project && tab === 'layers' && (section === 'revision' ? <ItemLayerList key={project.id} {...props} /> : project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
         {project && tab === 'table' && <ScheduleTable {...props} />}
+        {tab === 'products' && <ProductInfo {...props} />}
         {tab === 'process' && <ProcessSheet {...props} />}
         {tab === 'rules' && <Rules {...props} />}
       </main>

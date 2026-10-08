@@ -172,9 +172,13 @@ Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 
 입력이 바뀌면 바로 다시 계산하고, 묶음·규칙은 localStorage(`mto.v2`)에 저장합니다. 예전(`mto.v1`) 입력은 Product 1로 옮겨집니다.
 [규칙]은 모든 묶음의 기본값이고, 하루 MTO 수·STEP2 동시 수는 묶음마다 [일정 현황]에서 따로 바꿀 수 있습니다. Revision STEP1 TAT 기본값은 3일.
 
-## Product 탭 / Revision 탭
+## Product 탭 / Revision 탭 / Common
 
-MTO 앱 왼쪽 위에서 **Product**와 **Revision**을 나눠 봅니다 (공정 · Layer SPEC과 규칙은 같이 씀).
+MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
+- **Common**: Product 정보(기준 공정 · BEOL Option · Code/고객/담당/비고 등 정보 열 추가 가능), 공정 · Layer SPEC, 규칙 — Product · Revision이 같이 쓰는 기준 정보.
+- Part는 **FEOL · BEOL** 두 개. FEOL은 **Module**로 나누고, BEOL은 여러 **BEOL Option**(예: 15M, 11M) 중 Product가 하나를 고릅니다.
+  Set List = FEOL 전체 + 고른 BEOL Option의 Layer. BEOL Option을 바꾸면 FEOL은 그대로 두고 BEOL Layer만 바뀌어요.
+- 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.
 - **Product**: 새로 만들면 기준 공정의 **Set List 전체**가 담겨요. 중간부터 나가는 경우 [Set List]의 "중간부터"에서 시작 Layer를 고르면 그 Layer부터 끝까지 담깁니다.
   GDS 입고일은 Set의 첫 Part GDS예요 (Part B부터 나가면 입력한 날이 Part B GDS).
 - **Revision**: **ITEM** 단위(보통 1~5장 Set)로 들어오고, 항상 **Product에 딸려** 있어요. Product가 있어야 ITEM을 만들 수 있고,
