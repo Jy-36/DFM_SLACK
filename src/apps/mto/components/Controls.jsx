@@ -9,7 +9,7 @@ export function QuickControls({ project, cfg, dispatch, compact = false }) {
   return (
     <div className={`mto-controls ${compact ? 'compact' : ''}`}>
       <label className="field gds">
-        <span>{project.kind === 'revision' ? 'GDS 입고일' : 'Part A GDS 입고일'}</span>
+        <span>{project.kind === 'revision' ? 'GDS 입고일' : 'GDS 입고일 (첫 Part)'}</span>
         <input type="date" className="input num" value={project.gds} onChange={(e) => dispatch({ type: 'gds', value: e.target.value })} />
       </label>
       <div className="field">

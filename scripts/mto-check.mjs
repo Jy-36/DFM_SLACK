@@ -144,6 +144,31 @@ const pr = parseProcessRows('Layer\tPart\tType\tModule\tGrade\tCD\nM1\ta\tx\tBEO
 eq('시트 붙여넣기 (열 순서 무관, 새 SPEC 열)', [pr.rows.map((r) => [r.part, r.module, r.layer, r.type, r.spec]), pr.newColumns], [[['A', 'BEOL', 'M1', 'X', { Grade: '1', CD: '40nm' }]], ['CD']]);
 ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part: 'Q', module: '', layer: 'L', type: 'X' }] }, ['X', 'Y', 'Z']).length === 1);
 
+// ── Product 탭 / Revision 탭 (ITEM은 Product에 딸림)
+{
+  const { mtoReducer } = await import('../src/apps/mto/lib/reducer.js');
+  const pr = exampleProcess();
+  let st = { projects: [], processes: [pr], config: DEFAULT_CONFIG, section: 'product', activeByKind: { product: null, revision: null }, activeId: null };
+  const st0 = mtoReducer(st, { type: 'addProject', kind: 'revision', patch: { parentId: 'none' } });
+  ok('Product 없으면 ITEM 못 만듦', st0.projects.length === 0);
+  st = mtoReducer(st, { type: 'addProject', kind: 'product', patch: { name: 'P1', gds: '2026-09-21' } });
+  const P1 = st.projects[0];
+  eq('새 Product는 기준 공정 Set List 전체', [P1.processId === pr.id, P1.layers.length], [true, 30]);
+  st = mtoReducer(st, { type: 'addProject', kind: 'revision', patch: { parentId: P1.id, gds: '2026-11-02' } });
+  const I1 = st.projects[1];
+  eq('ITEM: Product에 딸림 · 이름 · 공정 따라감 · Revision 탭으로', [I1.parentId, I1.name, I1.processId, st.section], [P1.id, 'P1 REV01', pr.id, 'revision']);
+  st = mtoReducer(st, { type: 'layers', layers: layersFromRows(pr.rows.slice(20, 23)) });
+  const ic = computeProject(st.projects[1], DEFAULT_CONFIG, [pr]);
+  eq('ITEM 3장 계산 (Part 없이)', [Object.keys(ic.result.step1), ic.result.layers.map((l) => l.layer)], [['R'], ['B-6', 'B-7', 'B-8']]);
+  const mid = computeProject({ ...P1, layers: layersFromRows(pr.rows.slice(15)) }, DEFAULT_CONFIG, [pr]);
+  eq('중간부터(Part B만) 나가면 입력한 GDS = Part B GDS', [Object.keys(mid.result.step1), mid.result.step1.B.gds], [['B'], '2026-09-21']);
+  st = mtoReducer(st, { type: 'section', section: 'product' });
+  eq('탭 바꾸면 그 탭의 선택으로', [st.section, st.activeId], ['product', P1.id]);
+  const removed = mtoReducer(st, { type: 'removeProject', id: P1.id });
+  eq('Product 지우면 딸린 ITEM도 같이', removed.projects.length, 0);
+  eq('되돌리기', mtoReducer(removed, { type: 'restoreProject' }).projects.length, 2);
+}
+
 // ── Python 엔진과 비교
 const golden = JSON.parse(readFileSync(new URL('./fixtures/mto-golden.json', import.meta.url), 'utf8'));
 let diffs = 0;

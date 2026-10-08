@@ -5,11 +5,17 @@ import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort, todayIso } from '../lib/dates.js';
 import { COLUMNS } from '../lib/report.js';
 import PortfolioGantt from '../components/PortfolioGantt.jsx';
-import { KindTag } from '../components/ProjectBar.jsx';
+import { AddItem, KindTag } from '../components/ProjectBar.jsx';
 import { copyText } from './ScheduleTable.jsx';
 
-export default function Portfolio({ state, dispatch, calcs, go, notify }) {
-  const { projects } = state;
+export default function Portfolio({ state, dispatch, calcs, go, notify, section }) {
+  const rev = section === 'revision';
+  const products = state.projects.filter((p) => p.kind === 'product');
+  // Revision 탭: Product 순서대로 ITEM을 묶어서 보여 준다
+  const projects = rev
+    ? [...products.flatMap((pr) => state.projects.filter((p) => p.kind === 'revision' && p.parentId === pr.id)), ...state.projects.filter((p) => p.kind === 'revision' && !products.some((pr) => pr.id === p.parentId))]
+    : products;
+  const parentName = (p) => products.find((pr) => pr.id === p.parentId)?.name;
   const items = projects.filter((p) => calcs[p.id].result).map((p) => ({ project: p, ...calcs[p.id] }));
   const today = todayIso();
 
@@ -29,8 +35,8 @@ export default function Portfolio({ state, dispatch, calcs, go, notify }) {
   const colorOf = Object.fromEntries(projects.map((p, i) => [p.id, i % 6]));
 
   const copyAll = async () => {
-    const head = ['묶음', '종류', ...COLUMNS.map(([k]) => k)].join('\t');
-    const body = items.flatMap((it) => it.result.layers.map((l) => [it.project.name, it.project.kind === 'revision' ? 'Revision' : 'Product', ...COLUMNS.map(([, f]) => String(f(l)).replace(/\t|\n/g, ' '))].join('\t')));
+    const head = [rev ? 'Product' : '', rev ? 'ITEM' : 'Product', ...COLUMNS.map(([k]) => k)].filter((x, i) => rev || i > 0).join('\t');
+    const body = items.flatMap((it) => it.result.layers.map((l) => [...(rev ? [parentName(it.project) || ''] : []), it.project.name, ...COLUMNS.map(([, f]) => String(f(l)).replace(/\t|\n/g, ' '))].join('\t')));
     notify((await copyText([head, ...body].join('\n'))) ? `${items.length}개 묶음 일정을 복사했어요 · 엑셀에 붙여 넣으세요` : '복사하지 못했어요');
   };
   const add = (kind) => {
@@ -42,23 +48,23 @@ export default function Portfolio({ state, dispatch, calcs, go, notify }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>전체 일정</h1>
-          <p>Product {projects.filter((p) => p.kind === 'product').length}개 · Revision {projects.filter((p) => p.kind === 'revision').length}개 — 묶음마다 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)</p>
+          <h1>{rev ? '전체 Revision' : '전체 Product'}</h1>
+          <p>{rev ? `Revision ITEM ${projects.length}개 · Product별로 묶음 · ITEM 단위(보통 1~5장 Set)로 따로 계산` : `Product ${projects.length}개 — Set List 전체(또는 중간부터) · Product마다 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)`}</p>
         </div>
         <div className="head-actions">
-          <button type="button" className="btn" onClick={() => add('product')}><Icon name="plus" size={15} /> Product</button>
-          <button type="button" className="btn" onClick={() => add('revision')}><Icon name="plus" size={15} /> Revision</button>
+          {rev ? <AddItem state={state} dispatch={dispatch} /> : <button type="button" className="btn" onClick={() => add('product')}><Icon name="plus" size={15} /> Product</button>}
           <button type="button" className="btn" onClick={copyAll} disabled={!items.length}><Icon name="copy" size={15} /> 전체 엑셀용 복사</button>
         </div>
       </div>
 
       <section className="panel">
-        <h2>Product · Revision <span className="small muted">행을 누르면 그 묶음의 일정 현황 · 화살표로 순서 바꾸기</span></h2>
+        <h2>{rev ? 'Revision ITEM' : 'Product'} <span className="small muted">행을 누르면 그 묶음의 일정 현황 · 화살표로 순서 바꾸기</span></h2>
         <div className="table-wrap">
           <table className="data-table pf-table">
             <thead>
               <tr>
-                <th>이름</th>
+                {rev && <th>Product</th>}
+                <th>{rev ? 'ITEM' : '이름'}</th>
                 <th>GDS</th>
                 <th className="r">Layer</th>
                 <th>조건</th>
@@ -77,11 +83,12 @@ export default function Portfolio({ state, dispatch, calcs, go, notify }) {
                 const first = r ? r.layers.reduce((m, l) => (l.mtoDate < m ? l.mtoDate : m), r.layers[0].mtoDate) : null;
                 return (
                   <tr key={p.id} className={p.id === state.activeId ? 'cur' : ''} onClick={() => go('overview', p.id)} title="눌러서 일정 현황 보기">
+                    {rev && <td className="small">{parentName(p) || <span className="tone-warn">Product 없음</span>}</td>}
                     <td>
                       <span className="pf-name">
                         <KindTag kind={p.kind} />
                         <b>{p.name}</b>
-                        {p.kind === 'revision' && p.base && <span className="small muted">← {p.base}</span>}
+                        {!rev && state.projects.some((x) => x.parentId === p.id) && <span className="small muted">ITEM {state.projects.filter((x) => x.parentId === p.id).length}</span>}
                       </span>
                     </td>
                     <td className="num">{p.gds ? fmtShort(p.gds) : <span className="muted">-</span>}{r && r.step1.B && <span className="small muted"> · B {fmtShort(r.partBGds)}</span>}</td>

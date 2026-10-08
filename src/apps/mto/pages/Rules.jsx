@@ -51,7 +51,7 @@ export default function Rules({ state, dispatch, calc, notify }) {
     setNewHol('');
   };
 
-  const r = calc.result; // 선택한 묶음 기준
+  const r = calc?.result; // 선택한 묶음 기준
   const cal = makeCalendar(c);
   const pubInWindow = r ? cal.holidaysBetween(r.partAGds, r.finalMto).filter((h) => h.name !== '회사 휴무') : [];
   const years = [...new Set(Object.keys(HOLIDAYS).map((k) => k.slice(0, 4)))];
