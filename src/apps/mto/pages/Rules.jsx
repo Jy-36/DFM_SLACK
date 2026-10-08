@@ -36,7 +36,7 @@ export default function Rules({ state, dispatch, calc, notify }) {
   const patch = (p) => dispatch({ type: 'config', patch: p });
   const [newType, setNewType] = useState('');
   const [newHol, setNewHol] = useState('');
-  const used = new Set(state.layers.map((l) => l.type));
+  const used = new Set(state.projects.flatMap((p) => p.layers.map((l) => l.type)));
   const changed = JSON.stringify({ ...c }) !== JSON.stringify({ ...DEFAULT_CONFIG, extraHolidays: [...DEFAULT_CONFIG.extraHolidays] });
 
   const addType = () => {
@@ -51,7 +51,7 @@ export default function Rules({ state, dispatch, calc, notify }) {
     setNewHol('');
   };
 
-  const r = calc.result;
+  const r = calc.result; // 선택한 묶음 기준
   const cal = makeCalendar(c);
   const pubInWindow = r ? cal.holidaysBetween(r.partAGds, r.finalMto).filter((h) => h.name !== '회사 휴무') : [];
   const years = [...new Set(Object.keys(HOLIDAYS).map((k) => k.slice(0, 4)))];
@@ -73,6 +73,7 @@ export default function Rules({ state, dispatch, calc, notify }) {
         <div className="settings-grid">
           <NumField label="STEP1 TAT · Part A" value={c.step1Tat.A} min={1} onChange={(v) => patch({ step1Tat: { ...c.step1Tat, A: v } })} />
           <NumField label="STEP1 TAT · Part B" value={c.step1Tat.B} min={1} onChange={(v) => patch({ step1Tat: { ...c.step1Tat, B: v } })} />
+          <NumField label="STEP1 TAT · Revision (기본)" value={c.revisionStep1Tat} min={1} tip="Revision은 Part A/B 없이 한 묶음. Revision마다 따로 바꿀 수 있고, 비워 두면 이 값" onChange={(v) => patch({ revisionStep1Tat: v })} />
           <NumField label="Part B GDS" value={c.partBOffsetDays} unit="일 뒤 (Part A 기준)" tip="Part B GDS = Part A GDS + 이 일수 (기본 14일 = 2주)" onChange={(v) => patch({ partBOffsetDays: v })} />
         </div>
         <h3 className="sub-h">STEP2 TAT · Type별</h3>
@@ -102,7 +103,7 @@ export default function Rules({ state, dispatch, calc, notify }) {
       </section>
 
       <section className="panel">
-        <h2>운영 제약</h2>
+        <h2>운영 제약 · 기본값 <span className="small muted">Product·Revision마다 [일정 현황]에서 따로 바꿀 수 있어요 (묶음끼리 공유 안 함)</span></h2>
         <div className="settings-grid">
           <NumField label="하루 MTO 가능 수" value={c.mtoPerDay} min={1} max={50} unit="장 / 근무일" tip="No 순서대로 하루 이 장수까지 MTO (규정 2~3장, 기본 2장)" onChange={(v) => patch({ mtoPerDay: v })} />
           <NumField label="STEP2 동시 진행 수" value={c.step2Concurrency} min={1} max={200} unit="장" allowEmpty emptyLabel="무제한" tip="어느 날이든 STEP2 중인 Layer 수 상한 (규정 4~5장, 기본 4장). 비우면 무제한" onChange={(v) => patch({ step2Concurrency: v })} />

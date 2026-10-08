@@ -1,6 +1,7 @@
 // 분석 화면 조각: 최종 MTO 경로, 병목, 추천 일정, 리스크, 시나리오 비교
 import { Pill, InfoTip } from '../../../shared/ui.jsx';
 import { diffDays, fmtShort } from '../lib/dates.js';
+import { partLabel } from '../lib/scheduler.js';
 
 /** 최종 MTO Layer가 어디서 시간을 썼는지: 가로 누적 막대 */
 export function CriticalPath({ critical, result }) {
@@ -11,7 +12,7 @@ export function CriticalPath({ critical, result }) {
       <div className="crit-head">
         <span className="label">최종 MTO 경로</span>
         <span className="small muted">
-          <b className="crit-layer">{l.no}. {l.layer}</b> · Part {l.part} · Type {l.type} · MTO {fmtShort(l.mtoDate)} · Part A GDS부터 {result.leadTimeDays}일
+          <b className="crit-layer">{l.no}. {l.layer}</b> · {partLabel(l.part)} · Type {l.type} · MTO {fmtShort(l.mtoDate)} · {l.part === 'R' ? 'GDS' : 'Part A GDS'}부터 {result.leadTimeDays}일
         </span>
       </div>
       <div className="crit-bar" role="img" aria-label={critical.steps.map((s) => `${s.label} ${s.days}일`).join(', ')}>

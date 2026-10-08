@@ -1,11 +1,10 @@
-// MTO: DFM Slack 안의 탭. Part A GDS 입고일 + Layer List → Layer별 STEP2 시작일·MTO 날짜, 간트, 병목 분석.
+// MTO: DFM Slack 안의 탭. 여러 Product(Part A/B)와 Revision(Product와 별개, 몇 장만)의 STEP2·MTO 일정을 묶음별로 계산한다.
 // 계산은 lib/scheduler.js (mto-scheduling-agent 규칙 엔진을 옮긴 것), 입력이 바뀌면 바로 다시 계산한다.
 import { useEffect, useMemo, useState } from 'react';
 import { useMtoStore } from './lib/store.js';
-import { buildSchedule } from './lib/scheduler.js';
-import { validateLayers } from './lib/layers.js';
-import { analyze } from './lib/insights.js';
+import { computeProject } from './lib/projects.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
+import Portfolio from './pages/Portfolio.jsx';
 import Overview from './pages/Overview.jsx';
 import LayerList from './pages/LayerList.jsx';
 import ScheduleTable from './pages/ScheduleTable.jsx';
@@ -14,36 +13,27 @@ import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.1.0';
+export const MTO_VERSION = '0.2.0';
 
 const NAV = [
+  ['all', '전체 일정', 'dashboard'],
   ['overview', '일정 현황', 'gantt'],
   ['layers', 'Layer List', 'layers'],
   ['table', 'Layer별 일정표', 'table'],
   ['rules', '규칙', 'settings'],
 ];
 
-/** 입력 → 계산 결과. 입력에 문제가 있으면 { issues } 만 */
-export function useSchedule(state) {
-  return useMemo(() => {
-    const { gds, layers, config } = state;
-    if (!layers.length) return { empty: true };
-    const issues = validateLayers(layers, Object.keys(config.step2Tat));
-    if (!gds) issues.unshift({ index: -1, field: 'gds', msg: 'Part A GDS 입고일을 입력하세요.' });
-    if (issues.length) return { issues };
-    try {
-      const result = buildSchedule(gds, layers, config);
-      return { result, analysis: analyze(result, layers) };
-    } catch (e) {
-      return { issues: [{ index: -1, msg: e.message }] };
-    }
-  }, [state.gds, state.layers, state.config]);
+/** 모든 묶음의 계산 결과: { [id]: calc } */
+export function useCalcs(state) {
+  return useMemo(() => Object.fromEntries(state.projects.map((p) => [p.id, computeProject(p, state.config)])), [state.projects, state.config]);
 }
 
 export default function Mto({ mode, setMode, widget, setWidget }) {
   const [state, dispatch] = useMtoStore();
-  const calc = useSchedule(state);
-  const [tab, setTab] = useState('overview');
+  const calcs = useCalcs(state);
+  const project = state.projects.find((p) => p.id === state.activeId) || state.projects[0];
+  const calc = calcs[project.id];
+  const [tab, setTab] = useState(() => (state.projects.length > 1 ? 'all' : 'overview'));
   const [toast, setToast] = useState(null);
   const [navMini, setNavMini] = useState(() => {
     try {
@@ -69,12 +59,15 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   }, [toast]);
 
   const notify = (text, action) => setToast({ text, action });
-  const go = (next) => setTab(next);
-  const expand = (next = 'overview') => {
+  const go = (next, id) => {
+    if (id) dispatch({ type: 'select', id });
     setTab(next);
+  };
+  const expand = (next = 'overview', id) => {
+    go(next, id);
     setMode('full');
   };
-  const props = { state, dispatch, calc, go, notify };
+  const props = { state, dispatch, project, calc, calcs, go, notify };
   const toastEl = toast && (
     <div className="toast" role="status">
       {toast.text}
@@ -98,6 +91,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   }
 
   const issueCount = calc.issues?.length || 0;
+  const done = state.projects.filter((p) => calcs[p.id].result);
   return (
     <div className={`app mto fade-in ${navMini ? 'nav-mini' : ''}`}>
       <nav className="nav" aria-label="MTO 메뉴">
@@ -105,30 +99,33 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
           <BrandMark icon="mask" />
           <div className="brand-text">
             <div className="brand-name">MTO</div>
-            <div className="brand-sub">STEP2 · MTO 일정 · v{MTO_VERSION}</div>
+            <div className="brand-sub">Product · Revision 일정 · v{MTO_VERSION}</div>
           </div>
         </div>
         <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
           <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
         </button>
-        {NAV.map(([key, label, icon]) => (
-          <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
-            <Icon name={icon} />
-            <span className="nav-label">{label}</span>
-            {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
-          </button>
+        {NAV.map(([key, label, icon], i) => (
+          <div key={key} className="nav-item-wrap">
+            {i === 1 && !navMini && <div className="nav-sec">선택한 묶음 · {project.name}</div>}
+            <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+              <Icon name={icon} />
+              <span className="nav-label">{label}</span>
+              {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
+              {key === 'all' && <span className="nav-count num">{state.projects.length}</span>}
+            </button>
+          </div>
         ))}
         <div className="nav-foot">
           <span>
-            {calc.result ? <Pill tone="accent">최종 MTO {calc.result.finalMto.slice(5).replace('-', '/')}</Pill> : <Pill tone="neutral">계산 전</Pill>}
+            <Pill tone="accent">Product {state.projects.filter((p) => p.kind === 'product').length} · Revision {state.projects.filter((p) => p.kind === 'revision').length}</Pill>
           </span>
-          <span className="num">
-            Layer {state.layers.length}장 · MTO {state.config.mtoPerDay}장/일 · STEP2 {state.config.step2Concurrency ?? '무제한'}
-          </span>
+          <span className="num">계산 완료 {done.length}/{state.projects.length}</span>
         </div>
       </nav>
 
       <main className="main">
+        {tab === 'all' && <Portfolio {...props} />}
         {tab === 'overview' && <Overview {...props} />}
         {tab === 'layers' && <LayerList {...props} />}
         {tab === 'table' && <ScheduleTable {...props} />}

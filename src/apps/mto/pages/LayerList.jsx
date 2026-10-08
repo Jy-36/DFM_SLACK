@@ -4,14 +4,17 @@ import { Icon, Pill } from '../../../shared/ui.jsx';
 import { parseLayerText, validateLayers } from '../lib/layers.js';
 import { fmtShort } from '../lib/dates.js';
 import { loadExample } from './Overview.jsx';
+import ProjectBar from '../components/ProjectBar.jsx';
 
-export default function LayerList({ state, dispatch, calc, notify }) {
-  const { layers, config } = state;
-  const types = Object.keys(config.step2Tat);
+export default function LayerList({ state, dispatch, project, calc, calcs, notify }) {
+  const { layers } = project;
+  const rev = project.kind === 'revision';
+  const types = Object.keys(state.config.step2Tat);
+  const config = calc.config;
   const [paste, setPaste] = useState(false);
   const [text, setText] = useState('');
   const fileRef = useRef(null);
-  const issues = useMemo(() => validateLayers(layers, types), [layers, types.join()]);
+  const issues = useMemo(() => validateLayers(layers, types, { revision: rev }), [layers, types.join(), rev]);
   const bad = useMemo(() => {
     const m = new Map();
     issues.forEach((i) => m.set(`${i.index}:${i.field}`, i.msg));
@@ -27,13 +30,13 @@ export default function LayerList({ state, dispatch, calc, notify }) {
   const nextNo = () => (layers.length ? Math.max(...layers.map((l) => (Number.isFinite(l.no) ? l.no : 0))) + 1 : 1);
   const addRow = () => {
     const last = layers[layers.length - 1];
-    set([...layers, { no: nextNo(), part: last?.part || 'A', layer: '', type: last?.type || types[0] }]);
+    set([...layers, { no: nextNo(), part: rev ? 'R' : last?.part || 'A', layer: '', type: last?.type || types[0] }]);
   };
 
   const applyPaste = (mode) => {
-    const rows = parseLayerText(text);
+    const rows = parseLayerText(text, { noPart: rev });
     if (!rows.length) {
-      notify('붙여넣은 내용에서 Layer를 찾지 못했어요 (Part · Layer · Type 열 필요)');
+      notify(rev ? '붙여넣은 내용에서 Layer를 찾지 못했어요 (Layer · Type 열 필요)' : '붙여넣은 내용에서 Layer를 찾지 못했어요 (Part · Layer · Type 열 필요)');
       return;
     }
     if (mode === 'append') {
@@ -50,7 +53,7 @@ export default function LayerList({ state, dispatch, calc, notify }) {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
-    const rows = parseLayerText(await f.text());
+    const rows = parseLayerText(await f.text(), { noPart: rev });
     if (!rows.length) return notify(`${f.name}에서 Layer를 찾지 못했어요`);
     set(rows, `${f.name}에서 ${rows.length}장을 불러왔어요`);
   };
@@ -79,8 +82,8 @@ export default function LayerList({ state, dispatch, calc, notify }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Layer List</h1>
-          <p>No 순서대로 STEP2에 투입하고, 같은 순서로 MTO합니다. 바꾸면 바로 다시 계산돼요.</p>
+          <h1>{project.name} · Layer List</h1>
+          <p>No 순서대로 STEP2에 투입하고, 같은 순서로 MTO합니다.{rev ? ' Revision은 Part 구분 없이 한 묶음이에요.' : ''} 바꾸면 바로 다시 계산돼요.</p>
         </div>
         <div className="head-actions">
           <button type="button" className={`btn ${paste ? 'primary' : ''}`} onClick={() => setPaste((v) => !v)}>
@@ -88,17 +91,19 @@ export default function LayerList({ state, dispatch, calc, notify }) {
           </button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>CSV 열기</button>
           <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" hidden onChange={openCsv} />
-          <button type="button" className="btn" onClick={() => loadExample(state, dispatch, notify)}>예시 30장</button>
+          <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>예시 {rev ? 5 : 30}장</button>
         </div>
       </div>
 
+      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
+
       {paste && (
         <section className="panel paste-panel">
-          <h2>엑셀에서 복사해 붙여넣기 <span className="small muted">머리줄(No · Part · Layer · Type)이 있으면 열 순서가 달라도 됩니다</span></h2>
+          <h2>엑셀에서 복사해 붙여넣기 <span className="small muted">{rev ? '머리줄(No · Layer · Type)이 있으면 열 순서가 달라도 됩니다 · Part 열은 무시' : '머리줄(No · Part · Layer · Type)이 있으면 열 순서가 달라도 됩니다'}</span></h2>
           <textarea className="input" rows={8} value={text} onChange={(e) => setText(e.target.value)} autoFocus
-            placeholder={'No\tPart\tLayer\tType\n1\tA\tA-1\tX\n2\tA\tA-2\tZ\n…'} />
+            placeholder={rev ? 'No\tLayer\tType\n1\tM1\tX\n2\tV1\tY\n…' : 'No\tPart\tLayer\tType\n1\tA\tA-1\tX\n2\tA\tA-2\tZ\n…'} />
           <div className="head-actions end">
-            <span className="small muted">{text.trim() ? `${parseLayerText(text).length}장 인식` : ''}</span>
+            <span className="small muted">{text.trim() ? `${parseLayerText(text, { noPart: rev }).length}장 인식` : ''}</span>
             <button type="button" className="btn ghost" onClick={() => setPaste(false)}>취소</button>
             <button type="button" className="btn" disabled={!layers.length} onClick={() => applyPaste('append')}>뒤에 추가</button>
             <button type="button" className="btn primary" onClick={() => applyPaste('replace')}>목록 바꾸기</button>
@@ -116,7 +121,7 @@ export default function LayerList({ state, dispatch, calc, notify }) {
         <h2>
           <span className="layer-sum">
             Layer {layers.length}장
-            {Object.entries(counts.parts).sort().map(([p, n]) => <Pill key={p} tone="accent">Part {p} {n}</Pill>)}
+            {!rev && Object.entries(counts.parts).sort().map(([p, n]) => <Pill key={p} tone="accent">Part {p} {n}</Pill>)}
             {Object.entries(counts.types).sort().map(([t, n]) => <Pill key={t} tone="neutral">{t} {n}</Pill>)}
           </span>
           <span className="head-actions">
@@ -132,7 +137,7 @@ export default function LayerList({ state, dispatch, calc, notify }) {
             <thead>
               <tr>
                 <th style={{ width: 84 }}>No</th>
-                <th style={{ width: 110 }}>Part</th>
+                {!rev && <th style={{ width: 110 }}>Part</th>}
                 <th>Layer</th>
                 <th style={{ width: 120 }}>Type</th>
                 <th className="r">STEP2 TAT</th>
@@ -147,12 +152,14 @@ export default function LayerList({ state, dispatch, calc, notify }) {
                 return (
                   <tr key={i}>
                     <td><input className={`input num cell ${bad.has(`${i}:no`) ? 'bad' : ''}`} type="number" value={Number.isFinite(l.no) ? l.no : ''} onChange={(e) => edit(i, { no: parseInt(e.target.value, 10) })} aria-label={`${i + 1}행 No`} /></td>
-                    <td>
-                      <div className={`seg ${bad.has(`${i}:part`) ? 'bad' : ''}`} role="group" aria-label={`${i + 1}행 Part`}>
-                        {['A', 'B'].map((p) => <button key={p} type="button" aria-pressed={l.part === p} onClick={() => edit(i, { part: p })}>{p}</button>)}
-                      </div>
-                    </td>
-                    <td><input className={`input cell ${bad.has(`${i}:layer`) ? 'bad' : ''}`} value={l.layer} placeholder="A-1" onChange={(e) => edit(i, { layer: e.target.value })} aria-label={`${i + 1}행 Layer`} /></td>
+                    {!rev && (
+                      <td>
+                        <div className={`seg ${bad.has(`${i}:part`) ? 'bad' : ''}`} role="group" aria-label={`${i + 1}행 Part`}>
+                          {['A', 'B'].map((p) => <button key={p} type="button" aria-pressed={l.part === p} onClick={() => edit(i, { part: p })}>{p}</button>)}
+                        </div>
+                      </td>
+                    )}
+                    <td><input className={`input cell ${bad.has(`${i}:layer`) ? 'bad' : ''}`} value={l.layer} placeholder={rev ? 'M1' : 'A-1'} onChange={(e) => edit(i, { layer: e.target.value })} aria-label={`${i + 1}행 Layer`} /></td>
                     <td>
                       <select className={`input cell ${bad.has(`${i}:type`) ? 'bad' : ''}`} value={types.includes(l.type) ? l.type : ''} onChange={(e) => edit(i, { type: e.target.value })} aria-label={`${i + 1}행 Type`}>
                         {!types.includes(l.type) && <option value="">{l.type || '선택'}</option>}
