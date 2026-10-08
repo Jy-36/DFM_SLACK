@@ -4,8 +4,9 @@ import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
 import { mtoByDate, toCsv, toTsv } from '../lib/report.js';
 import { EmptyCard, IssueBanner } from './Overview.jsx';
+import ProjectBar from '../components/ProjectBar.jsx';
 
-async function copyText(text) {
+export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -20,21 +21,22 @@ async function copyText(text) {
   }
 }
 
-function saveCsv(result) {
-  const blob = new Blob(['﻿' + toCsv(result)], { type: 'text/csv;charset=utf-8' }); // 엑셀에서 한글이 깨지지 않게 BOM
+export function saveCsv(text, filename) {
+  const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }); // 엑셀에서 한글이 깨지지 않게 BOM
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `mto_schedule_${result.partAGds}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-export default function ScheduleTable({ state, dispatch, calc, go, notify }) {
+export default function ScheduleTable({ state, dispatch, project, calc, calcs, go, notify }) {
+  const rev = project.kind === 'revision';
   const { result } = calc;
   const [part, setPart] = useState('all');
-  const rows = useMemo(() => (result ? result.layers.filter((l) => part === 'all' || l.part === part) : []), [result, part]);
+  const rows = useMemo(() => (result ? result.layers.filter((l) => rev || part === 'all' || l.part === part) : []), [result, part, rev]);
   const days = useMemo(() => (result ? mtoByDate(result) : []), [result]);
   const maxWait = result ? Math.max(0, ...result.layers.map((l) => l.mtoWaitDays)) : 0;
 
@@ -42,7 +44,7 @@ export default function ScheduleTable({ state, dispatch, calc, go, notify }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Layer별 일정표</h1>
+          <h1>{project.name} · Layer별 일정표</h1>
           <p>STEP2 가능일 → 실제 시작(슬롯 대기) → MTO 가능일 → 실제 MTO(순차 대기)</p>
         </div>
         {result && (
@@ -50,14 +52,16 @@ export default function ScheduleTable({ state, dispatch, calc, go, notify }) {
             <button type="button" className="btn" onClick={async () => notify((await copyText(toTsv(result))) ? '표를 복사했어요 · 엑셀에 붙여 넣으세요' : '복사하지 못했어요')}>
               <Icon name="copy" size={15} /> 엑셀용 복사
             </button>
-            <button type="button" className="btn" onClick={() => saveCsv(result)}>
+            <button type="button" className="btn" onClick={() => saveCsv(toCsv(result), `mto_${project.name.replace(/[\\/:*?"<>|\s]+/g, '_')}_${result.partAGds}.csv`)}>
               <Icon name="download" size={15} /> CSV 저장
             </button>
           </div>
         )}
       </div>
 
-      {calc.empty && <EmptyCard state={state} dispatch={dispatch} notify={notify} go={go} />}
+      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} showSettings={false} />
+
+      {calc.empty && <EmptyCard project={project} dispatch={dispatch} notify={notify} go={go} />}
       {calc.issues && <IssueBanner issues={calc.issues} go={go} />}
 
       {result && (
@@ -80,11 +84,11 @@ export default function ScheduleTable({ state, dispatch, calc, go, notify }) {
           <section className="panel">
             <h2>
               Layer {rows.length}장
-              <div className="seg" role="group" aria-label="Part 거르기">
+              {!rev && <div className="seg" role="group" aria-label="Part 거르기">
                 {[['all', '전체'], ['A', 'Part A'], ['B', 'Part B']].map(([k, label]) => (
                   <button key={k} type="button" aria-pressed={part === k} onClick={() => setPart(k)}>{label}</button>
                 ))}
-              </div>
+              </div>}
             </h2>
             <div className="table-wrap">
               <table className="data-table sched">
@@ -99,7 +103,7 @@ export default function ScheduleTable({ state, dispatch, calc, go, notify }) {
                   {rows.map((l) => (
                     <tr key={l.no}>
                       <td className="num">{l.no}</td>
-                      <td>{l.part}</td>
+                      <td>{l.part === 'R' ? 'Rev' : l.part}</td>
                       <td><b>{l.layer}</b></td>
                       <td><span className={`type-chip t-${l.type}`}>{l.type}</span></td>
                       <td className="num">{fmtShort(l.step1Start)} ~ {fmtShort(l.step1End)}</td>

@@ -4,24 +4,33 @@ import { QuickControls } from '../components/Controls.jsx';
 import Gantt, { GanttLegend } from '../components/Gantt.jsx';
 import { Bottlenecks, CriticalPath, Recommendations, Risks, Scenarios } from '../components/Insights.jsx';
 import { fmtLong, fmtShort } from '../lib/dates.js';
-import { EXAMPLE_GDS, EXAMPLE_LAYERS } from '../lib/layers.js';
+import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js';
+import { partLabel } from '../lib/scheduler.js';
+import ProjectBar from '../components/ProjectBar.jsx';
 
-export function loadExample(state, dispatch, notify) {
-  dispatch({ type: 'layers', layers: EXAMPLE_LAYERS, keepUndo: state.layers.length > 0 });
-  if (!state.gds) dispatch({ type: 'gds', value: EXAMPLE_GDS });
-  notify?.('예시 30개 Layer를 불러왔어요', state.layers.length ? { label: '되돌리기', run: () => dispatch({ type: 'undoLayers' }) } : null);
+export function loadExample(project, dispatch, notify) {
+  const rev = project.kind === 'revision';
+  dispatch({ type: 'layers', layers: rev ? EXAMPLE_REVISION : EXAMPLE_LAYERS, keepUndo: project.layers.length > 0 });
+  if (!project.gds) dispatch({ type: 'gds', value: rev ? '2026-10-12' : EXAMPLE_GDS });
+  notify?.(`예시 ${rev ? 5 : 30}개 Layer를 불러왔어요`, project.layers.length ? { label: '되돌리기', run: () => dispatch({ type: 'undoLayers' }) } : null);
 }
 
-export function EmptyCard({ state, dispatch, notify, go }) {
+export function EmptyCard({ project, dispatch, notify, go }) {
+  const rev = project.kind === 'revision';
   return (
     <section className="panel mto-empty">
-      <h2>Layer List를 넣으면 바로 계산해요</h2>
-      <p className="muted">Part A GDS 입고일과 Layer(No · Part · Layer · Type)를 넣으면 Layer별 STEP2 시작일과 MTO 날짜, 병목을 보여 줍니다. 엑셀에서 표를 복사해 붙여 넣어도 됩니다.</p>
+      <h2>{project.name} · Layer List를 넣으면 바로 계산해요</h2>
+      <p className="muted">
+        {rev
+          ? 'GDS 입고일과 다시 만들 Layer(No · Layer · Type)를 넣으면 STEP1 → STEP2 → MTO 일정을 계산합니다. Part A/B 구분은 없습니다.'
+          : 'Part A GDS 입고일과 Layer(No · Part · Layer · Type)를 넣으면 Layer별 STEP2 시작일과 MTO 날짜, 병목을 보여 줍니다.'}{' '}
+        엑셀에서 표를 복사해 붙여 넣어도 됩니다.
+      </p>
       <div className="head-actions">
         <button type="button" className="btn primary" onClick={() => go('layers')}>
           <Icon name="layers" size={16} /> Layer List 입력
         </button>
-        <button type="button" className="btn" onClick={() => loadExample(state, dispatch, notify)}>예시 30장 불러오기</button>
+        <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>예시 {rev ? 5 : 30}장 불러오기</button>
       </div>
     </section>
   );
@@ -39,9 +48,11 @@ export function IssueBanner({ issues, go }) {
   );
 }
 
-export default function Overview({ state, dispatch, calc, go, notify }) {
+export default function Overview({ state, dispatch, project, calc, calcs, go, notify }) {
   const { result, analysis: an } = calc;
-  const pickScenario = (g) => dispatch({ type: 'config', patch: { mtoPerDay: g.mtoPerDay, step2Concurrency: g.step2Concurrency } });
+  const rev = project.kind === 'revision';
+  const cfg = calc.config;
+  const pickScenario = (g) => dispatch({ type: 'override', patch: { mtoPerDay: g.mtoPerDay, step2Concurrency: g.step2Concurrency } });
   const applyOrder = (order) => {
     dispatch({ type: 'layers', layers: order, keepUndo: true });
     notify('추천 순서로 Layer No를 바꿨어요', { label: '되돌리기', run: () => dispatch({ type: 'undoLayers' }) });
@@ -51,20 +62,27 @@ export default function Overview({ state, dispatch, calc, go, notify }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>MTO 일정 현황</h1>
-          <p>Part A GDS + Layer List → Layer별 STEP2 시작일 · MTO 날짜 · 병목</p>
+          <h1>{project.name} 일정 현황</h1>
+          <p>{rev ? 'Revision · GDS → STEP1 → STEP2 → MTO (Part 구분 없음)' : 'Product · Part A GDS + Layer List → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>
         </div>
       </div>
 
+      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
+
       <section className="panel mto-bar">
-        <QuickControls state={state} dispatch={dispatch} />
+        <QuickControls project={project} cfg={cfg} dispatch={dispatch} />
         <div className="mto-bar-rules small muted">
-          STEP1 {Object.entries(state.config.step1Tat).map(([k, v]) => `${k} ${v}일`).join(' · ')} / STEP2 {Object.entries(state.config.step2Tat).map(([k, v]) => `${k} ${v}일`).join(' · ')} / Part B = A + {state.config.partBOffsetDays}일
+          {rev
+            ? <>STEP1 {cfg.step1Tat.R}일</>
+            : <>STEP1 A {cfg.step1Tat.A}일 · B {cfg.step1Tat.B}일</>}
+          {' '}/ STEP2 {Object.entries(cfg.step2Tat).map(([k, v]) => `${k} ${v}일`).join(' · ')}
+          {!rev && <> / Part B = A + {cfg.partBOffsetDays}일</>}
+          <span> · 이 {rev ? 'Revision' : 'Product'}만 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)</span>
           <button type="button" className="link-btn" onClick={() => go('rules')}>규칙 바꾸기</button>
         </div>
       </section>
 
-      {calc.empty && <EmptyCard state={state} dispatch={dispatch} notify={notify} go={go} />}
+      {calc.empty && <EmptyCard project={project} dispatch={dispatch} notify={notify} go={go} />}
       {calc.issues && <IssueBanner issues={calc.issues} go={go} />}
 
       {result && an && (
@@ -86,7 +104,7 @@ export default function Overview({ state, dispatch, calc, go, notify }) {
             <div className="today-side">
               {Object.entries(an.summary.byPart).map(([p, b]) => (
                 <div key={p} className="hero-part">
-                  <div className="kv"><span className="label">Part {p} · {b.layers}장</span><span className="v">GDS {fmtShort(b.gds)}</span></div>
+                  <div className="kv"><span className="label">{partLabel(p)} · {b.layers}장</span><span className="v">GDS {fmtShort(b.gds)}</span></div>
                   <div className="kv"><span className="muted">STEP1</span><span className="v">{fmtShort(b.step1Start)} ~ {fmtShort(b.step1End)}</span></div>
                   <div className="kv"><span className="muted">MTO</span><span className="v">{fmtShort(b.firstMto)} ~ {fmtShort(b.lastMto)}</span></div>
                 </div>

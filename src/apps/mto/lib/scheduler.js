@@ -19,9 +19,13 @@ export const DEFAULT_CONFIG = Object.freeze({
   step2Concurrency: 4, // 규칙 11: STEP2 동시 4~5장 (null = 무제한)
   weekendsAreHolidays: true,
   extraHolidays: [], // 회사 휴무일 'YYYY-MM-DD'
+  revisionStep1Tat: 3, // Revision 기본 STEP1 TAT (Revision마다 바꿀 수 있음)
 });
 
 export const PARTS = ['A', 'B'];
+/** Revision은 Part A/B 없이 한 묶음: 엔진 안에서는 Part 'R'로 계산한다 */
+export const REVISION_PART = 'R';
+export const partLabel = (p) => (p === REVISION_PART ? 'Revision' : `Part ${p}`);
 
 /** 근무일 달력: 대한민국 공휴일 + 주말(선택) + 추가 휴무 */
 export function makeCalendar({ weekendsAreHolidays = true, extraHolidays = [] } = {}) {
@@ -76,12 +80,12 @@ export function buildSchedule(partAGds, layers, config) {
   if (!(cfg.mtoPerDay >= 1)) throw new Error('하루 MTO 가능 수는 1 이상이어야 합니다.');
   if (cfg.step2Concurrency != null && !(cfg.step2Concurrency >= 1)) throw new Error('STEP2 동시 진행 수는 1 이상(또는 무제한)이어야 합니다.');
   for (const l of layers) {
-    if (!PARTS.includes(l.part) || !(l.part in cfg.step1Tat)) throw new Error(`Layer ${l.layer || l.no}: Part '${l.part}'를 알 수 없습니다 (A 또는 B).`);
+    if (!(l.part in cfg.step1Tat)) throw new Error(`Layer ${l.layer || l.no}: Part '${l.part}'를 알 수 없습니다 (A 또는 B).`);
     if (!(l.type in cfg.step2Tat)) throw new Error(`Layer ${l.layer || l.no}: Type '${l.type}'를 알 수 없습니다 (${Object.keys(cfg.step2Tat).join('/')}).`);
   }
 
-  // 규칙 1
-  const gds = { A: partAGds, B: addDays(partAGds, cfg.partBOffsetDays) };
+  // 규칙 1 (Revision은 GDS 입고일 그대로)
+  const gds = { A: partAGds, B: addDays(partAGds, cfg.partBOffsetDays), [REVISION_PART]: partAGds };
   const cal = makeCalendar(cfg);
 
   // 규칙 2, 4, 6, 7: STEP1은 Part(GDS) 단위
