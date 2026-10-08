@@ -22,7 +22,7 @@ function criticalPath(result) {
   ].filter((s) => s.days > 0);
   // Part B면 GDS 자체가 늦게 들어온다
   const gdsLag = diffDays(last.gds, result.partAGds);
-  if (gdsLag > 0) steps.unshift({ key: 'gds', label: `${partLabel(last.part)} GDS`, days: gdsLag, note: `Part A + ${gdsLag}일` });
+  if (gdsLag > 0) steps.unshift({ key: 'gds', label: `${partLabel(last.part)} GDS`, days: gdsLag, note: `첫 GDS + ${gdsLag}일` });
   return { layer: last, steps };
 }
 
@@ -186,7 +186,7 @@ export function analyze(result, layersInput) {
     if (g > k) {
       recs.push({
         key: 'gds',
-        title: `${result.step1[REVISION_PART] ? '' : 'Part A '}GDS ${k}일 앞당기기 (${fmtShort(addDays(result.partAGds, -k))})`,
+        title: `GDS ${k}일 앞당기기 (${fmtShort(addDays(result.partAGds, -k))})`,
         gainDays: g,
         detail: `휴일을 피해 최종 MTO가 ${g}일 당겨짐 (${fmtShort(r.finalMto)}) — 앞당긴 일수보다 효과가 큼`,
         agreement: true,

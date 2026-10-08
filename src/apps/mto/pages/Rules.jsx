@@ -71,10 +71,10 @@ export default function Rules({ state, dispatch, calc, notify }) {
       <section className="panel">
         <h2>공정 TAT <span className="small muted">달력일 · 시작은 근무일만, 시작 후에는 휴일에도 진행</span></h2>
         <div className="settings-grid">
-          <NumField label="STEP1 TAT · Part A" value={c.step1Tat.A} min={1} onChange={(v) => patch({ step1Tat: { ...c.step1Tat, A: v } })} />
-          <NumField label="STEP1 TAT · Part B" value={c.step1Tat.B} min={1} onChange={(v) => patch({ step1Tat: { ...c.step1Tat, B: v } })} />
-          <NumField label="STEP1 TAT · Revision (기본)" value={c.revisionStep1Tat} min={1} tip="Revision은 Part A/B 없이 한 묶음. Revision마다 따로 바꿀 수 있고, 비워 두면 이 값" onChange={(v) => patch({ revisionStep1Tat: v })} />
-          <NumField label="Part B GDS" value={c.partBOffsetDays} unit="일 뒤 (Part A 기준)" tip="Part B GDS = Part A GDS + 이 일수 (기본 14일 = 2주)" onChange={(v) => patch({ partBOffsetDays: v })} />
+          <NumField label="STEP1 TAT · FEOL" value={c.step1Tat.FEOL} min={1} tip="직접 입력 Product에 쓰는 값. 공정 기준 Product는 공정의 Part 설정을 따라요" onChange={(v) => patch({ step1Tat: { ...c.step1Tat, FEOL: v } })} />
+          <NumField label="STEP1 TAT · BEOL" value={c.step1Tat.BEOL} min={1} onChange={(v) => patch({ step1Tat: { ...c.step1Tat, BEOL: v } })} />
+          <NumField label="STEP1 TAT · Revision (기본)" value={c.revisionStep1Tat} min={1} tip="Revision ITEM은 FEOL/BEOL 구분 없이 한 묶음. Revision마다 따로 바꿀 수 있고, 비워 두면 이 값" onChange={(v) => patch({ revisionStep1Tat: v })} />
+          <NumField label="BEOL GDS" value={c.partBOffsetDays} unit="일 뒤 (FEOL 기준)" tip="BEOL GDS = FEOL GDS + 이 일수 (기본 14일 = 2주). 직접 입력 Product용, 공정 기준은 공정 설정" onChange={(v) => patch({ partBOffsetDays: v })} />
         </div>
         <h3 className="sub-h">STEP2 TAT · Type별</h3>
         <div className="type-grid">

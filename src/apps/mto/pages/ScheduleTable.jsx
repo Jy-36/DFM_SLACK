@@ -75,7 +75,7 @@ export default function ScheduleTable({ state, dispatch, project, calc, calcs, g
               {days.map((d) => (
                 <div key={d.date} className="mto-day">
                   <span className="num when">{fmtShort(d.date)}</span>
-                  <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'A' ? 'accent' : 'leave'}>{l.layer}</Pill>)}</span>
+                  <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'BEOL' || l.part === 'B' ? 'leave' : 'accent'}>{l.layer}</Pill>)}</span>
                 </div>
               ))}
             </div>
@@ -85,7 +85,7 @@ export default function ScheduleTable({ state, dispatch, project, calc, calcs, g
             <h2>
               Layer {rows.length}장
               {!rev && <div className="seg" role="group" aria-label="Part 거르기">
-                {[['all', '전체'], ['A', 'Part A'], ['B', 'Part B']].map(([k, label]) => (
+                {[['all', '전체'], ['FEOL', 'FEOL'], ['BEOL', 'BEOL']].map(([k, label]) => (
                   <button key={k} type="button" aria-pressed={part === k} onClick={() => setPart(k)}>{label}</button>
                 ))}
               </div>}
