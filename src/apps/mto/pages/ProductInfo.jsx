@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
-import { beolOptionsOf } from '../lib/process.js';
+import { beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
 
 export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
   const products = state.projects.filter((p) => p.kind === 'product');
@@ -39,7 +39,7 @@ export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
       <div className="page-head">
         <div>
           <h1>Product 정보</h1>
-          <p>Product의 기준 공정 · BEOL Option과 정보(Code · 고객 등)를 한곳에서 관리해요. 공정이나 BEOL Option을 바꾸면 Set List가 그에 맞게 다시 담겨요. 일정(GDS · MTO 조건)은 Product 탭에서 정해요.</p>
+          <p>Product의 기준 공정 · FEOL Option · BEOL Option과 정보(Code · 고객 등)를 한곳에서 관리해요. 공정이나 Option을 바꾸면 Set List가 그에 맞게 다시 담겨요. 일정(GDS · MTO 조건)은 Product 탭에서 정해요.</p>
         </div>
         <div className="head-actions">
           <button type="button" className="btn primary" onClick={() => { dispatch({ type: 'addProject', kind: 'product' }); notify('Product를 추가했어요 · 기준 공정 Set List 전체가 담겼어요'); }}><Icon name="plus" size={15} /> Product</button>
@@ -58,6 +58,7 @@ export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
                 <tr>
                   <th>이름</th>
                   <th>기준 공정</th>
+                  <th>FEOL Option</th>
                   <th>BEOL Option</th>
                   {cols.map((c) => (
                     <th key={c} className="spec-h">
@@ -91,6 +92,17 @@ export default function ProductInfo({ state, dispatch, calcs, go, notify }) {
                           <option value="">직접 입력</option>
                           {state.processes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                         </select>
+                      </td>
+                      <td>
+                        {proc ? (
+                          <select className={`input cell ${feolOptionOf(proc, p.feolOption).por ? 'por-sel' : ''}`} value={feolOptionOf(proc, p.feolOption).id} onChange={(e) => {
+                            const o = feolOptionsOf(proc).find((x) => x.id === e.target.value);
+                            dispatch({ type: 'setFeolOption', id: p.id, option: e.target.value });
+                            notify(`${p.name}: FEOL ${o?.name}로 바꿨어요 · BEOL은 그대로, FEOL Layer만 바뀌었어요${its.length ? ` · ITEM ${its.length}개 확인 필요` : ''}`);
+                          }} aria-label="FEOL Option">
+                            {feolOptionsOf(proc).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
+                          </select>
+                        ) : <span className="muted small">-</span>}
                       </td>
                       <td>
                         {proc ? (

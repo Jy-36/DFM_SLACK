@@ -1,6 +1,8 @@
-// 공정(Process) 마스터: Process → Part(FEOL · BEOL) → Module / BEOL Option → Layer, Layer마다 Type(STEP2 TAT)과 SPEC 값.
-// FEOL은 Module로 나누고, BEOL은 여러 Option(예: 15M, 11M) 중 Product가 하나를 고른다.
-// Product Set List = FEOL Layer 전체 + 고른 BEOL Option의 Layer (중간부터 나가면 시작 Layer부터).
+// Process Layer Set: Process → Part(FEOL · BEOL) → Layer, Layer마다 Type(STEP2 TAT)과 SPEC 값.
+// FEOL: Module로 나누고, Module마다 Module Option(변형)을 둘 수 있다. FEOL Option(POR 등)은 Module마다 어떤 Module Option을 쓸지 정한 조합.
+//       Layer의 Module Option이 비어 있으면 그 Module 공통 Layer (모든 FEOL Option에 들어감).
+// BEOL: 여러 BEOL Option(예: 15M, 11M) 중 하나. Option마다 컨셉 설명과 Metal · Via 쌓는 순서(stack)를 둔다.
+// Product Set List = 고른 FEOL Option의 FEOL Layer + 고른 BEOL Option의 Layer (BEOL은 stack 순서).
 import { EXAMPLE_LAYERS } from './layers.js';
 
 let seq = 0;
@@ -19,21 +21,31 @@ export function newProcess(processes = [], patch = {}) {
       { name: 'BEOL', gdsOffset: 14, step1Tat: 3 },
     ],
     beolOptions: ['기본'],
+    beolMeta: {}, // { [BEOL Option]: { concept, stack: [rowId…] } }
+    feolOptions: [{ id: 'por', name: 'POR', por: true, modules: {} }], // modules: { [Module]: Module Option }
+    feolModules: [], // Layer가 아직 없는 Module도 목록에 두기 위해
+    moduleOptions: {}, // { [Module]: [Module Option…] } (첫 번째가 기본)
     columns: [...DEFAULT_SPEC_COLUMNS],
-    rows: [], // { id, part, module, layer, type, spec: { [column]: value } }
+    rows: [], // { id, part, module, modOpt?, layer, type, spec: { [column]: value } }
     ...patch,
   };
 }
 
 /** 예시 공정: mto-scheduling-agent 예시 30장 — FEOL(FEOL·MOL Module) 15장 + BEOL Option 15M(15장) / 11M(11장) */
 export function exampleProcess(processes = []) {
-  const feol = EXAMPLE_LAYERS.filter((l) => l.part === 'FEOL').map((l) => ({ id: uid('ly'), part: 'FEOL', module: l.no <= 8 ? 'FEOL' : 'MOL', layer: l.layer, type: l.type, spec: {} }));
+  const feol = EXAMPLE_LAYERS.filter((l) => l.part === 'FEOL').map((l) => ({ id: uid('ly'), part: 'FEOL', module: l.no <= 8 ? 'FEOL' : 'MOL', modOpt: l.layer === 'A-13' ? 'Base' : '', layer: l.layer, type: l.type, spec: {} }));
+  // MOL Module에 HD 변형 예시: A-13 대신 A-13H를 쓰는 Module Option
+  const i13 = feol.findIndex((r) => r.layer === 'A-13');
+  feol.splice(i13 + 1, 0, { id: uid('ly'), part: 'FEOL', module: 'MOL', modOpt: 'HD', layer: 'A-13H', type: 'Z', spec: {} });
   const beol = EXAMPLE_LAYERS.filter((l) => l.part === 'BEOL');
   const opt = (name, n) => beol.slice(0, n).map((l) => ({ id: uid('ly'), part: 'BEOL', module: name, layer: l.layer, type: l.type, spec: {} }));
   return newProcess(processes, {
     name: '예시 공정',
-    desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL) / BEOL Option 15M · 11M',
+    desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL, FEOL Option POR · HD) / BEOL Option 15M · 11M',
     beolOptions: ['15M', '11M'],
+    beolMeta: { '15M': { concept: '15층 (예시)', stack: [] }, '11M': { concept: '11층 (예시)', stack: [] } },
+    feolOptions: [{ id: 'por', name: 'POR', por: true, modules: { MOL: 'Base' } }, { id: uid('fo'), name: 'HD', por: false, modules: { MOL: 'HD' } }],
+    moduleOptions: { MOL: ['Base', 'HD'] },
     rows: [...feol, ...opt('15M', 15), ...opt('11M', 11)],
   });
 }
@@ -48,11 +60,52 @@ export function beolOptionsOf(proc) {
   return out;
 }
 
-/** Product Set List에 들어갈 공정 Layer: FEOL 전체 + 고른 BEOL Option (공정 시트 순서) */
-export function setRowsOf(proc, option) {
+/** FEOL Option 목록 (POR이 맨 앞) */
+export function feolOptionsOf(proc) {
+  const list = proc?.feolOptions?.length ? proc.feolOptions : [{ id: 'por', name: 'POR', por: true, modules: {} }];
+  return [...list.filter((o) => o.por), ...list.filter((o) => !o.por)];
+}
+export const porOf = (proc) => feolOptionsOf(proc)[0];
+export const feolOptionOf = (proc, id) => feolOptionsOf(proc).find((o) => o.id === id) || porOf(proc);
+
+/** FEOL Module 목록 (시트 순서 + 아직 Layer 없는 Module) */
+export function modulesOf(proc) {
+  const out = [];
+  for (const r of proc?.rows || []) if (!isBeol(r) && r.module && !out.includes(r.module)) out.push(r.module);
+  for (const m of proc?.feolModules || []) if (!out.includes(m)) out.push(m);
+  return out;
+}
+/** Module의 Module Option (첫 번째가 기본). 시트에만 있는 Option도 포함 */
+export function moduleOptionsOf(proc, module) {
+  const out = [...(proc?.moduleOptions?.[module] || [])];
+  for (const r of proc?.rows || []) if (!isBeol(r) && r.module === module && r.modOpt && !out.includes(r.modOpt)) out.push(r.modOpt);
+  return out;
+}
+/** FEOL Option이 이 Module에서 쓰는 Module Option (정하지 않았으면 첫 번째) */
+export const chosenModOpt = (proc, fo, module) => fo?.modules?.[module] ?? moduleOptionsOf(proc, module)[0] ?? '';
+
+/** FEOL Option에 들어가는 FEOL Layer (공통 Layer + 고른 Module Option Layer) */
+export function feolRowsOf(proc, feolOptionId) {
+  const fo = feolOptionOf(proc, feolOptionId);
+  return (proc?.rows || []).filter((r) => !isBeol(r) && (!r.modOpt || r.modOpt === chosenModOpt(proc, fo, r.module)));
+}
+
+/** BEOL Option의 컨셉 · 쌓는 순서 */
+export const beolMetaOf = (proc, option) => ({ concept: '', stack: [], ...(proc?.beolMeta?.[option] || {}) });
+/** BEOL Option Layer: 정한 순서(stack)가 있으면 그 순서, 나머지는 시트 순서로 뒤에 */
+export function beolRowsOf(proc, option) {
+  const rows = (proc?.rows || []).filter((r) => isBeol(r) && r.module === option);
+  const stack = beolMetaOf(proc, option).stack.filter((id) => rows.some((r) => r.id === id));
+  return [...stack.map((id) => rows.find((r) => r.id === id)), ...rows.filter((r) => !stack.includes(r.id))];
+}
+/** Layer 이름으로 Metal / Via 구분 (M1, Mx, V1, Via…) */
+export const layerKind = (name) => (/^(v|via)\s*\d*/i.test(name || '') ? 'via' : /^(m|metal)\s*\d*/i.test(name || '') ? 'metal' : 'etc');
+
+/** Product Set List에 들어갈 공정 Layer: FEOL Option의 FEOL + BEOL Option (BEOL은 쌓는 순서) */
+export function setRowsOf(proc, option, feolOptionId) {
   if (!proc) return [];
   const opt = option ?? beolOptionsOf(proc)[0];
-  return proc.rows.filter((r) => !isBeol(r) || r.module === opt);
+  return [...feolRowsOf(proc, feolOptionId), ...beolRowsOf(proc, opt)];
 }
 
 /** 예전 공정(Part A/B) → FEOL/BEOL, BEOL Module → BEOL Option */
@@ -72,6 +125,10 @@ export function migrateProcess(proc) { // eslint-disable-line no-param-reassign
   const out = { ...proc, parts, rows };
   out.beolOptions = beolOptionsOf({ ...out, beolOptions: proc.beolOptions || [] });
   if (!out.beolOptions.length) out.beolOptions = ['기본'];
+  out.beolMeta = proc.beolMeta || {};
+  out.feolOptions = proc.feolOptions?.length ? proc.feolOptions : [{ id: 'por', name: 'POR', por: true, modules: {} }];
+  out.feolModules = proc.feolModules || [];
+  out.moduleOptions = proc.moduleOptions || {};
   return out;
 }
 
