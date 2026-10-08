@@ -13,8 +13,10 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
   const picked = new Set(project.layers.map((l) => l.ref));
   const resolved = useMemo(() => resolveLayers(project.layers, proc), [project.layers, proc]);
   const mtoOf = useMemo(() => new Map((calc.result?.layers || []).map((l) => [l.no, l])), [calc.result]);
-  const [open, setOpen] = useState(() => project.layers.length === 0);
+  const [open, setOpen] = useState(false);
   const [closed, setClosed] = useState({}); // 접은 Part
+  const firstPicked = proc.rows.find((r) => picked.has(r.id));
+  const [startId, setStartId] = useState(() => firstPicked?.id || proc.rows[0]?.id || '');
 
   const set = (layers, undoMsg) => {
     dispatch({ type: 'layers', layers, keepUndo: !!undoMsg });
@@ -67,9 +69,9 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{project.name} · Layer List</h1>
+          <h1>{project.name} · Set List</h1>
           <p>
-            기준 공정 <b>{proc.name}</b>에서 Layer를 골라 담아요. No 순서대로 STEP2에 투입하고 같은 순서로 MTO합니다.
+            기준 공정 <b>{proc.name}</b>의 Set List. Product는 보통 전체가 나가고, 중간부터 나가면 시작 Layer를 고르세요. No 순서대로 STEP2에 투입하고 같은 순서로 MTO합니다.
             {rev ? ' Revision은 Part 구분 없이 한 묶음으로 계산해요.' : ' Part의 GDS 간격·STEP1 TAT는 공정 설정을 따라요.'}
           </p>
         </div>
@@ -80,6 +82,22 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
       </div>
 
       <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
+
+      {!rev && all.length > 0 && (
+        <section className="panel start-bar">
+          <span className="small"><b>Set 범위</b></span>
+          <button type="button" className={`btn small-btn ${picked.size === all.length ? 'primary' : ''}`} onClick={() => set(all.map((r, i) => ({ no: i + 1, ref: r.id })), '전체 Set List를 담았어요')}>전체 Set</button>
+          <span className="small muted">중간부터:</span>
+          <select className="input start-sel" value={startId} onChange={(e) => setStartId(e.target.value)} aria-label="시작 Layer">
+            {all.map((r, i) => <option key={r.id} value={r.id}>{i + 1}. {r.part} › {r.module || '-'} › {r.layer}</option>)}
+          </select>
+          <button type="button" className="btn small-btn" onClick={() => {
+            const i = all.findIndex((r) => r.id === startId);
+            set(all.slice(i).map((r, k) => ({ no: k + 1, ref: r.id })), `${all[i].layer}부터 ${all.length - i}장을 담았어요`);
+          }}>이 Layer부터 끝까지</button>
+          <span className="small muted">지금 {picked.size}/{all.length}장{firstPicked ? ` · 첫 Layer ${firstPicked.layer}` : ''}</span>
+        </section>
+      )}
 
       {open && (
         <section className="panel picker">

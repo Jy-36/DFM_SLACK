@@ -348,3 +348,27 @@ h3.sub-h { font-weight: 700; }
 .pick-layer .type-chip { height: 18px; min-width: 20px; font-size: 11px; }
 tr.missing td { background: var(--warn-soft); }
 @media (max-width: 1040px) { .pr-grid { grid-template-columns: 1fr; } .pr-tree { position: static; max-height: none; } .pick-mod { grid-template-columns: 1fr; } }
+
+/* ── Product / Revision 탭 ── */
+.sec-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; margin: 0 2px 12px; border-radius: 12px; background: var(--surface-3); }
+.sec-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; padding: 8px 6px; border-radius: 9px; font-weight: 700; font-size: 13px; color: var(--muted); cursor: pointer; }
+.sec-switch button .num { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); line-height: 16px; }
+.sec-switch button[aria-selected='true'].product { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(16, 38, 84, 0.14); }
+.sec-switch button[aria-selected='true'].revision { background: var(--surface); color: var(--leave); box-shadow: 0 1px 3px rgba(16, 38, 84, 0.14); }
+.sec-switch.mini { grid-template-columns: 1fr; margin-inline: 0; }
+.kind-tag.revision { min-width: 30px; }
+
+.pb-groups { display: grid; gap: 8px; }
+.pb-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.pb-group-h { font-size: 12px; font-weight: 800; color: var(--accent); padding: 0 6px 0 2px; min-width: 90px; }
+.pb-group-h.warn { color: var(--warn); }
+.pb-add .input.pb-parent { width: 170px; height: 32px; padding-block: 4px; }
+.pb-add { align-items: center; }
+.pb-ro { justify-content: end; padding-bottom: 7px; }
+.pb-ro > span:first-child { font-size: 12px; color: var(--muted); font-weight: 600; }
+.input.bad { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+
+.start-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 16px; }
+.panel .input.start-sel { width: auto; min-width: 260px; max-width: 420px; height: 32px; padding-block: 4px; }
+.pick-mod.flat { padding-left: 0; border-top: 0; margin-top: 0; }
+.pick-mod.flat + .pick-mod.flat { border-top: 1px dashed var(--line); padding-top: 10px; }

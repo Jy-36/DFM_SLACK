@@ -172,6 +172,15 @@ Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 
 입력이 바뀌면 바로 다시 계산하고, 묶음·규칙은 localStorage(`mto.v2`)에 저장합니다. 예전(`mto.v1`) 입력은 Product 1로 옮겨집니다.
 [규칙]은 모든 묶음의 기본값이고, 하루 MTO 수·STEP2 동시 수는 묶음마다 [일정 현황]에서 따로 바꿀 수 있습니다. Revision STEP1 TAT 기본값은 3일.
 
+## Product 탭 / Revision 탭
+
+MTO 앱 왼쪽 위에서 **Product**와 **Revision**을 나눠 봅니다 (공정 · Layer SPEC과 규칙은 같이 씀).
+- **Product**: 새로 만들면 기준 공정의 **Set List 전체**가 담겨요. 중간부터 나가는 경우 [Set List]의 "중간부터"에서 시작 Layer를 고르면 그 Layer부터 끝까지 담깁니다.
+  GDS 입고일은 Set의 첫 Part GDS예요 (Part B부터 나가면 입력한 날이 Part B GDS).
+- **Revision**: **ITEM** 단위(보통 1~5장 Set)로 들어오고, 항상 **Product에 딸려** 있어요. Product가 있어야 ITEM을 만들 수 있고,
+  ITEM Layer는 그 Product의 Set List에서 고릅니다. 기준 공정은 Product를 따라가고, Part 구분 없이 GDS → STEP1 → STEP2 → MTO로 계산해요.
+  Product를 지우면 딸린 ITEM도 함께 지워집니다 (되돌리기 가능). 이름은 `Product REV01`처럼 자동으로 붙어요.
+
 ## 공정 기준 Product
 
 Product·Revision마다 **기준 공정**을 고르면 Layer List는 그 공정의 Part → Module → Layer 트리에서 체크해서 담습니다.

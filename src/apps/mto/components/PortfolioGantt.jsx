@@ -70,8 +70,8 @@ export default function PortfolioGantt({ items, config, onPick }) {
     return (
       <g key={p.id} className="pf-row" onClick={() => onPick?.(p.id)}>
         <rect className={k % 2 ? 'rowband' : 'rowband-0'} x={0} y={y} width={W} height={ROW} />
-        <text className={`lbl kind ${p.kind}`} x={10} y={mid + 4}>{p.kind === 'revision' ? 'Rev' : 'P'}</text>
-        <text className="lbl strong" x={38} y={mid + 4}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>
+        <text className={`lbl kind ${p.kind}`} x={10} y={mid + 4}>{p.kind === 'revision' ? 'ITEM' : 'P'}</text>
+        <text className="lbl strong" x={44} y={mid + 4}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>
         <text className="lbl sub" x={LABEL_W - 10} y={mid + 4} textAnchor="end">{`${L.length}장`}</text>
         {gdsList.map((g, i) => <path key={`g${i}`} className="gds-mark" d={`M${x(g) + colW / 2 - 4},${y + 2} l4,6 l4,-6 z`} />)}
         {bar('s1', 'step1', s1.from, s1.to, mid - 6, 9, t('STEP1', [['시작', fmtShort(s1.from)], ['종료', fmtShort(s1.to)]], 'step1'))}

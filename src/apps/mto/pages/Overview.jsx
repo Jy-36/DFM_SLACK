@@ -6,7 +6,7 @@ import { Bottlenecks, CriticalPath, Recommendations, Risks, Scenarios } from '..
 import { fmtLong, fmtShort } from '../lib/dates.js';
 import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js';
 import { partLabel } from '../lib/scheduler.js';
-import ProjectBar from '../components/ProjectBar.jsx';
+import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 
 export function loadExample(project, dispatch, notify) {
   const rev = project.kind === 'revision';
@@ -26,20 +26,49 @@ export function EmptyCard({ project, dispatch, notify, go }) {
   const rev = project.kind === 'revision';
   return (
     <section className="panel mto-empty">
-      <h2>{project.name} · Layer List를 넣으면 바로 계산해요</h2>
+      <h2>{project.name} · {rev ? 'ITEM Layer를 고르면' : 'Set List를 넣으면'} 바로 계산해요</h2>
       <p className="muted">
         {rev
-          ? 'GDS 입고일과 다시 만들 Layer(No · Layer · Type)를 넣으면 STEP1 → STEP2 → MTO 일정을 계산합니다. Part A/B 구분은 없습니다.'
+          ? 'Product의 Layer 중 이번 ITEM에 들어오는 Layer(보통 1~5장)를 고르고 GDS 입고일을 넣으면 STEP1 → STEP2 → MTO 일정을 계산합니다. Part 구분은 없습니다.'
           : 'Part A GDS 입고일과 Layer(No · Part · Layer · Type)를 넣으면 Layer별 STEP2 시작일과 MTO 날짜, 병목을 보여 줍니다.'}{' '}
-        엑셀에서 표를 복사해 붙여 넣어도 됩니다.
+        {!rev && '엑셀에서 표를 복사해 붙여 넣어도 됩니다.'}
       </p>
       <div className="head-actions">
         <button type="button" className="btn primary" onClick={() => go('layers')}>
-          <Icon name="layers" size={16} /> Layer List 입력
+          <Icon name="layers" size={16} /> {rev ? 'ITEM Layer 고르기' : 'Set List 입력'}
         </button>
-        <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? "공정 Layer 모두 담기" : `예시 ${rev ? 5 : 30}장 불러오기`}</button>
+        {!rev && <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? '공정 Set List 모두 담기' : '예시 30장 불러오기'}</button>}
       </div>
     </section>
+  );
+}
+
+/** 지금 탭(Product / Revision)에 묶음이 하나도 없을 때 */
+export function NoneCard({ state, dispatch, section }) {
+  const products = state.projects.filter((p) => p.kind === 'product');
+  if (section === 'product') {
+    return (
+      <div className="page">
+        <section className="panel mto-empty">
+          <h2>Product가 없어요</h2>
+          <p className="muted">Product를 만들면 기준 공정의 Set List 전체가 담겨요. 중간부터 나가는 경우는 Set List에서 시작 Layer를 고르면 돼요.</p>
+          <div className="head-actions">
+            <button type="button" className="btn primary" onClick={() => dispatch({ type: 'addProject', kind: 'product' })}><Icon name="plus" size={15} /> Product 추가</button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="page">
+      <section className="panel mto-empty">
+        <h2>Revision ITEM이 없어요</h2>
+        <p className="muted">Revision은 Product에 딸린 ITEM 단위(보통 1~5장 Set)로 들어와요. {products.length ? 'ITEM이 딸릴 Product를 고르고 추가하세요.' : '먼저 Product를 만들어야 ITEM을 추가할 수 있어요.'}</p>
+        <div className="head-actions">
+          <AddItem state={state} dispatch={dispatch} />
+        </div>
+      </section>
+    </div>
   );
 }
 
