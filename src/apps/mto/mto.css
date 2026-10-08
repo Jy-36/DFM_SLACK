@@ -294,3 +294,57 @@ h3.sub-h { font-weight: 700; }
 .mto-mini .mini-list li { cursor: pointer; }
 .mto-mini .mini-list li.cur { box-shadow: inset 0 0 0 2px var(--accent); }
 .wg-date { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 공정 · Layer SPEC ── */
+.kind-tag.process { background: var(--good-soft); color: var(--good); }
+.pb-proc { min-width: 220px; }
+.pb-proc select.input { height: 34px; padding-block: 5px; }
+.pr-desc { flex: 1 1 260px; }
+.pr-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+.pr-tree { display: grid; gap: 2px; padding: 16px; position: sticky; top: calc(var(--shellbar-h) + 12px); max-height: calc(100vh - var(--shellbar-h) - 40px); overflow: auto; }
+.pr-tree h2 { margin-bottom: 8px; }
+.tree-item { display: flex; justify-content: space-between; gap: 8px; align-items: center; width: 100%; border: 0; background: none; color: var(--fg); text-align: left; cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+.tree-item:hover { background: var(--surface-2); }
+.tree-item.on { background: var(--accent-soft); color: var(--accent); }
+.tree-item.root { font-weight: 700; }
+.tree-item.part { padding-left: 16px; }
+.tree-item.module { padding-left: 32px; font-size: 12.5px; }
+.tree-item.orphan b { color: var(--warn); }
+.part-table .input.cell { width: 86px; }
+.part-table .num-field .input.cell { width: 70px; }
+.pr-used { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.panel .input.sheet-search { width: 200px; height: 32px; padding-block: 4px; flex: none; }
+.sheet-wrap { max-height: 70vh; overflow: auto; }
+.sheet { font-size: 12.5px; }
+.sheet thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
+.sheet td { padding: 3px 4px; }
+.sheet th { padding: 6px 6px; }
+.sheet .input.cell { height: 30px; padding: 3px 7px; font-size: 12.5px; border-radius: 7px; }
+.sheet .input.cell.sm { width: 64px; padding-inline: 4px; }
+.sheet .layer-in { width: 110px; font-weight: 700; }
+.sheet .spec-in { width: 110px; }
+.sheet td:nth-child(3) .input { width: 100px; }
+.spec-h-in { display: inline-flex; align-items: center; gap: 2px; }
+.col-name { width: 100px; border: 1px dashed transparent; background: none; font: inherit; font-weight: 700; font-size: 12px; color: var(--muted); padding: 2px 4px; border-radius: 6px; }
+.col-name:hover, .col-name:focus { border-color: var(--line-strong); background: var(--surface); color: var(--fg); outline: none; }
+.spec-add .col-name { color: var(--accent); border-color: var(--line); }
+.col-del { border: 0; background: none; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; color: var(--faint); cursor: pointer; opacity: 0; }
+.spec-h:hover .col-del, .col-del:focus { opacity: 1; }
+.col-del:hover { color: var(--bad); background: var(--bad-soft); }
+
+/* 공정 기준 Layer 고르기 */
+.picker { display: grid; gap: 4px; }
+.pick-grid { display: grid; gap: 14px; }
+.pick-part { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+.pick-part-h { display: flex; align-items: center; gap: 10px; }
+.pick-n { margin-left: auto; }
+.pick { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px; }
+.pick input, .pick-layer input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.pick-mod { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 0 2px 24px; border-top: 1px dashed var(--line); margin-top: 8px; }
+.mod-name { font-weight: 600; color: var(--muted); }
+.pick-layers { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-layer { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pick-layer.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pick-layer .type-chip { height: 18px; min-width: 20px; font-size: 11px; }
+tr.missing td { background: var(--warn-soft); }
+@media (max-width: 1040px) { .pr-grid { grid-template-columns: 1fr; } .pr-tree { position: static; max-height: none; } .pick-mod { grid-template-columns: 1fr; } }

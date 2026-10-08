@@ -48,6 +48,18 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
             <span>{p.kind === 'revision' ? 'Revision 이름' : 'Product 이름'}</span>
             <input className="input" value={p.name} onChange={(e) => dispatch({ type: 'project', patch: { name: e.target.value } })} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} />
           </label>
+          <label className="field pb-proc">
+            <span>기준 공정</span>
+            <select className="input" value={p.processId || ''} onChange={(e) => {
+              const id = e.target.value || null;
+              const had = p.layers.length > 0 && (p.layers.some((l) => l.ref) || id);
+              dispatch({ type: 'setProcess', processId: id });
+              if (had) notify?.(id ? '기준 공정을 바꿨어요 · Layer를 공정에서 다시 골라 주세요' : '직접 입력으로 바꿨어요', { label: '되돌리기', run: () => dispatch({ type: 'undoProcess' }) });
+            }}>
+              <option value="">직접 입력 (공정 없음)</option>
+              {(state.processes || []).map((x) => <option key={x.id} value={x.id}>{x.name} · {x.rows.length}장</option>)}
+            </select>
+          </label>
           {p.kind === 'revision' && (
             <>
               <label className="field">

@@ -50,7 +50,7 @@ export default function Gantt({ result, highlight }) {
     const t0 = toDay(result.partAGds);
     const nDays = diffDays(result.finalMto, result.partAGds) + 4;
     const colW = Math.max(14, Math.min(30, Math.floor((width - LABEL_W - PAD_R) / nDays)));
-    const parts = [...new Set(result.layers.map((l) => l.part))].sort();
+    const parts = Object.keys(result.step1);
     const W = LABEL_W + colW * nDays + PAD_R;
     const H = TOP + ROW * (result.layers.length + parts.length) + 14;
     const cal = makeCalendar(result.config);

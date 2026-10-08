@@ -10,6 +10,13 @@ import ProjectBar from '../components/ProjectBar.jsx';
 
 export function loadExample(project, dispatch, notify) {
   const rev = project.kind === 'revision';
+  if (project.processId) {
+    // 공정 기준이면 공정의 Layer를 모두 담는다
+    dispatch({ type: 'pickAllFromProcess' });
+    if (!project.gds) dispatch({ type: 'gds', value: rev ? '2026-10-12' : EXAMPLE_GDS });
+    notify?.('공정의 Layer를 모두 담았어요', { label: '되돌리기', run: () => dispatch({ type: 'undoLayers' }) });
+    return;
+  }
   dispatch({ type: 'layers', layers: rev ? EXAMPLE_REVISION : EXAMPLE_LAYERS, keepUndo: project.layers.length > 0 });
   if (!project.gds) dispatch({ type: 'gds', value: rev ? '2026-10-12' : EXAMPLE_GDS });
   notify?.(`예시 ${rev ? 5 : 30}개 Layer를 불러왔어요`, project.layers.length ? { label: '되돌리기', run: () => dispatch({ type: 'undoLayers' }) } : null);
@@ -30,7 +37,7 @@ export function EmptyCard({ project, dispatch, notify, go }) {
         <button type="button" className="btn primary" onClick={() => go('layers')}>
           <Icon name="layers" size={16} /> Layer List 입력
         </button>
-        <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>예시 {rev ? 5 : 30}장 불러오기</button>
+        <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? "공정 Layer 모두 담기" : `예시 ${rev ? 5 : 30}장 불러오기`}</button>
       </div>
     </section>
   );
