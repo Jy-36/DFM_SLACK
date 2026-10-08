@@ -180,6 +180,11 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
   Set List = 고른 **FEOL Concept**의 Layer + 고른 BEOL Option의 Layer. Option을 바꾸면 다른 쪽은 그대로 두고 그 Part Layer만 바뀌어요.
 - **FEOL Concept**: Module마다 어떤 **Module Option**(예: MOL의 Base / HD)을 쓸지 정한 조합. 하나는 **POR**(기본, 주황색, 맨 앞).
   Module Option이 빈 Layer는 공통이라 항상 들어가고, Module Option이 있는 Layer는 FEOL Concept이 고른 것만 들어가요.
+- FEOL Concept은 **활성/비활성**을 정할 수 있어요. 비활성 Concept은 Product에서 새로 고를 수 없고(이미 쓰는 Product는 유지), POR은 항상 활성.
+- Concept의 Module Option을 바꾸거나 Module에서 **POR로 지정**하면 팝업에서 빠지고 들어오는 Layer를 보여 주고, 그 Concept을 쓰는 Product Set List를 다시 담을지 고를 수 있어요.
+- FEOL Concept · Module · BEOL Option은 **+** 버튼(분류 묶음 옆, 각 편집 화면)에서 팝업으로 추가해요. BEOL Option은 Reference Copy(Layer · 순서 복사) 또는 새로 Setting.
+- Module은 ▲▼로 순서를 바꿀 수 있고, 시트와 Set List의 FEOL Layer 순서도 같이 바뀌어요.
+- MTO 왼쪽 위 **뒤로 · 앞으로** 버튼(Alt + ← / →, 마우스 뒤로·앞으로 버튼)으로 메뉴 · Product · 공정 분류 이동을 되돌아갈 수 있어요.
 - **BEOL Option**: 컨셉(예: 1X 6층 + 2X 4층 …)과 **Metal · Via 쌓는 순서**를 가져요. 순서가 없으면 [편집]에서 Layer를 아래부터 차례로 골라 정하고, Set List도 그 순서로 담겨요.
 - 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.
 - **Product**: 새로 만들면 기준 공정의 **Set List 전체**가 담겨요. 중간부터 나가는 경우 [Set List]의 "중간부터"에서 시작 Layer를 고르면 그 Layer부터 끝까지 담깁니다.

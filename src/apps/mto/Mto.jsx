@@ -1,6 +1,6 @@
 // MTO: DFM Slack 안의 탭. 여러 Product(Part A/B)와 Revision(Product와 별개, 몇 장만)의 STEP2·MTO 일정을 묶음별로 계산한다.
 // 계산은 lib/scheduler.js (mto-scheduling-agent 규칙 엔진을 옮긴 것), 입력이 바뀌면 바로 다시 계산한다.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMtoStore } from './lib/store.js';
 import { computeProject } from './lib/projects.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
@@ -18,7 +18,7 @@ import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.7.0';
+export const MTO_VERSION = '0.8.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -56,6 +56,54 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   const calc = project ? calcs[project.id] : null;
   const [tab, setTab] = useState(() => (state.projects.filter((p) => p.kind === section).length > 1 ? 'all' : 'overview'));
   const [toast, setToast] = useState(null);
+  // Process Layer Set에서 고른 공정 · 분류 (뒤로 · 앞으로 가기에 같이 기록)
+  const [procLoc, setProcLoc] = useState(() => ({ procId: state.lastProcessId || state.processes[0]?.id || null, sel: { kind: 'root' } }));
+
+  // 뒤로 · 앞으로 가기: 메뉴 · Product/Revision · 고른 묶음 · 공정 분류가 바뀔 때마다 기록
+  const here = { tab, section, activeId: state.activeId, ...(tab === 'process' ? procLoc : {}) };
+  const hereKey = JSON.stringify(here);
+  const [hist, setHist] = useState(() => ({ list: [here], idx: 0 }));
+  useEffect(() => {
+    setHist((h) => {
+      if (JSON.stringify(h.list[h.idx]) === hereKey) return h;
+      const list = [...h.list.slice(0, h.idx + 1), JSON.parse(hereKey)].slice(-100);
+      return { list, idx: list.length - 1 };
+    });
+  }, [hereKey]);
+  const travel = useCallback(
+    (d) => {
+      const i = hist.idx + d;
+      const e = hist.list[i];
+      if (!e) return;
+      setHist((h) => ({ ...h, idx: i }));
+      if (e.section !== section) dispatch({ type: 'section', section: e.section });
+      if (e.activeId && e.activeId !== state.activeId && state.projects.some((p) => p.id === e.activeId)) dispatch({ type: 'select', id: e.activeId });
+      setTab(e.tab);
+      if (e.tab === 'process') setProcLoc({ procId: e.procId, sel: e.sel || { kind: 'root' } });
+    },
+    [hist, section, state.activeId, state.projects, dispatch],
+  );
+  const canBack = hist.idx > 0;
+  const canFwd = hist.idx < hist.list.length - 1;
+  useEffect(() => {
+    if (mode !== 'full') return undefined;
+    const key = (e) => {
+      if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      travel(e.key === 'ArrowLeft' ? -1 : 1);
+    };
+    const mouse = (e) => {
+      if (e.button !== 3 && e.button !== 4) return;
+      e.preventDefault();
+      travel(e.button === 3 ? -1 : 1);
+    };
+    window.addEventListener('keydown', key);
+    window.addEventListener('mouseup', mouse);
+    return () => {
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('mouseup', mouse);
+    };
+  }, [mode, travel]);
   const [navMini, setNavMini] = useState(() => {
     try {
       return localStorage.getItem('mto.navMini') === '1';
@@ -146,6 +194,11 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
           <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
         </button>
+        <div className={`nav-hist ${navMini ? 'mini' : ''}`}>
+          <button type="button" className="icon-btn sm back" disabled={!canBack} onClick={() => travel(-1)} title="뒤로 (Alt + ←)" aria-label="뒤로"><Icon name="chevron" size={15} /></button>
+          <button type="button" className="icon-btn sm" disabled={!canFwd} onClick={() => travel(1)} title="앞으로 (Alt + →)" aria-label="앞으로"><Icon name="chevron" size={15} /></button>
+          {!navMini && <span className="small muted">뒤로 · 앞으로</span>}
+        </div>
         <div className={`sec-switch two ${navMini ? 'mini' : ''}`} role="tablist" aria-label="Product · Revision">
           {[['product', 'Product'], ['revision', 'Revision']].map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={section === k} className={`${k} ${area === 'common' ? 'dim' : ''}`}
@@ -194,7 +247,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         {project && tab === 'layers' && (section === 'revision' ? <ItemLayerList key={project.id} {...props} /> : project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
         {project && tab === 'table' && <ScheduleTable {...props} />}
         {tab === 'products' && <ProductInfo {...props} />}
-        {tab === 'process' && <ProcessSheet {...props} />}
+        {tab === 'process' && <ProcessSheet {...props} procLoc={procLoc} setProcLoc={setProcLoc} />}
         {tab === 'rules' && <Rules {...props} />}
       </main>
       {toastEl}
