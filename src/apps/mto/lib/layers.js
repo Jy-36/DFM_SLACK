@@ -57,14 +57,15 @@ export function parseLayerText(text, { noPart = false } = {}) {
 }
 
 /** 입력 문제를 Layer별로 찾는다: [{ index, msg }] */
-export function validateLayers(layers, types, { revision = false } = {}) {
+export function validateLayers(layers, types, { revision = false, parts = null } = {}) {
+  const partList = parts || ['A', 'B'];
   const errs = [];
   const seen = new Map();
   layers.forEach((l, i) => {
     if (!Number.isFinite(l.no)) errs.push({ index: i, field: 'no', msg: `${i + 1}행: No가 숫자가 아닙니다.` });
     else if (seen.has(l.no)) errs.push({ index: i, field: 'no', msg: `No ${l.no}가 두 번 있습니다 (${seen.get(l.no) + 1}행, ${i + 1}행).` });
     else seen.set(l.no, i);
-    if (!revision && !['A', 'B'].includes(l.part)) errs.push({ index: i, field: 'part', msg: `${l.layer || `${i + 1}행`}: Part는 A 또는 B여야 합니다.` });
+    if (!revision && !partList.includes(l.part)) errs.push({ index: i, field: 'part', msg: `${l.layer || `${i + 1}행`}: Part는 ${partList.join(' 또는 ')}여야 합니다.` });
     if (!types.includes(l.type)) errs.push({ index: i, field: 'type', msg: `${l.layer || `${i + 1}행`}: Type은 ${types.join('/')} 중 하나여야 합니다.` });
     if (!l.layer) errs.push({ index: i, field: 'layer', msg: `No ${l.no}: Layer 이름이 비어 있습니다.` });
   });

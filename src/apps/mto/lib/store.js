@@ -3,6 +3,7 @@
 import { useEffect, useReducer } from 'react';
 import { DEFAULT_CONFIG, normalizeConfig } from './scheduler.js';
 import { newProject } from './projects.js';
+import { exampleProcess, newProcess } from './process.js';
 
 const KEY = 'mto.v2';
 const LEGACY = 'mto.v1'; // 0.15.x: Product 하나 { gds, layers, config }
@@ -17,14 +18,16 @@ const readJson = (k) => {
 
 function init() {
   const s = readJson(KEY);
+  // 공정 마스터가 없으면 예시 공정 하나로 시작 (지워도 됨)
+  const processes = Array.isArray(s?.processes) ? s.processes : [exampleProcess()];
   if (s?.projects?.length) {
-    return { projects: s.projects, activeId: s.projects.some((p) => p.id === s.activeId) ? s.activeId : s.projects[0].id, config: normalizeConfig(s.config || DEFAULT_CONFIG), prevLayers: null };
+    return { projects: s.projects, processes, activeId: s.projects.some((p) => p.id === s.activeId) ? s.activeId : s.projects[0].id, config: normalizeConfig(s.config || DEFAULT_CONFIG), prevLayers: null };
   }
   // 예전 버전에서 넘어오면 기존 입력을 Product 1로 옮긴다
   const old = readJson(LEGACY);
   const config = normalizeConfig(old?.config || DEFAULT_CONFIG);
   const first = newProject('product', [], { gds: old?.gds || '', layers: Array.isArray(old?.layers) ? old.layers : [] });
-  return { projects: [first], activeId: first.id, config, prevLayers: null };
+  return { projects: [first], processes, activeId: first.id, config, prevLayers: null };
 }
 
 const mapActive = (state, fn) => ({ ...state, projects: state.projects.map((p) => (p.id === state.activeId ? fn(p) : p)) });
@@ -80,6 +83,43 @@ function reducer(state, a) {
     }
     case 'undoLayers':
       return state.prevLayers ? { ...mapActive(state, (p) => ({ ...p, layers: state.prevLayers })), prevLayers: null } : state;
+    case 'setProcess': {
+      // 기준 공정을 바꾸면 Layer는 새 공정에서 다시 고른다 (되돌리기 가능)
+      const cur = state.projects.find((p) => p.id === state.activeId);
+      const keep = !a.processId && !cur.layers.some((l) => l.ref);
+      return { ...mapActive(state, (p) => ({ ...p, processId: a.processId || null, layers: keep ? p.layers : [] })), prevLayers: keep ? null : cur.layers, prevProcessId: cur.processId };
+    }
+    case 'pickAllFromProcess': {
+      const cur = state.projects.find((p) => p.id === state.activeId);
+      const proc = state.processes.find((x) => x.id === cur?.processId);
+      if (!proc) return state;
+      return { ...mapActive(state, (p) => ({ ...p, layers: proc.rows.map((r, i) => ({ no: i + 1, ref: r.id })) })), prevLayers: cur.layers };
+    }
+    case 'undoProcess': {
+      return { ...mapActive(state, (p) => ({ ...p, processId: state.prevProcessId ?? null, layers: state.prevLayers || p.layers })), prevLayers: null };
+    }
+    case 'addProcess': {
+      const pr = a.example ? exampleProcess(state.processes) : newProcess(state.processes, a.patch);
+      return { ...state, processes: [...state.processes, pr], lastProcessId: pr.id };
+    }
+    case 'updateProcess':
+      return { ...state, processes: state.processes.map((x) => (x.id === a.id ? { ...x, ...a.patch } : x)) };
+    case 'duplicateProcess': {
+      const src = state.processes.find((x) => x.id === a.id);
+      if (!src) return state;
+      const copy = { ...structuredClone(src), id: newProcess().id, name: `${src.name} 복사` };
+      return { ...state, processes: [...state.processes, copy], lastProcessId: copy.id };
+    }
+    case 'removeProcess': {
+      const i = state.processes.findIndex((x) => x.id === a.id);
+      return { ...state, processes: state.processes.filter((x) => x.id !== a.id), removedProcess: { process: state.processes[i], index: i } };
+    }
+    case 'restoreProcess': {
+      if (!state.removedProcess) return state;
+      const processes = [...state.processes];
+      processes.splice(state.removedProcess.index, 0, state.removedProcess.process);
+      return { ...state, processes, removedProcess: null, lastProcessId: state.removedProcess.process.id };
+    }
     case 'config':
       return { ...state, config: normalizeConfig({ ...state.config, ...a.patch }) };
     case 'resetConfig':
@@ -93,11 +133,11 @@ export function useMtoStore() {
   const [state, dispatch] = useReducer(reducer, undefined, init);
   useEffect(() => {
     try {
-      const { projects, activeId, config } = state;
-      localStorage.setItem(KEY, JSON.stringify({ projects, activeId, config }));
+      const { projects, processes, activeId, config } = state;
+      localStorage.setItem(KEY, JSON.stringify({ projects, processes, activeId, config }));
     } catch {
       /* 저장 불가 환경에서는 메모리에만 유지 */
     }
-  }, [state.projects, state.activeId, state.config]);
+  }, [state.projects, state.processes, state.activeId, state.config]);
   return [state, dispatch];
 }

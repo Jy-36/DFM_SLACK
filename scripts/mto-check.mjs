@@ -8,6 +8,7 @@ import { parseLayerText } from '../src/apps/mto/lib/layers.js';
 import { analyze } from '../src/apps/mto/lib/insights.js';
 import { toCsv } from '../src/apps/mto/lib/report.js';
 import { computeProject, newProject, effectiveConfig } from '../src/apps/mto/lib/projects.js';
+import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows } from '../src/apps/mto/lib/process.js';
 
 let fail = 0;
 let pass = 0;
@@ -123,6 +124,25 @@ const pB = newProject('product', [pA], { gds: '2026-09-21', layers: EXAMPLE_LAYE
 eq('Product마다 따로 계산 (조건 다르면 결과 다름)', [computeProject(pA, DEFAULT_CONFIG).result.finalMto, computeProject(pB, DEFAULT_CONFIG).result.finalMto], ['2026-11-03', '2026-11-13']);
 eq('묶음 이름 자동', [pA.name, pB.name, revP.name], ['Product 1', 'Product 2', 'Revision 1']);
 ok('Product에 Part 빠지면 입력 확인', computeProject({ ...pB, layers: [{ no: 1, part: '', layer: 'x', type: 'X' }] }, DEFAULT_CONFIG).issues?.length > 0);
+
+// ── 공정(Process) 기준 Product
+const ex = exampleProcess();
+const pp = newProject('product', [], { gds: '2026-09-21', processId: ex.id, layers: layersFromRows(ex.rows) });
+const pc = computeProject(pp, DEFAULT_CONFIG, [ex]);
+eq('공정 기준 Product = 직접 입력과 같은 결과 (예시 30장)', pc.result?.finalMto, '2026-11-13');
+eq('공정 트리 Module 나눔', [...new Set(ex.rows.map((r) => `${r.part}/${r.module}`))], ['A/FEOL', 'A/MOL', 'B/BEOL-1', 'B/BEOL-2']);
+const ex2 = { ...ex, parts: [{ name: 'A', gdsOffset: 0, step1Tat: 5 }, { name: 'B', gdsOffset: 7, step1Tat: 4 }] };
+const pc2 = computeProject(pp, DEFAULT_CONFIG, [ex2]);
+eq('Part별 GDS 간격·STEP1 TAT는 공정 설정을 따름', [pc2.result.step1.B.gds, pc2.result.step1.B.start, pc2.result.step1.B.end], ['2026-09-28', '2026-09-28', '2026-10-01']);
+const named = newProcess([], { parts: [{ name: 'FEOL', gdsOffset: 0, step1Tat: 5 }, { name: 'BEOL', gdsOffset: 10, step1Tat: 3 }], rows: [{ id: 'r1', part: 'FEOL', module: 'M', layer: 'PO', type: 'X', spec: {} }, { id: 'r2', part: 'BEOL', module: 'M1', layer: 'M1', type: 'Y', spec: {} }] });
+const pn = computeProject(newProject('product', [], { gds: '2026-11-02', processId: named.id, layers: layersFromRows(named.rows) }), DEFAULT_CONFIG, [named]);
+eq('Part 이름 자유 (FEOL/BEOL), 순서 유지', [Object.keys(pn.result?.step1 || {}), pn.result?.step1.BEOL.gds], [['FEOL', 'BEOL'], '2026-11-12']);
+ok('공정에서 지운 Layer는 입력 확인', computeProject({ ...pp, layers: [...pp.layers, { no: 99, ref: 'gone' }] }, DEFAULT_CONFIG, [ex]).issues?.some((i) => /지워진/.test(i.msg)));
+const rv = computeProject(newProject('revision', [], { gds: '2026-11-02', processId: ex.id, layers: layersFromRows(ex.rows.slice(0, 3)) }), DEFAULT_CONFIG, [ex]);
+eq('Revision도 공정 Layer 사용, Part는 무시', [Object.keys(rv.result?.step1 || {}), rv.result?.layers.map((l) => l.layer)], [['R'], ['A-1', 'A-2', 'A-3']]);
+const pr = parseProcessRows('Layer\tPart\tType\tModule\tGrade\tCD\nM1\ta\tx\tBEOL\t1\t40nm', ['Grade']);
+eq('시트 붙여넣기 (열 순서 무관, 새 SPEC 열)', [pr.rows.map((r) => [r.part, r.module, r.layer, r.type, r.spec]), pr.newColumns], [[['A', 'BEOL', 'M1', 'X', { Grade: '1', CD: '40nm' }]], ['CD']]);
+ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part: 'Q', module: '', layer: 'L', type: 'X' }] }, ['X', 'Y', 'Z']).length === 1);
 
 // ── Python 엔진과 비교
 const golden = JSON.parse(readFileSync(new URL('./fixtures/mto-golden.json', import.meta.url), 'utf8'));

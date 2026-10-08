@@ -66,7 +66,7 @@ export default function Mini({ state, dispatch, project, calc, calcs, notify, ex
           )}
           <div className="mini-btns">
             <button type="button" className="btn primary" onClick={() => expand('layers')}><Icon name="layers" size={15} /> Layer List 입력</button>
-            <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>예시 {rev ? 5 : 30}장</button>
+            <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? "공정 Layer 모두 담기" : `예시 ${rev ? 5 : 30}장`}</button>
           </div>
         </section>
       )}
