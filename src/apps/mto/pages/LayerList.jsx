@@ -30,7 +30,7 @@ export default function LayerList({ state, dispatch, project, calc, calcs, notif
   const nextNo = () => (layers.length ? Math.max(...layers.map((l) => (Number.isFinite(l.no) ? l.no : 0))) + 1 : 1);
   const addRow = () => {
     const last = layers[layers.length - 1];
-    set([...layers, { no: nextNo(), part: rev ? 'R' : last?.part || 'A', layer: '', type: last?.type || types[0] }]);
+    set([...layers, { no: nextNo(), part: rev ? 'R' : last?.part || 'FEOL', layer: '', type: last?.type || types[0] }]);
   };
 
   const applyPaste = (mode) => {
@@ -101,7 +101,7 @@ export default function LayerList({ state, dispatch, project, calc, calcs, notif
         <section className="panel paste-panel">
           <h2>엑셀에서 복사해 붙여넣기 <span className="small muted">{rev ? '머리줄(No · Layer · Type)이 있으면 열 순서가 달라도 됩니다 · Part 열은 무시' : '머리줄(No · Part · Layer · Type)이 있으면 열 순서가 달라도 됩니다'}</span></h2>
           <textarea className="input" rows={8} value={text} onChange={(e) => setText(e.target.value)} autoFocus
-            placeholder={rev ? 'No\tLayer\tType\n1\tM1\tX\n2\tV1\tY\n…' : 'No\tPart\tLayer\tType\n1\tA\tA-1\tX\n2\tA\tA-2\tZ\n…'} />
+            placeholder={rev ? 'No\tLayer\tType\n1\tM1\tX\n2\tV1\tY\n…' : 'No\tPart\tLayer\tType\n1\tFEOL\tA-1\tX\n2\tFEOL\tA-2\tZ\n…'} />
           <div className="head-actions end">
             <span className="small muted">{text.trim() ? `${parseLayerText(text, { noPart: rev }).length}장 인식` : ''}</span>
             <button type="button" className="btn ghost" onClick={() => setPaste(false)}>취소</button>
@@ -121,7 +121,7 @@ export default function LayerList({ state, dispatch, project, calc, calcs, notif
         <h2>
           <span className="layer-sum">
             Layer {layers.length}장
-            {!rev && Object.entries(counts.parts).sort().map(([p, n]) => <Pill key={p} tone="accent">Part {p} {n}</Pill>)}
+            {!rev && Object.entries(counts.parts).sort().map(([p, n]) => <Pill key={p} tone="accent">{p} {n}</Pill>)}
             {Object.entries(counts.types).sort().map(([t, n]) => <Pill key={t} tone="neutral">{t} {n}</Pill>)}
           </span>
           <span className="head-actions">
@@ -155,7 +155,7 @@ export default function LayerList({ state, dispatch, project, calc, calcs, notif
                     {!rev && (
                       <td>
                         <div className={`seg ${bad.has(`${i}:part`) ? 'bad' : ''}`} role="group" aria-label={`${i + 1}행 Part`}>
-                          {['A', 'B'].map((p) => <button key={p} type="button" aria-pressed={l.part === p} onClick={() => edit(i, { part: p })}>{p}</button>)}
+                          {['FEOL', 'BEOL'].map((p) => <button key={p} type="button" aria-pressed={l.part === p} onClick={() => edit(i, { part: p })}>{p}</button>)}
                         </div>
                       </td>
                     )}

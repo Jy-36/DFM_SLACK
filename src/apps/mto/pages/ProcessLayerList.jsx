@@ -3,13 +3,14 @@
 import { useMemo, useState } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
-import { processTree, resolveLayers } from '../lib/process.js';
+import { processTree, resolveLayers, setRowsOf } from '../lib/process.js';
 import ProjectBar from '../components/ProjectBar.jsx';
 
 export default function ProcessLayerList({ state, dispatch, project, calc, calcs, go, notify }) {
   const proc = state.processes.find((x) => x.id === project.processId);
   const rev = project.kind === 'revision';
-  const tree = useMemo(() => processTree(proc), [proc]);
+  // Product는 FEOL 전체 + 고른 BEOL Option만 보여 준다
+  const tree = useMemo(() => processTree(proc).map((p) => (p.name === 'BEOL' && !rev ? { ...p, modules: p.modules.filter((m) => m.name === project.beolOption) } : p)), [proc, rev, project.beolOption]);
   const picked = new Set(project.layers.map((l) => l.ref));
   const resolved = useMemo(() => resolveLayers(project.layers, proc), [project.layers, proc]);
   const mtoOf = useMemo(() => new Map((calc.result?.layers || []).map((l) => [l.no, l])), [calc.result]);
@@ -50,7 +51,7 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
     set(project.layers.map((l) => (l === a ? { ...l, no: b.no } : l === b ? { ...l, no: a.no } : l)));
   };
   const rowsSorted = [...resolved].sort((a, b) => a.no - b.no);
-  const all = proc.rows;
+  const all = rev ? proc.rows : setRowsOf(proc, project.beolOption);
   const counts = {};
   for (const l of resolved) if (!l.missing) counts[l.part] = (counts[l.part] || 0) + 1;
 
@@ -116,7 +117,7 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
                   <div className="pick-part-h">
                     <button type="button" className="fold-btn" aria-expanded={!closed[p.name]} onClick={() => setClosed((c) => ({ ...c, [p.name]: !c[p.name] }))}><Icon name="chevron" size={14} /></button>
                     <Check rows={prow} label={<b>{/^[A-Z0-9]{1,2}$/.test(p.name) ? `Part ${p.name}` : p.name}</b>} />
-                    {!rev && !p.orphan && <span className="small muted">GDS +{p.gdsOffset}일 · STEP1 {p.step1Tat}일</span>}
+                    {!rev && !p.orphan && <span className="small muted">GDS +{p.gdsOffset}일 · STEP1 {p.step1Tat}일{p.name === 'BEOL' ? ` · Option ${project.beolOption || '-'}` : ''}</span>}
                     <span className="num small muted pick-n">{prow.filter((r) => picked.has(r.id)).length}/{prow.length}</span>
                   </div>
                   {!closed[p.name] && p.modules.map((m) => (
@@ -164,7 +165,7 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
                 <tr>
                   <th style={{ width: 84 }}>No</th>
                   {!rev && <th>Part</th>}
-                  <th>Module</th>
+                  <th>Module / Option</th>
                   <th>Layer</th>
                   <th>Type</th>
                   <th className="r">STEP2 TAT</th>

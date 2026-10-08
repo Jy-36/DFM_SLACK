@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
+import { beolOptionsOf } from '../lib/process.js';
 
 export function KindTag({ kind }) {
   return <span className={`kind-tag ${kind}`}>{kind === 'revision' ? 'ITEM' : 'P'}</span>;
@@ -95,6 +96,18 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
             <span>{p.kind === 'revision' ? 'ITEM 이름' : 'Product 이름'}</span>
             <input className="input" value={p.name} onChange={(e) => dispatch({ type: 'project', patch: { name: e.target.value } })} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} />
           </label>
+          {p.kind === 'product' && proc && (
+            <label className="field pb-opt">
+              <span>BEOL Option</span>
+              <select className="input" value={p.beolOption || ''} onChange={(e) => {
+                dispatch({ type: 'setBeolOption', option: e.target.value });
+                notify?.(`BEOL ${e.target.value}로 바꿨어요 · FEOL은 그대로, BEOL Layer만 바뀌었어요${children.length ? ` · ITEM ${children.length}개 확인 필요` : ''}`);
+              }}>
+                {!beolOptionsOf(proc).includes(p.beolOption) && <option value="">{p.beolOption || '고르기'}</option>}
+                {beolOptionsOf(proc).map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </label>
+          )}
           {p.kind === 'product' ? (
             <label className="field pb-proc">
               <span>기준 공정</span>
@@ -105,7 +118,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
                 if (had) notify?.(id ? `기준 공정을 바꿨어요 · Set List를 새 공정 전체로 담았어요${children.length ? ` · ITEM ${children.length}개는 Layer를 다시 골라 주세요` : ''}` : '직접 입력으로 바꿨어요', { label: '되돌리기', run: () => dispatch({ type: 'undoProcess' }) });
               }}>
                 <option value="">직접 입력 (공정 없음)</option>
-                {(state.processes || []).map((x) => <option key={x.id} value={x.id}>{x.name} · {x.rows.length}장</option>)}
+                {(state.processes || []).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
             </label>
           ) : (

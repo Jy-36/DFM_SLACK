@@ -12,7 +12,7 @@ export function CriticalPath({ critical, result }) {
       <div className="crit-head">
         <span className="label">최종 MTO 경로</span>
         <span className="small muted">
-          <b className="crit-layer">{l.no}. {l.layer}</b> · {partLabel(l.part)} · Type {l.type} · MTO {fmtShort(l.mtoDate)} · {l.part === 'R' ? 'GDS' : 'Part A GDS'}부터 {result.leadTimeDays}일
+          <b className="crit-layer">{l.no}. {l.layer}</b> · {partLabel(l.part)} · Type {l.type} · MTO {fmtShort(l.mtoDate)} · {l.part === 'R' ? 'GDS' : '첫 GDS'}부터 {result.leadTimeDays}일
         </span>
       </div>
       <div className="crit-bar" role="img" aria-label={critical.steps.map((s) => `${s.label} ${s.days}일`).join(', ')}>

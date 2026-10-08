@@ -49,8 +49,8 @@ export default function Mini({ state, dispatch, project, calc, calcs, notify, ex
               </>
             ) : (
               <>
-                <div><span>Part A GDS</span><b className="num">{fmtShort(result.partAGds)}</b></div>
-                <div><span>Part B GDS</span><b className="num">{fmtShort(result.partBGds)}</b></div>
+                <div><span>{result.step1.FEOL || result.step1.A ? 'FEOL GDS' : 'GDS'}</span><b className="num">{fmtShort(result.partAGds)}</b></div>
+                <div><span>BEOL GDS</span><b className="num">{result.step1.BEOL || result.step1.B ? fmtShort(result.partBGds) : '-'}</b></div>
               </>
             )}
             <div><span>MTO 완료</span><b className="num">{done}/{result.layers.length}</b></div>
@@ -62,7 +62,7 @@ export default function Mini({ state, dispatch, project, calc, calcs, notify, ex
           {calc.issues ? (
             <p className="small tone-warn">입력 확인 {calc.issues.length}건 · {calc.issues[0].msg}</p>
           ) : (
-            <p className="small muted">{rev ? 'GDS 입고일과 다시 만들 Layer를' : 'Part A GDS 입고일과 Layer List를'} 넣으면 최종 MTO와 병목을 보여 줘요.</p>
+            <p className="small muted">{rev ? 'GDS 입고일과 다시 만들 Layer를' : 'GDS 입고일과 Set List를'} 넣으면 최종 MTO와 병목을 보여 줘요.</p>
           )}
           <div className="mini-btns">
             <button type="button" className="btn primary" onClick={() => expand('layers')}><Icon name="layers" size={15} /> {rev ? 'ITEM Layer 고르기' : 'Set List 입력'}</button>
@@ -106,7 +106,7 @@ export default function Mini({ state, dispatch, project, calc, calcs, notify, ex
               <ul className="mini-list">
                 {upcoming.map((d) => (
                   <li key={d.date}>
-                    <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'B' ? 'leave' : 'accent'}>{l.layer}</Pill>)}</span>
+                    <span className="chips">{d.layers.map((l) => <Pill key={l.no} tone={l.part === 'BEOL' || l.part === 'B' ? 'leave' : 'accent'}>{l.layer}</Pill>)}</span>
                     <span className="when">{d.date === today ? '오늘' : `${fmtShort(d.date)} · D-${diffDays(d.date, today)}`}</span>
                   </li>
                 ))}

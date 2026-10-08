@@ -2,13 +2,19 @@
 // 1) mto-scheduling-agent/tests/test_scheduler.py 를 옮긴 규칙 테스트
 // 2) Python 엔진 결과(fixtures/mto-golden.json, 같은 공휴일 표로 생성)와 날짜가 모두 같은지 비교
 import { readFileSync } from 'node:fs';
-import { buildSchedule, scenarioGrid, makeCalendar, DEFAULT_CONFIG } from '../src/apps/mto/lib/scheduler.js';
+import * as SCH from '../src/apps/mto/lib/scheduler.js';
+const { makeCalendar, DEFAULT_CONFIG } = SCH;
+// 원본(Python) 규칙 테스트는 Part A/B 이름을 쓴다 → A/B TAT를 같이 넘겨 준다
+const AB = { A: 5, B: 3 };
+const withAB = (c = {}) => ({ ...c, step1Tat: { ...AB, ...(c.step1Tat || {}) } });
+const buildSchedule = (g, l, c) => SCH.buildSchedule(g, l, withAB(c));
+const scenarioGrid = (g, l, c) => SCH.scenarioGrid(g, l, withAB(c));
 import { EXAMPLE_LAYERS } from '../src/apps/mto/lib/layers.js';
 import { parseLayerText } from '../src/apps/mto/lib/layers.js';
 import { analyze } from '../src/apps/mto/lib/insights.js';
 import { toCsv } from '../src/apps/mto/lib/report.js';
 import { computeProject, newProject, effectiveConfig } from '../src/apps/mto/lib/projects.js';
-import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows } from '../src/apps/mto/lib/process.js';
+import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows, setRowsOf, beolOptionsOf, migrateProcess } from '../src/apps/mto/lib/process.js';
 
 let fail = 0;
 let pass = 0;
@@ -101,7 +107,7 @@ const by = Object.fromEntries(grid.map((g) => [`${g.mtoPerDay}x${g.step2Concurre
 ok('시나리오 단조', by['2x5'] <= by['2x4'] && by['3x4'] <= by['2x4'] && by['3x5'] <= by['3x4']);
 
 // ── 붙여넣기 파싱
-eq('엑셀 붙여넣기 (머리줄, 열 순서 다름)', parseLayerText('Layer\tType\tPart\tNo\nM1\tz\ta\t3\nM2\tx\tb\t4'), [{ no: 3, part: 'A', layer: 'M1', type: 'Z' }, { no: 4, part: 'B', layer: 'M2', type: 'X' }]);
+eq('엑셀 붙여넣기 (머리줄, 열 순서 다름)', parseLayerText('Layer\tType\tPart\tNo\nM1\tz\ta\t3\nM2\tx\tb\t4'), [{ no: 3, part: 'FEOL', layer: 'M1', type: 'Z' }, { no: 4, part: 'BEOL', layer: 'M2', type: 'X' }]); // 예전 A/B → FEOL/BEOL
 eq('3열 (No 없음)', parseLayerText('A A-1 X\nA A-2 Y').map((x) => x.no), [1, 2]);
 
 // ── 분석이 오류 없이 돌아가는지
@@ -127,21 +133,26 @@ ok('Product에 Part 빠지면 입력 확인', computeProject({ ...pB, layers: [{
 
 // ── 공정(Process) 기준 Product
 const ex = exampleProcess();
-const pp = newProject('product', [], { gds: '2026-09-21', processId: ex.id, layers: layersFromRows(ex.rows) });
+const pp = newProject('product', [], { gds: '2026-09-21', processId: ex.id, beolOption: '15M', layers: layersFromRows(setRowsOf(ex, '15M')) });
 const pc = computeProject(pp, DEFAULT_CONFIG, [ex]);
 eq('공정 기준 Product = 직접 입력과 같은 결과 (예시 30장)', pc.result?.finalMto, '2026-11-13');
-eq('공정 트리 Module 나눔', [...new Set(ex.rows.map((r) => `${r.part}/${r.module}`))], ['A/FEOL', 'A/MOL', 'B/BEOL-1', 'B/BEOL-2']);
-const ex2 = { ...ex, parts: [{ name: 'A', gdsOffset: 0, step1Tat: 5 }, { name: 'B', gdsOffset: 7, step1Tat: 4 }] };
+eq('FEOL은 Module, BEOL은 Option', [...new Set(ex.rows.map((r) => `${r.part}/${r.module}`))], ['FEOL/FEOL', 'FEOL/MOL', 'BEOL/15M', 'BEOL/11M']);
+eq('Set List = FEOL 전체 + 고른 BEOL Option', [setRowsOf(ex, '15M').length, setRowsOf(ex, '11M').length, beolOptionsOf(ex)], [30, 26, ['15M', '11M']]);
+const p11 = computeProject({ ...pp, beolOption: '11M', layers: layersFromRows(setRowsOf(ex, '11M')) }, DEFAULT_CONFIG, [ex]);
+ok('BEOL 11M Option이면 26장 계산', p11.result?.layers.length === 26);
+const mig = migrateProcess({ id: 'old', name: 'old', parts: [{ name: 'A', gdsOffset: 0, step1Tat: 5 }, { name: 'B', gdsOffset: 14, step1Tat: 3 }], columns: [], rows: [{ id: 'a', part: 'A', module: 'X', layer: 'L1', type: 'X' }, { id: 'b', part: 'B', module: '', layer: 'L2', type: 'Y' }] });
+eq('예전 공정 A/B → FEOL/BEOL, 빈 BEOL Module → 기본 Option', [mig.parts.map((p) => p.name), mig.rows.map((r) => `${r.part}/${r.module}`), mig.beolOptions], [['FEOL', 'BEOL'], ['FEOL/X', 'BEOL/기본'], ['기본']]);
+const ex2 = { ...ex, parts: [{ name: 'FEOL', gdsOffset: 0, step1Tat: 5 }, { name: 'BEOL', gdsOffset: 7, step1Tat: 4 }] };
 const pc2 = computeProject(pp, DEFAULT_CONFIG, [ex2]);
-eq('Part별 GDS 간격·STEP1 TAT는 공정 설정을 따름', [pc2.result.step1.B.gds, pc2.result.step1.B.start, pc2.result.step1.B.end], ['2026-09-28', '2026-09-28', '2026-10-01']);
+eq('Part별 GDS 간격·STEP1 TAT는 공정 설정을 따름', [pc2.result.step1.BEOL.gds, pc2.result.step1.BEOL.start, pc2.result.step1.BEOL.end], ['2026-09-28', '2026-09-28', '2026-10-01']);
 const named = newProcess([], { parts: [{ name: 'FEOL', gdsOffset: 0, step1Tat: 5 }, { name: 'BEOL', gdsOffset: 10, step1Tat: 3 }], rows: [{ id: 'r1', part: 'FEOL', module: 'M', layer: 'PO', type: 'X', spec: {} }, { id: 'r2', part: 'BEOL', module: 'M1', layer: 'M1', type: 'Y', spec: {} }] });
 const pn = computeProject(newProject('product', [], { gds: '2026-11-02', processId: named.id, layers: layersFromRows(named.rows) }), DEFAULT_CONFIG, [named]);
-eq('Part 이름 자유 (FEOL/BEOL), 순서 유지', [Object.keys(pn.result?.step1 || {}), pn.result?.step1.BEOL.gds], [['FEOL', 'BEOL'], '2026-11-12']);
+eq('FEOL → BEOL 순서, BEOL GDS 간격', [Object.keys(pn.result?.step1 || {}), pn.result?.step1.BEOL.gds], [['FEOL', 'BEOL'], '2026-11-12']);
 ok('공정에서 지운 Layer는 입력 확인', computeProject({ ...pp, layers: [...pp.layers, { no: 99, ref: 'gone' }] }, DEFAULT_CONFIG, [ex]).issues?.some((i) => /지워진/.test(i.msg)));
 const rv = computeProject(newProject('revision', [], { gds: '2026-11-02', processId: ex.id, layers: layersFromRows(ex.rows.slice(0, 3)) }), DEFAULT_CONFIG, [ex]);
 eq('Revision도 공정 Layer 사용, Part는 무시', [Object.keys(rv.result?.step1 || {}), rv.result?.layers.map((l) => l.layer)], [['R'], ['A-1', 'A-2', 'A-3']]);
 const pr = parseProcessRows('Layer\tPart\tType\tModule\tGrade\tCD\nM1\ta\tx\tBEOL\t1\t40nm', ['Grade']);
-eq('시트 붙여넣기 (열 순서 무관, 새 SPEC 열)', [pr.rows.map((r) => [r.part, r.module, r.layer, r.type, r.spec]), pr.newColumns], [[['A', 'BEOL', 'M1', 'X', { Grade: '1', CD: '40nm' }]], ['CD']]);
+eq('시트 붙여넣기 (열 순서 무관, 새 SPEC 열)', [pr.rows.map((r) => [r.part, r.module, r.layer, r.type, r.spec]), pr.newColumns], [[['FEOL', 'BEOL', 'M1', 'X', { Grade: '1', CD: '40nm' }]], ['CD']]);
 ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part: 'Q', module: '', layer: 'L', type: 'X' }] }, ['X', 'Y', 'Z']).length === 1);
 
 // ── Product 탭 / Revision 탭 (ITEM은 Product에 딸림)
@@ -153,7 +164,10 @@ ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part
   ok('Product 없으면 ITEM 못 만듦', st0.projects.length === 0);
   st = mtoReducer(st, { type: 'addProject', kind: 'product', patch: { name: 'P1', gds: '2026-09-21' } });
   const P1 = st.projects[0];
-  eq('새 Product는 기준 공정 Set List 전체', [P1.processId === pr.id, P1.layers.length], [true, 30]);
+  eq('새 Product는 FEOL + 첫 BEOL Option Set List 전체', [P1.processId === pr.id, P1.beolOption, P1.layers.length], [true, '15M', 30]);
+  const sw = mtoReducer(st, { type: 'setBeolOption', id: P1.id, option: '11M' });
+  const P1b = sw.projects.find((p) => p.id === P1.id);
+  eq('BEOL Option 바꾸면 FEOL 그대로 + 새 Option BEOL', [P1b.beolOption, P1b.layers.length, P1b.layers.slice(0, 15).map((l) => l.ref).join() === P1.layers.slice(0, 15).map((l) => l.ref).join()], ['11M', 26, true]);
   st = mtoReducer(st, { type: 'addProject', kind: 'revision', patch: { parentId: P1.id, gds: '2026-11-02' } });
   const I1 = st.projects[1];
   eq('ITEM: Product에 딸림 · 이름 · 공정 따라감 · Revision 탭으로', [I1.parentId, I1.name, I1.processId, st.section], [P1.id, 'P1 REV01', pr.id, 'revision']);
@@ -161,7 +175,7 @@ ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part
   const ic = computeProject(st.projects[1], DEFAULT_CONFIG, [pr]);
   eq('ITEM 3장 계산 (Part 없이)', [Object.keys(ic.result.step1), ic.result.layers.map((l) => l.layer)], [['R'], ['B-6', 'B-7', 'B-8']]);
   const mid = computeProject({ ...P1, layers: layersFromRows(pr.rows.slice(15)) }, DEFAULT_CONFIG, [pr]);
-  eq('중간부터(Part B만) 나가면 입력한 GDS = Part B GDS', [Object.keys(mid.result.step1), mid.result.step1.B.gds], [['B'], '2026-09-21']);
+  eq('중간부터(BEOL만) 나가면 입력한 GDS = BEOL GDS', [Object.keys(mid.result.step1), mid.result.step1.BEOL.gds], [['BEOL'], '2026-09-21']);
   st = mtoReducer(st, { type: 'section', section: 'product' });
   eq('탭 바꾸면 그 탭의 선택으로', [st.section, st.activeId], ['product', P1.id]);
   const removed = mtoReducer(st, { type: 'removeProject', id: P1.id });
@@ -176,7 +190,7 @@ for (const [key, g] of Object.entries(golden)) {
   const [gds, m, c] = key.split('|');
   const res = buildSchedule(gds, EXAMPLE_LAYERS, { mtoPerDay: Number(m), step2Concurrency: c === 'None' ? null : Number(c) });
   const mine = res.layers.map((x) => [x.no, x.step2Ready, x.step2Start, x.step2End, x.mtoEarliest, x.mtoDate]);
-  const same = show(mine) === show(g.layers) && res.finalMto === g.final && show(res.step2Load) === show(g.load) && show(Object.fromEntries(Object.entries(res.step1).map(([p, v]) => [p, [v.start, v.end]]))) === show(g.step1);
+  const same = show(mine) === show(g.layers) && res.finalMto === g.final && show(res.step2Load) === show(g.load) && show(Object.fromEntries(Object.entries(res.step1).map(([p, v]) => [{ FEOL: 'A', BEOL: 'B' }[p] || p, [v.start, v.end]]))) === show(g.step1);
   if (!same) {
     diffs++;
     const i = mine.findIndex((row, k) => show(row) !== show(g.layers[k]));

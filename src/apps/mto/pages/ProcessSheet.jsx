@@ -2,7 +2,7 @@
 // Product는 여기서 정한 공정을 고르고 Layer를 골라 담는다. Part의 GDS 간격·STEP1 TAT도 공정이 정한다.
 import { useMemo, useState } from 'react';
 import { Icon, InfoTip, Pill } from '../../../shared/ui.jsx';
-import { checkProcess, parseProcessRows, processToTsv, processTree, uid } from '../lib/process.js';
+import { beolOptionsOf, checkProcess, parseProcessRows, processToTsv, processTree, uid } from '../lib/process.js';
 import { copyText } from './ScheduleTable.jsx';
 
 export default function ProcessSheet({ state, dispatch, go, notify }) {
@@ -14,6 +14,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
   const [paste, setPaste] = useState(false);
   const [text, setText] = useState('');
   const [newCol, setNewCol] = useState('');
+  const [newOpt, setNewOpt] = useState('');
   const types = Object.keys(config.step2Tat);
 
   const tree = useMemo(() => (proc ? processTree(proc) : []), [proc]);
@@ -59,13 +60,6 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
     const rows = patch.name != null && patch.name !== old.name ? proc.rows.map((r) => (r.part === old.name ? { ...r, part: patch.name } : r)) : proc.rows;
     upd({ parts, rows });
   };
-  const addPart = () => {
-    const names = new Set(proc.parts.map((p) => p.name));
-    let n = 'C';
-    for (const c of 'CDEFGHIJ') if (!names.has(c)) { n = c; break; }
-    const last = proc.parts[proc.parts.length - 1];
-    upd({ parts: [...proc.parts, { name: n, gdsOffset: (last?.gdsOffset || 0) + 14, step1Tat: 3 }] });
-  };
 
   // SPEC 열
   const addCol = () => {
@@ -96,7 +90,8 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
     if (!rows.length) return notify('붙여넣은 내용에서 Layer를 찾지 못했어요 (Part · Module · Layer · Type 열 필요)');
     const prev = { rows: proc.rows, columns: proc.columns, parts: proc.parts };
     const partNames = new Set(proc.parts.map((p) => p.name));
-    const extraParts = [...new Set(rows.map((r) => r.part).filter((p) => p && !partNames.has(p)))].map((name) => ({ name, gdsOffset: 0, step1Tat: 3 }));
+    const extraParts = []; // Part는 FEOL · BEOL만 (다른 Part 이름은 시트 확인에 표시)
+    void partNames;
     upd({ rows: mode === 'append' ? [...proc.rows, ...rows] : rows, columns: [...proc.columns, ...newColumns], parts: [...proc.parts, ...extraParts] });
     notify(`${rows.length}개 Layer를 ${mode === 'append' ? '추가' : '바꿔 넣'}었어요${extraParts.length ? ` · 새 Part ${extraParts.map((p) => p.name).join(', ')}` : ''}`, { label: '되돌리기', run: () => upd(prev) });
     setPaste(false);
@@ -120,14 +115,14 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
 
   const ql = q.trim().toLowerCase();
   const shown = proc.rows.filter((r) => (!filter || (r.part === filter.part && (filter.module == null || r.module === filter.module))) && (!ql || [r.layer, r.module, r.part, r.type, ...Object.values(r.spec || {})].some((v) => String(v).toLowerCase().includes(ql))));
-  const modules = [...new Set(proc.rows.map((r) => r.module).filter(Boolean))];
+  const modules = [...new Set(proc.rows.filter((r) => r.part !== 'BEOL').map((r) => r.module).filter(Boolean))];
 
   return (
     <div className="page">
       <div className="page-head">
         <div>
           <h1>공정 · Layer SPEC</h1>
-          <p>Process → Part → Module → Layer. Product는 공정을 고르고 여기 있는 Layer를 담습니다. Layer 이름·Part·Type을 바꾸면 그 공정을 쓰는 Product에 바로 반영돼요.</p>
+          <p>Process → FEOL(Module) · BEOL(Option) → Layer. Product는 공정과 BEOL Option을 고르면 FEOL 전체 + 그 Option의 Layer가 Set List가 돼요. Layer 이름·Type을 바꾸면 그 공정을 쓰는 Product에 바로 반영돼요.</p>
         </div>
         <div className="head-actions">
           <button type="button" className="btn" onClick={() => { dispatch({ type: 'addProcess' }); setSelId(null); }}><Icon name="plus" size={15} /> 새 공정</button>
@@ -172,7 +167,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
               </button>
               {p.modules.map((m) => (
                 <button key={m.name} type="button" className={`tree-item module ${filter?.part === p.name && filter.module === m.name ? 'on' : ''}`} onClick={() => setFilter({ part: p.name, module: m.name })}>
-                  <span>{m.name || <i className="muted">(Module 없음)</i>}</span><span className="num muted">{m.rows.length}</span>
+                  <span>{p.name === 'BEOL' && <span className="opt-tag">Option</span>}{m.name || <i className="muted">(Module 없음)</i>}</span><span className="num muted">{m.rows.length}</span>
                 </button>
               ))}
             </div>
@@ -180,31 +175,40 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
         </section>
 
         <section className="panel">
-          <h2>
-            Part <span className="small muted">Product 일정 계산에 쓰는 값 · 순서 = 일정표 순서</span>
-            <button type="button" className="btn small-btn" onClick={addPart}><Icon name="plus" size={14} /> Part</button>
-          </h2>
+          <h2>Part <span className="small muted">FEOL → BEOL · Product 일정 계산에 쓰는 값</span></h2>
           <div className="table-wrap">
             <table className="data-table part-table">
-              <thead><tr><th>Part</th><th>GDS 입고 <InfoTip text="첫 Part GDS 입고일로부터 며칠 뒤에 이 Part GDS가 들어오는지 (Part A 0일, Part B 14일 = 2주)" /></th><th>STEP1 TAT</th><th className="r">Layer</th><th /></tr></thead>
+              <thead><tr><th>Part</th><th>나누는 단위</th><th>GDS 입고 <InfoTip text="FEOL GDS 입고일로부터 며칠 뒤에 BEOL GDS가 들어오는지 (기본 14일 = 2주). 중간부터(BEOL만) 나가면 입력한 GDS가 BEOL GDS가 돼요." /></th><th>STEP1 TAT</th><th className="r">Layer</th></tr></thead>
               <tbody>
-                {proc.parts.map((p, i) => {
-                  const n = proc.rows.filter((r) => r.part === p.name).length;
-                  return (
-                    <tr key={i}>
-                      <td><input key={p.name} className="input cell" defaultValue={p.name} onBlur={(e) => { const v = e.target.value.trim().toUpperCase(); if (v && v !== p.name && !proc.parts.some((x) => x.name === v)) editPart(i, { name: v }); else e.target.value = p.name; }} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} aria-label="Part 이름" /></td>
-                      <td><div className="num-field"><input className="input num cell" type="number" min={0} max={365} value={p.gdsOffset} onChange={(e) => editPart(i, { gdsOffset: Math.max(0, parseInt(e.target.value, 10) || 0) })} /><span className="muted small">일 뒤</span></div></td>
-                      <td><div className="num-field"><input className="input num cell" type="number" min={1} max={60} value={p.step1Tat} onChange={(e) => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= 60) editPart(i, { step1Tat: v }); }} /><span className="muted small">일</span></div></td>
-                      <td className="num r">{n}</td>
-                      <td><div className="row-act">
-                        <button type="button" className="icon-btn sm" disabled={i === 0} onClick={() => { const parts = [...proc.parts]; [parts[i - 1], parts[i]] = [parts[i], parts[i - 1]]; upd({ parts }); }} aria-label="위로"><Icon name="chevron" size={14} /></button>
-                        <button type="button" className="icon-btn sm" disabled={n > 0 || proc.parts.length <= 1} title={n ? 'Layer가 있는 Part는 지울 수 없어요' : 'Part 지우기'} onClick={() => upd({ parts: proc.parts.filter((_, k) => k !== i) })} aria-label="Part 지우기"><Icon name="close" size={14} /></button>
-                      </div></td>
-                    </tr>
-                  );
-                })}
+                {proc.parts.map((p, i) => (
+                  <tr key={p.name}>
+                    <td><b>{p.name}</b></td>
+                    <td className="small muted">{p.name === 'BEOL' ? `Option ${beolOptionsOf(proc).length}개 중 하나` : p.name === 'FEOL' ? `Module ${new Set(proc.rows.filter((r) => r.part === 'FEOL').map((r) => r.module)).size}개` : '-'}</td>
+                    <td><div className="num-field"><input className="input num cell" type="number" min={0} max={365} value={p.gdsOffset} onChange={(e) => editPart(i, { gdsOffset: Math.max(0, parseInt(e.target.value, 10) || 0) })} /><span className="muted small">일 뒤</span></div></td>
+                    <td><div className="num-field"><input className="input num cell" type="number" min={1} max={60} value={p.step1Tat} onChange={(e) => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= 60) editPart(i, { step1Tat: v }); }} /><span className="muted small">일</span></div></td>
+                    <td className="num r">{proc.rows.filter((r) => r.part === p.name).length}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+          </div>
+
+          <h3 className="sub-h">BEOL Option <span className="small muted">Product는 이 중 하나를 골라요 · 이름을 바꾸면 쓰는 Product에도 반영</span></h3>
+          <div className="opt-list">
+            {beolOptionsOf(proc).map((o) => {
+              const n = proc.rows.filter((r) => r.part === 'BEOL' && r.module === o).length;
+              const users = state.projects.filter((x) => x.kind === 'product' && x.processId === proc.id && x.beolOption === o).length;
+              return (
+                <span key={o} className="opt-chip">
+                  <input key={o} className="col-name" defaultValue={o} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== o && !beolOptionsOf(proc).includes(v)) dispatch({ type: 'renameBeolOption', id: proc.id, from: o, to: v }); else e.target.value = o; }} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} aria-label={`BEOL Option ${o}`} />
+                  <span className="num small muted">{n}장{users ? ` · P ${users}` : ''}</span>
+                  <button type="button" className="col-del show" disabled={n > 0 || users > 0} title={n || users ? 'Layer나 쓰는 Product가 있으면 지울 수 없어요' : 'Option 지우기'} onClick={() => upd({ beolOptions: beolOptionsOf(proc).filter((x) => x !== o) })} aria-label={`${o} 지우기`}><Icon name="close" size={11} /></button>
+                </span>
+              );
+            })}
+            <span className="opt-chip add">
+              <input className="col-name" value={newOpt} placeholder="+ Option (예: 13M)" onChange={(e) => setNewOpt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const v = newOpt.trim(); if (v && !beolOptionsOf(proc).includes(v)) { upd({ beolOptions: [...beolOptionsOf(proc), v] }); setNewOpt(''); } } }} aria-label="새 BEOL Option" />
+            </span>
           </div>
           <div className="pr-used small muted">
             이 공정을 쓰는 Product · Revision: {products.length ? products.map((p) => <button key={p.id} type="button" className="link-btn" onClick={() => go('layers', p.id)}>{p.name}</button>) : '없음'}
@@ -215,7 +219,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
       {paste && (
         <section className="panel paste-panel">
           <h2>엑셀에서 복사해 붙여넣기 <span className="small muted">머리줄(Part · Module · Layer · Type · SPEC 열 이름)이 있으면 열 순서가 달라도 되고, 모르는 열은 SPEC 열로 추가돼요</span></h2>
-          <textarea className="input" rows={8} value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={`Part\tModule\tLayer\tType\t${proc.columns.join('\t')}\nA\tFEOL\tA-1\tX\t…`} />
+          <textarea className="input" rows={8} value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={`Part\tModule\tLayer\tType\t${proc.columns.join('\t')}\nFEOL\tMOL\tCA\tX\t…\nBEOL\t15M\tM1\tY\t… (BEOL은 Module 칸에 Option)`} />
           <div className="head-actions end">
             <span className="small muted">{text.trim() ? `${parseProcessRows(text, proc.columns).rows.length}개 인식` : ''}</span>
             <button type="button" className="btn ghost" onClick={() => setPaste(false)}>취소</button>
@@ -247,7 +251,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
               <tr>
                 <th className="r">#</th>
                 <th>Part</th>
-                <th>Module</th>
+                <th>Module / BEOL Option</th>
                 <th>Layer</th>
                 <th>Type</th>
                 <th className="r">STEP2</th>
@@ -281,7 +285,16 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
                         {proc.parts.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
                       </select>
                     </td>
-                    <td><input className="input cell" list={`mods-${proc.id}`} value={r.module || ''} onChange={(e) => editRow(r.id, { module: e.target.value })} aria-label="Module" /></td>
+                    <td>
+                      {r.part === 'BEOL' ? (
+                        <select className="input cell opt-sel" value={r.module || ''} onChange={(e) => editRow(r.id, { module: e.target.value })} aria-label="BEOL Option">
+                          {!beolOptionsOf(proc).includes(r.module) && <option value={r.module || ''}>{r.module || '고르기'}</option>}
+                          {beolOptionsOf(proc).map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : (
+                        <input className="input cell" list={`mods-${proc.id}`} value={r.module || ''} onChange={(e) => editRow(r.id, { module: e.target.value })} aria-label="Module" />
+                      )}
+                    </td>
                     <td><input className={`input cell layer-in ${bad.has(`${r.id}:layer`) ? 'bad' : ''}`} value={r.layer} placeholder="Layer" onChange={(e) => editRow(r.id, { layer: e.target.value })} aria-label="Layer" /></td>
                     <td>
                       <select className={`input cell sm ${bad.has(`${r.id}:type`) ? 'bad' : ''}`} value={types.includes(r.type) ? r.type : ''} onChange={(e) => editRow(r.id, { type: e.target.value })} aria-label="Type">

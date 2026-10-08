@@ -3,7 +3,7 @@
 const EX = [[1,"A","A-1","X"],[2,"A","A-2","Z"],[3,"A","A-3","X"],[4,"A","A-4","Y"],[5,"A","A-5","X"],[6,"A","A-6","X"],[7,"A","A-7","X"],[8,"A","A-8","Y"],[9,"A","A-9","Y"],[10,"A","A-10","Y"],[11,"A","A-11","Y"],[12,"A","A-12","Y"],[13,"A","A-13","Y"],[14,"A","A-14","X"],[15,"A","A-15","X"],[16,"B","B-1","Z"],[17,"B","B-2","Z"],[18,"B","B-3","Z"],[19,"B","B-4","Z"],[20,"B","B-5","Z"],[21,"B","B-6","Z"],[22,"B","B-7","Z"],[23,"B","B-8","Z"],[24,"B","B-9","Y"],[25,"B","B-10","Y"],[26,"B","B-11","Y"],[27,"B","B-12","Y"],[28,"B","B-13","X"],[29,"B","B-14","X"],[30,"B","B-15","X"]]; // prettier-ignore
 
 /** 30개 Layer 예시 (mto-scheduling-agent/data/layers_example.csv) */
-export const EXAMPLE_LAYERS = EX.map(([no, part, layer, type]) => ({ no, part, layer, type }));
+export const EXAMPLE_LAYERS = EX.map(([no, part, layer, type]) => ({ no, part: part === 'A' ? 'FEOL' : 'BEOL', layer, type }));
 export const EXAMPLE_GDS = '2026-09-21';
 
 /** Revision 예시: 몇 장만 다시 만드는 경우 */
@@ -51,14 +51,15 @@ export function parseLayerText(text, { noPart = false } = {}) {
       if (no == null) no = rows.length + 1;
     }
     if (!layer && !part && !type) continue;
-    rows.push({ no: parseInt(no, 10), part: String(part || '').toUpperCase(), layer: String(layer || ''), type: String(type || '').toUpperCase() });
+    const P = String(part || '').toUpperCase();
+    rows.push({ no: parseInt(no, 10), part: P === 'A' ? 'FEOL' : P === 'B' ? 'BEOL' : P, layer: String(layer || ''), type: String(type || '').toUpperCase() });
   }
   return rows;
 }
 
 /** 입력 문제를 Layer별로 찾는다: [{ index, msg }] */
 export function validateLayers(layers, types, { revision = false, parts = null } = {}) {
-  const partList = parts || ['A', 'B'];
+  const partList = parts || ['FEOL', 'BEOL'];
   const errs = [];
   const seen = new Map();
   layers.forEach((l, i) => {
