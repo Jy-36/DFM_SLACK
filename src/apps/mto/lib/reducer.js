@@ -126,7 +126,7 @@ export function mtoReducer(state, a) {
       return { ...state, projects: state.projects.map((p) => (p.id === cur.id ? { ...p, beolOption: a.option, layers: [...feol, ...beol] } : p)), prevLayers: cur.id === state.activeId ? cur.layers : state.prevLayers };
     }
     case 'setFeolOption': {
-      // FEOL Option을 바꾸면 BEOL은 그대로 두고 FEOL Layer만 새 Option 조합으로 바꾼다
+      // FEOL Concept을 바꾸면 BEOL은 그대로 두고 FEOL Layer만 새 Option 조합으로 바꾼다
       const cur = state.projects.find((p) => p.id === (a.id || state.activeId));
       const proc = state.processes.find((x) => x.id === cur?.processId);
       if (!cur || !proc) return state;

@@ -98,7 +98,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
           </label>
           {p.kind === 'product' && proc && (
             <label className="field pb-opt">
-              <span>FEOL Option</span>
+              <span>FEOL Concept</span>
               <select className={`input ${feolOptionOf(proc, p.feolOption).por ? 'por-sel' : ''}`} value={feolOptionOf(proc, p.feolOption).id} onChange={(e) => {
                 const o = feolOptionsOf(proc).find((x) => x.id === e.target.value);
                 dispatch({ type: 'setFeolOption', option: e.target.value });

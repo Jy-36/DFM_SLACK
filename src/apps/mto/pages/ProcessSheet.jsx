@@ -5,6 +5,7 @@ import { Icon, Pill } from '../../../shared/ui.jsx';
 import { beolOptionsOf, beolRowsOf, checkProcess, feolOptionsOf, feolRowsOf, isBeol, layerKind, moduleOptionsOf, modulesOf, parseProcessRows, processToTsv, uid } from '../lib/process.js';
 import { copyText } from './ScheduleTable.jsx';
 import { Confirm, Modal } from '../components/Modal.jsx';
+import ModOptCompare from '../components/ModOptCompare.jsx';
 import { BeolOptionPanel, BeolPanel, FeolOptionPanel, FeolPanel, ModulePanel, RootPanel } from '../components/ProcessEditors.jsx';
 
 /** 새 공정 팝업: Reference Copy 또는 새로 Setting */
@@ -90,44 +91,103 @@ function ProcessInfo({ proc, upd, onDelete, processes }) {
   );
 }
 
-/** 왼쪽 분류 트리 */
+/** 왼쪽 분류 트리 (FEOL · BEOL과 그 아래 묶음은 접었다 펼 수 있다) */
 function Tree({ proc, sel, setSel }) {
+  const [closed, setClosed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('mto.treeClosed') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const toggle = (k) =>
+    setClosed((c) => {
+      const next = { ...c, [k]: !c[k] };
+      try {
+        localStorage.setItem('mto.treeClosed', JSON.stringify(next));
+      } catch {
+        /* 저장 불가 */
+      }
+      return next;
+    });
+  const allKeys = ['FEOL', 'FEOL.concept', 'FEOL.module', 'BEOL', 'BEOL.option'];
+  const anyOpen = allKeys.some((k) => !closed[k]);
+  const setAll = (v) => {
+    const next = Object.fromEntries(allKeys.map((k) => [k, v]));
+    setClosed(next);
+    try {
+      localStorage.setItem('mto.treeClosed', JSON.stringify(next));
+    } catch {
+      /* 저장 불가 */
+    }
+  };
   const feolRows = proc.rows.filter((r) => !isBeol(r));
   const beolRows = proc.rows.filter((r) => isBeol(r));
-  const fo = [...feolOptionsOf(proc)].sort((a, b) => (b.por ? 1 : 0) - (a.por ? 1 : 0));
+  const fo = feolOptionsOf(proc);
   const on = (k, extra = {}) => sel.kind === k && Object.entries(extra).every(([key, v]) => sel[key] === v);
+  const Caret = ({ k, label }) => (
+    <button type="button" className={`tree-caret ${closed[k] ? 'closed' : ''}`} onClick={() => toggle(k)} aria-expanded={!closed[k]} aria-label={`${label} ${closed[k] ? '펼치기' : '접기'}`}>
+      <Icon name="chevron" size={13} />
+    </button>
+  );
+  const Group = ({ k, label, n }) => (
+    <button type="button" className={`tree-group ${closed[k] ? 'closed' : ''}`} onClick={() => toggle(k)} aria-expanded={!closed[k]}>
+      <Icon name="chevron" size={11} />
+      {label}
+      <span className="num">{n}</span>
+    </button>
+  );
   return (
     <section className="panel pr-tree">
-      <button type="button" className={`tree-item root ${on('root') ? 'on' : ''}`} onClick={() => setSel({ kind: 'root' })}>
-        <span>{proc.name}</span><span className="num muted">{proc.rows.length}</span>
-      </button>
-      <div className="tree-part">
-        <button type="button" className={`tree-item part ${on('feol') ? 'on' : ''}`} onClick={() => setSel({ kind: 'feol' })}>
-          <span><b>FEOL</b></span><span className="num muted">{feolRows.length}</span>
+      <div className="tree-root-row">
+        <button type="button" className={`tree-item root ${on('root') ? 'on' : ''}`} onClick={() => setSel({ kind: 'root' })}>
+          <span>{proc.name}</span><span className="num muted">{proc.rows.length}</span>
         </button>
-        <div className="tree-group">Option</div>
-        {fo.map((o) => (
-          <button key={o.id} type="button" className={`tree-item module ${on('feolOpt', { id: o.id }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'feolOpt', id: o.id })}>
-            <span>{o.por ? <span className="por-tag">POR</span> : <span className="opt-tag">Opt</span>}{o.name}</span><span className="num muted">{feolRowsOf(proc, o.id).length}</span>
-          </button>
-        ))}
-        <div className="tree-group">Module</div>
-        {modulesOf(proc).map((m) => (
-          <button key={m} type="button" className={`tree-item module ${on('module', { name: m }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'module', name: m })}>
-            <span>{m}{moduleOptionsOf(proc, m).length > 0 && <small className="muted"> · {moduleOptionsOf(proc, m).length}</small>}</span><span className="num muted">{feolRows.filter((r) => r.module === m).length}</span>
-          </button>
-        ))}
+        <button type="button" className={`icon-btn sm tree-all ${anyOpen ? 'open' : ''}`} onClick={() => setAll(anyOpen)} title={anyOpen ? '모두 접기' : '모두 펼치기'} aria-label={anyOpen ? '모두 접기' : '모두 펼치기'}>
+          <Icon name="chevron" size={14} />
+        </button>
       </div>
       <div className="tree-part">
-        <button type="button" className={`tree-item part ${on('beol') ? 'on' : ''}`} onClick={() => setSel({ kind: 'beol' })}>
-          <span><b>BEOL</b></span><span className="num muted">{beolRows.length}</span>
-        </button>
-        <div className="tree-group">Option</div>
-        {beolOptionsOf(proc).map((o) => (
-          <button key={o} type="button" className={`tree-item module ${on('beolOpt', { name: o }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'beolOpt', name: o })}>
-            <span><span className="opt-tag">Opt</span>{o}</span><span className="num muted">{beolRows.filter((r) => r.module === o).length}</span>
+        <div className="tree-part-row">
+          <Caret k="FEOL" label="FEOL" />
+          <button type="button" className={`tree-item part ${on('feol') ? 'on' : ''}`} onClick={() => setSel({ kind: 'feol' })}>
+            <span><b>FEOL</b></span><span className="num muted">{feolRows.length}</span>
           </button>
-        ))}
+        </div>
+        {!closed.FEOL && (
+          <>
+            <Group k="FEOL.concept" label="Concept" n={fo.length} />
+            {!closed['FEOL.concept'] && fo.map((o) => (
+              <button key={o.id} type="button" className={`tree-item module ${on('feolOpt', { id: o.id }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'feolOpt', id: o.id })}>
+                <span>{o.por ? <span className="por-tag">POR</span> : <span className="opt-tag">Con</span>}{o.name}</span><span className="num muted">{feolRowsOf(proc, o.id).length}</span>
+              </button>
+            ))}
+            <Group k="FEOL.module" label="Module" n={modulesOf(proc).length} />
+            {!closed['FEOL.module'] && modulesOf(proc).map((m) => (
+              <button key={m} type="button" className={`tree-item module ${on('module', { name: m }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'module', name: m })}>
+                <span>{m}{moduleOptionsOf(proc, m).length > 0 && <small className="muted"> · Option {moduleOptionsOf(proc, m).length}</small>}</span><span className="num muted">{feolRows.filter((r) => r.module === m).length}</span>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+      <div className="tree-part">
+        <div className="tree-part-row">
+          <Caret k="BEOL" label="BEOL" />
+          <button type="button" className={`tree-item part ${on('beol') ? 'on' : ''}`} onClick={() => setSel({ kind: 'beol' })}>
+            <span><b>BEOL</b></span><span className="num muted">{beolRows.length}</span>
+          </button>
+        </div>
+        {!closed.BEOL && (
+          <>
+            <Group k="BEOL.option" label="BEOL Option" n={beolOptionsOf(proc).length} />
+            {!closed['BEOL.option'] && beolOptionsOf(proc).map((o) => (
+              <button key={o} type="button" className={`tree-item module ${on('beolOpt', { name: o }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'beolOpt', name: o })}>
+                <span><span className="opt-tag">Opt</span>{o}</span><span className="num muted">{beolRows.filter((r) => r.module === o).length}</span>
+              </button>
+            ))}
+          </>
+        )}
       </div>
     </section>
   );
@@ -143,8 +203,11 @@ function scopeOf(proc, sel) {
       const rows = feolRowsOf(proc, sel.id).filter((r) => !sel.module || r.module === sel.module);
       return { rows, label: `FEOL › ${o?.name || ''}${sel.module ? ` › ${sel.module}` : ''}`, part: 'FEOL', module: sel.module };
     }
-    case 'module':
-      return { rows: proc.rows.filter((r) => !isBeol(r) && r.module === sel.name), label: `FEOL › ${sel.name}`, part: 'FEOL', module: sel.name };
+    case 'module': {
+      // modOpt: Module Option 하나만 보기 (공통 Layer + 그 Option Layer)
+      const rows = proc.rows.filter((r) => !isBeol(r) && r.module === sel.name && (!sel.modOpt || !r.modOpt || r.modOpt === sel.modOpt));
+      return { rows, label: `FEOL › ${sel.name}${sel.modOpt ? ` › ${sel.modOpt}` : ''}`, part: 'FEOL', module: sel.name };
+    }
     case 'beol':
       return { rows: proc.rows.filter((r) => isBeol(r)), label: 'BEOL 전체', part: 'BEOL' };
     case 'beolOpt':
@@ -164,6 +227,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
   const [text, setText] = useState('');
   const [newCol, setNewCol] = useState('');
   const [modal, setModal] = useState(null); // 'new' | { confirm }
+  const [view, setView] = useState('sheet'); // 'sheet' | 'compare' (Module Option 비교)
   const types = Object.keys(config.step2Tat);
   const setSel = (s) => { setSelRaw(s); setQ(''); };
 
@@ -238,7 +302,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
     const same = proc.rows.filter((r) => r.part === part && (!scope.module || r.module === scope.module));
     const last = same[same.length - 1] || [...proc.rows].reverse().find((r) => r.part === part);
     const module = scope.module ?? last?.module ?? (part === 'BEOL' ? beolOptionsOf(proc)[0] : modulesOf(proc)[0]) ?? '';
-    const row = { id: uid('ly'), part, module, modOpt: '', layer: '', type: last?.type || types[0], spec: {} };
+    const row = { id: uid('ly'), part, module, modOpt: cur.modOpt || '', layer: '', type: last?.type || types[0], spec: {} };
     const i = last ? proc.rows.indexOf(last) + 1 : proc.rows.length;
     setRows([...proc.rows.slice(0, i), row, ...proc.rows.slice(i)]);
   };
@@ -296,6 +360,8 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
       },
     });
 
+  const canCompare = ['root', 'feol', 'feolOpt', 'module'].includes(cur.kind) && modulesOf(proc).some((m) => moduleOptionsOf(proc, m).length > 0);
+  const compare = canCompare && view === 'compare';
   const ql = q.trim().toLowerCase();
   const shown = scope.rows.filter((r) => !ql || [r.layer, r.module, r.modOpt, r.part, r.type, ...Object.values(r.spec || {})].some((v) => String(v ?? '').toLowerCase().includes(ql)));
   const ep = { proc, upd, sel: cur, setSel, dispatch, products, go, askConfirm };
@@ -306,7 +372,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
       <div className="page-head">
         <div>
           <h1>Process Layer Set</h1>
-          <p>Process → FEOL(Option · Module) · BEOL(Option) → Layer. Product는 공정 · FEOL Option · BEOL Option을 고르면 그 조합의 Layer가 Set List가 돼요.</p>
+          <p>Process → FEOL(Option · Module) · BEOL(Option) → Layer. Product는 공정 · FEOL Concept · BEOL Option을 고르면 그 조합의 Layer가 Set List가 돼요.</p>
         </div>
       </div>
 
@@ -361,11 +427,20 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
             {cur.kind !== 'root' && <button type="button" className="link-btn small" onClick={() => setSel({ kind: 'root' })}>전체 보기</button>}
           </span>
           <span className="head-actions">
+            {canCompare && (
+              <span className="seg" role="group" aria-label="보기">
+                <button type="button" aria-pressed={view === 'sheet'} onClick={() => setView('sheet')}>시트</button>
+                <button type="button" aria-pressed={view === 'compare'} onClick={() => setView('compare')}>Module Option 비교</button>
+              </span>
+            )}
             <input className="input sheet-search" placeholder="찾기 (Layer · SPEC)" value={q} onChange={(e) => setQ(e.target.value)} />
             <button type="button" className={`btn small-btn ${paste ? 'primary' : ''}`} onClick={() => setPaste((v) => !v)}><Icon name="copy" size={14} /> 엑셀 붙여넣기</button>
             <button type="button" className="btn small-btn" onClick={async () => notify((await copyText(processToTsv(proc))) ? '시트를 복사했어요 · 엑셀에 붙여 넣으세요' : '복사하지 못했어요')}>엑셀용 복사</button>
           </span>
         </h2>
+        {compare ? (
+          <ModOptCompare key={`${proc.id}-${scope.module || ''}`} proc={proc} modules={scope.module ? [scope.module] : modulesOf(proc)} step2Tat={config.step2Tat} onPick={(m, o) => { setSel({ kind: 'module', name: m, modOpt: o }); setView('sheet'); }} />
+        ) : (<>
         <div className="table-wrap sheet-wrap">
           <table className="data-table sheet">
             <thead>
@@ -456,6 +531,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
           </table>
         </div>
         <button type="button" className="btn ghost add-row" onClick={addRow}><Icon name="plus" size={15} /> Layer 추가 ({scope.part ? `${scope.part}${scope.module ? ` › ${scope.module}` : ''}` : '맨 뒤'})</button>
+        </>)}
       </section>
       {modalEl}
     </div>
