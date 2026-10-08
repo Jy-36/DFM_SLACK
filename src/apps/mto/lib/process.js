@@ -1,8 +1,8 @@
 // Process Layer Set: Process → Part(FEOL · BEOL) → Layer, Layer마다 Type(STEP2 TAT)과 SPEC 값.
-// FEOL: Module로 나누고, Module마다 Module Option(변형)을 둘 수 있다. FEOL Option(POR 등)은 Module마다 어떤 Module Option을 쓸지 정한 조합.
-//       Layer의 Module Option이 비어 있으면 그 Module 공통 Layer (모든 FEOL Option에 들어감).
+// FEOL: Module로 나누고, Module마다 Module Option(변형)을 둘 수 있다. FEOL Concept(POR 등)은 Module마다 어떤 Module Option을 쓸지 정한 조합.
+//       Layer의 Module Option이 비어 있으면 그 Module 공통 Layer (모든 FEOL Concept에 들어감).
 // BEOL: 여러 BEOL Option(예: 15M, 11M) 중 하나. Option마다 컨셉 설명과 Metal · Via 쌓는 순서(stack)를 둔다.
-// Product Set List = 고른 FEOL Option의 FEOL Layer + 고른 BEOL Option의 Layer (BEOL은 stack 순서).
+// Product Set List = 고른 FEOL Concept의 FEOL Layer + 고른 BEOL Option의 Layer (BEOL은 stack 순서).
 import { EXAMPLE_LAYERS } from './layers.js';
 
 let seq = 0;
@@ -41,7 +41,7 @@ export function exampleProcess(processes = []) {
   const opt = (name, n) => beol.slice(0, n).map((l) => ({ id: uid('ly'), part: 'BEOL', module: name, layer: l.layer, type: l.type, spec: {} }));
   return newProcess(processes, {
     name: '예시 공정',
-    desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL, FEOL Option POR · HD) / BEOL Option 15M · 11M',
+    desc: 'mto-scheduling-agent 예시 — FEOL 15장 (FEOL · MOL, FEOL Concept POR · HD) / BEOL Option 15M · 11M',
     beolOptions: ['15M', '11M'],
     beolMeta: { '15M': { concept: '15층 (예시)', stack: [] }, '11M': { concept: '11층 (예시)', stack: [] } },
     feolOptions: [{ id: 'por', name: 'POR', por: true, modules: { MOL: 'Base' } }, { id: uid('fo'), name: 'HD', por: false, modules: { MOL: 'HD' } }],
@@ -60,7 +60,7 @@ export function beolOptionsOf(proc) {
   return out;
 }
 
-/** FEOL Option 목록 (POR이 맨 앞) */
+/** FEOL Concept 목록 (POR이 맨 앞) */
 export function feolOptionsOf(proc) {
   const list = proc?.feolOptions?.length ? proc.feolOptions : [{ id: 'por', name: 'POR', por: true, modules: {} }];
   return [...list.filter((o) => o.por), ...list.filter((o) => !o.por)];
@@ -81,10 +81,10 @@ export function moduleOptionsOf(proc, module) {
   for (const r of proc?.rows || []) if (!isBeol(r) && r.module === module && r.modOpt && !out.includes(r.modOpt)) out.push(r.modOpt);
   return out;
 }
-/** FEOL Option이 이 Module에서 쓰는 Module Option (정하지 않았으면 첫 번째) */
+/** FEOL Concept이 이 Module에서 쓰는 Module Option (정하지 않았으면 첫 번째) */
 export const chosenModOpt = (proc, fo, module) => fo?.modules?.[module] ?? moduleOptionsOf(proc, module)[0] ?? '';
 
-/** FEOL Option에 들어가는 FEOL Layer (공통 Layer + 고른 Module Option Layer) */
+/** FEOL Concept에 들어가는 FEOL Layer (공통 Layer + 고른 Module Option Layer) */
 export function feolRowsOf(proc, feolOptionId) {
   const fo = feolOptionOf(proc, feolOptionId);
   return (proc?.rows || []).filter((r) => !isBeol(r) && (!r.modOpt || r.modOpt === chosenModOpt(proc, fo, r.module)));
@@ -101,7 +101,7 @@ export function beolRowsOf(proc, option) {
 /** Layer 이름으로 Metal / Via 구분 (M1, Mx, V1, Via…) */
 export const layerKind = (name) => (/^(v|via)\s*\d*/i.test(name || '') ? 'via' : /^(m|metal)\s*\d*/i.test(name || '') ? 'metal' : 'etc');
 
-/** Product Set List에 들어갈 공정 Layer: FEOL Option의 FEOL + BEOL Option (BEOL은 쌓는 순서) */
+/** Product Set List에 들어갈 공정 Layer: FEOL Concept의 FEOL + BEOL Option (BEOL은 쌓는 순서) */
 export function setRowsOf(proc, option, feolOptionId) {
   if (!proc) return [];
   const opt = option ?? beolOptionsOf(proc)[0];

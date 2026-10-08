@@ -164,7 +164,7 @@ Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 
 | 일정 현황 | 위쪽 칩으로 묶음 고르기·추가(Product/Revision)·이름·복제·삭제, Revision은 원래 Product(참고용)·STEP1 TAT, GDS 입고일·하루 MTO 수·STEP2 동시 수 빠른 변경, 최종 MTO, 대기 요약, 병목 분석(최종 MTO 경로 · 원인별 누적 대기), 추천 일정(조건 변경·Layer 순서 재배열·GDS 조정 효과), 리스크, 시나리오 비교(2·3장 × 4·5장, 누르면 적용), 간트 |
 | Layer List | 직접 편집, 엑셀 붙여넣기(머리줄이 있으면 열 순서 무관), CSV 열기, 예시 30장, No 다시 매기기·위아래 이동 |
 | Layer별 일정표 | 날짜별 MTO 묶음, Layer별 표, 엑셀용 복사, CSV 저장 |
-| Process Layer Set | 공정 칩 끝 **+** 로 새 공정(Reference Copy / 새로 Setting), 이름·설명은 [수정]으로, 삭제는 확인 팝업 + 되돌리기. 왼쪽 분류(공정 → FEOL Option · Module / BEOL Option)에서 고른 것에 따라 오른쪽 편집 화면과 아래 Layer SPEC Sheet가 바뀜 |
+| Process Layer Set | 공정 칩 끝 **+** 로 새 공정(Reference Copy / 새로 Setting), 이름·설명은 [수정]으로, 삭제는 확인 팝업 + 되돌리기. 왼쪽 분류(공정 → FEOL Concept · Module / BEOL Option, 접고 펼치기)에서 고른 것에 따라 오른쪽 편집 화면과 아래 Layer SPEC Sheet가 바뀜. 시트 위 **Module Option 비교**로 Module마다 Option별 Layer · Type · SPEC을 나란히 보고 다른 값을 표시 |
 | 규칙 | STEP1 TAT(Part), STEP2 TAT(Type 추가·삭제), Part B GDS 간격, 하루 MTO 수, STEP2 동시 수, MTO 가능 간격, 주말·회사 휴무일 |
 | App Mode | 묶음 고르기 · 최종 MTO · 빠른 조건 변경 · 전체 묶음 목록 · 다음 MTO · 병목 · 시나리오 |
 | Widget Mode | 선택한 묶음의 최종 MTO · 모든 묶음 중 가장 가까운 MTO · 진행 |
@@ -175,11 +175,11 @@ Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 
 ## Product 탭 / Revision 탭 / Common
 
 MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
-- **Common** (왼쪽 메뉴 아래): Product 정보(기준 공정 · FEOL Option · BEOL Option · Code/고객/담당/비고 등 정보 열 추가 가능), Process Layer Set, 규칙 — Product · Revision이 같이 쓰는 기준 정보.
+- **Common** (왼쪽 메뉴 아래): Product 정보(기준 공정 · FEOL Concept · BEOL Option · Code/고객/담당/비고 등 정보 열 추가 가능), Process Layer Set, 규칙 — Product · Revision이 같이 쓰는 기준 정보.
 - Part는 **FEOL · BEOL** 두 개. FEOL은 **Module**로 나누고, BEOL은 여러 **BEOL Option**(예: 15M, 11M) 중 Product가 하나를 고릅니다.
-  Set List = 고른 **FEOL Option**의 Layer + 고른 BEOL Option의 Layer. Option을 바꾸면 다른 쪽은 그대로 두고 그 Part Layer만 바뀌어요.
-- **FEOL Option**: Module마다 어떤 **Module Option**(예: MOL의 Base / HD)을 쓸지 정한 조합. 하나는 **POR**(기본, 주황색, 맨 앞).
-  Module Option이 빈 Layer는 공통이라 항상 들어가고, Module Option이 있는 Layer는 FEOL Option이 고른 것만 들어가요.
+  Set List = 고른 **FEOL Concept**의 Layer + 고른 BEOL Option의 Layer. Option을 바꾸면 다른 쪽은 그대로 두고 그 Part Layer만 바뀌어요.
+- **FEOL Concept**: Module마다 어떤 **Module Option**(예: MOL의 Base / HD)을 쓸지 정한 조합. 하나는 **POR**(기본, 주황색, 맨 앞).
+  Module Option이 빈 Layer는 공통이라 항상 들어가고, Module Option이 있는 Layer는 FEOL Concept이 고른 것만 들어가요.
 - **BEOL Option**: 컨셉(예: 1X 6층 + 2X 4층 …)과 **Metal · Via 쌓는 순서**를 가져요. 순서가 없으면 [편집]에서 Layer를 아래부터 차례로 골라 정하고, Set List도 그 순서로 담겨요.
 - 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.
 - **Product**: 새로 만들면 기준 공정의 **Set List 전체**가 담겨요. 중간부터 나가는 경우 [Set List]의 "중간부터"에서 시작 Layer를 고르면 그 Layer부터 끝까지 담깁니다.

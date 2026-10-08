@@ -68,7 +68,7 @@ export function deleteModOpt(proc, module, name) {
   };
 }
 
-// ── FEOL Option (Module Option 조합, POR 하나)
+// ── FEOL Concept (Module Option 조합, POR 하나)
 export function addFeolOption(proc, name, copyFrom) {
   if (!name || feolOptionsOf(proc).some((o) => o.name === name)) return { proc, id: null };
   const base = feolOptionsOf(proc).find((o) => o.id === copyFrom) || feolOptionsOf(proc)[0];
