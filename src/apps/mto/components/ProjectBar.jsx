@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
-import { beolOptionsOf } from '../lib/process.js';
+import { beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
 
 export function KindTag({ kind }) {
   return <span className={`kind-tag ${kind}`}>{kind === 'revision' ? 'ITEM' : 'P'}</span>;
@@ -96,6 +96,18 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
             <span>{p.kind === 'revision' ? 'ITEM 이름' : 'Product 이름'}</span>
             <input className="input" value={p.name} onChange={(e) => dispatch({ type: 'project', patch: { name: e.target.value } })} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} />
           </label>
+          {p.kind === 'product' && proc && (
+            <label className="field pb-opt">
+              <span>FEOL Option</span>
+              <select className={`input ${feolOptionOf(proc, p.feolOption).por ? 'por-sel' : ''}`} value={feolOptionOf(proc, p.feolOption).id} onChange={(e) => {
+                const o = feolOptionsOf(proc).find((x) => x.id === e.target.value);
+                dispatch({ type: 'setFeolOption', option: e.target.value });
+                notify?.(`FEOL ${o?.name}로 바꿨어요 · BEOL은 그대로, FEOL Layer만 바뀌었어요${children.length ? ` · ITEM ${children.length}개 확인 필요` : ''}`);
+              }}>
+                {feolOptionsOf(proc).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
+              </select>
+            </label>
+          )}
           {p.kind === 'product' && proc && (
             <label className="field pb-opt">
               <span>BEOL Option</span>

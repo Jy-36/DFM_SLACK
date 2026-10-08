@@ -1,7 +1,7 @@
 // MTO 상태 변경 (React 없이 테스트할 수 있게 따로 둔다)
 import { DEFAULT_CONFIG, normalizeConfig } from './scheduler.js';
 import { newProject } from './projects.js';
-import { beolOptionsOf, exampleProcess, isBeol, newProcess, setRowsOf } from './process.js';
+import { beolOptionsOf, beolRowsOf, exampleProcess, feolRowsOf, isBeol, newProcess, porOf, setRowsOf } from './process.js';
 
 const refs = (rows, start = 1) => rows.map((r, i) => ({ no: start + i, ref: r.id }));
 
@@ -28,7 +28,7 @@ export function mtoReducer(state, a) {
         const proc = state.processes.find((x) => x.id === (state.lastProcessId || '')) || state.processes[0];
         if (proc) {
           const option = beolOptionsOf(proc)[0] || null;
-          patch = { processId: proc.id, beolOption: option, layers: refs(setRowsOf(proc, option)), ...patch };
+          patch = { processId: proc.id, beolOption: option, feolOption: porOf(proc).id, layers: refs(setRowsOf(proc, option, porOf(proc).id)), ...patch };
         }
       }
       if (a.kind === 'revision') {
@@ -101,8 +101,9 @@ export function mtoReducer(state, a) {
       // Product는 새 공정의 Layer를 모두 담고 시작 (Set List 전체)
       const proc = state.processes.find((x) => x.id === a.processId);
       const option = proc ? beolOptionsOf(proc)[0] || null : null;
-      const full = proc && cur.kind === 'product' ? refs(setRowsOf(proc, option)) : [];
-      const next = { ...state, projects: state.projects.map((p) => (p.id === cur.id ? { ...p, processId: a.processId || null, beolOption: option, layers: keep ? p.layers : full } : p)) };
+      const feolOption = proc ? porOf(proc).id : null;
+      const full = proc && cur.kind === 'product' ? refs(setRowsOf(proc, option, feolOption)) : [];
+      const next = { ...state, projects: state.projects.map((p) => (p.id === cur.id ? { ...p, processId: a.processId || null, beolOption: option, feolOption, layers: keep ? p.layers : full } : p)) };
       // 이 Product의 ITEM도 같은 공정을 따른다 (담은 Layer는 다시 골라야 함)
       if (cur.kind === 'product') next.projects = next.projects.map((p) => (p.parentId === cur.id && p.processId !== (a.processId || null) ? { ...p, processId: a.processId || null, layers: [] } : p));
       return { ...next, prevLayers: keep ? null : cur.layers, prevProcessId: cur.processId, lastProcessId: a.processId || state.lastProcessId };
@@ -111,7 +112,7 @@ export function mtoReducer(state, a) {
       const cur = state.projects.find((p) => p.id === state.activeId);
       const proc = state.processes.find((x) => x.id === cur?.processId);
       if (!proc) return state;
-      return { ...mapActive(state, (p) => ({ ...p, layers: refs(setRowsOf(proc, p.beolOption)) })), prevLayers: cur.layers };
+      return { ...mapActive(state, (p) => ({ ...p, layers: refs(setRowsOf(proc, p.beolOption, p.feolOption)) })), prevLayers: cur.layers };
     }
     case 'setBeolOption': {
       // BEOL Option을 바꾸면 FEOL은 그대로 두고 BEOL Layer만 새 Option으로 바꾼다
@@ -121,8 +122,19 @@ export function mtoReducer(state, a) {
       const rowOf = new Map(proc.rows.map((r) => [r.id, r]));
       const feol = cur.layers.filter((l) => !(rowOf.get(l.ref) && isBeol(rowOf.get(l.ref))));
       const start = feol.reduce((m, l) => Math.max(m, Number.isFinite(l.no) ? l.no : 0), 0) + 1;
-      const beol = refs(proc.rows.filter((r) => isBeol(r) && r.module === a.option), start);
+      const beol = refs(beolRowsOf(proc, a.option), start);
       return { ...state, projects: state.projects.map((p) => (p.id === cur.id ? { ...p, beolOption: a.option, layers: [...feol, ...beol] } : p)), prevLayers: cur.id === state.activeId ? cur.layers : state.prevLayers };
+    }
+    case 'setFeolOption': {
+      // FEOL Option을 바꾸면 BEOL은 그대로 두고 FEOL Layer만 새 Option 조합으로 바꾼다
+      const cur = state.projects.find((p) => p.id === (a.id || state.activeId));
+      const proc = state.processes.find((x) => x.id === cur?.processId);
+      if (!cur || !proc) return state;
+      const rowOf = new Map(proc.rows.map((r) => [r.id, r]));
+      const beol = cur.layers.filter((l) => rowOf.get(l.ref) && isBeol(rowOf.get(l.ref)));
+      const feol = refs(feolRowsOf(proc, a.option));
+      const shift = feol.length;
+      return { ...state, projects: state.projects.map((p) => (p.id === cur.id ? { ...p, feolOption: a.option, layers: [...feol, ...beol.map((l, i) => ({ ...l, no: shift + i + 1 }))] } : p)), prevLayers: cur.id === state.activeId ? cur.layers : state.prevLayers };
     }
     case 'updateProject': // 목록 화면(Product 정보)에서 아무 Product나 고칠 때
       return { ...state, projects: state.projects.map((p) => (p.id === a.id ? { ...p, ...a.patch, info: a.patch.info ? { ...(p.info || {}), ...a.patch.info } : p.info } : p)) };
@@ -132,7 +144,11 @@ export function mtoReducer(state, a) {
       const { id, from, to } = a;
       return {
         ...state,
-        processes: state.processes.map((x) => (x.id !== id ? x : { ...x, beolOptions: beolOptionsOf(x).map((o) => (o === from ? to : o)), rows: x.rows.map((r) => (isBeol(r) && r.module === from ? { ...r, module: to } : r)) })),
+        processes: state.processes.map((x) => {
+          if (x.id !== id) return x;
+          const { [from]: meta, ...restMeta } = x.beolMeta || {};
+          return { ...x, beolOptions: beolOptionsOf(x).map((o) => (o === from ? to : o)), beolMeta: meta ? { ...restMeta, [to]: meta } : restMeta, rows: x.rows.map((r) => (isBeol(r) && r.module === from ? { ...r, module: to } : r)) };
+        }),
         projects: state.projects.map((p) => (p.processId === id && p.beolOption === from ? { ...p, beolOption: to } : p)),
       };
     }
@@ -140,7 +156,13 @@ export function mtoReducer(state, a) {
       return { ...mapActive(state, (p) => ({ ...p, processId: state.prevProcessId ?? null, layers: state.prevLayers || p.layers })), prevLayers: null };
     }
     case 'addProcess': {
-      const pr = a.example ? exampleProcess(state.processes) : newProcess(state.processes, a.patch);
+      // Reference Copy: 기존 공정을 그대로 복사해서 시작 / 새로 Setting: 빈 공정 (FEOL · BEOL, POR, BEOL Option 하나)
+      const src = a.copyFrom && state.processes.find((x) => x.id === a.copyFrom);
+      const pr = a.example
+        ? exampleProcess(state.processes)
+        : src
+          ? { ...structuredClone(src), id: newProcess().id, name: a.name || `${src.name} 복사`, desc: a.desc ?? src.desc }
+          : newProcess(state.processes, a.patch);
       return { ...state, processes: [...state.processes, pr], lastProcessId: pr.id };
     }
     case 'updateProcess':

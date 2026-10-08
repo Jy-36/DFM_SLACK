@@ -14,7 +14,7 @@ import { parseLayerText } from '../src/apps/mto/lib/layers.js';
 import { analyze } from '../src/apps/mto/lib/insights.js';
 import { toCsv } from '../src/apps/mto/lib/report.js';
 import { computeProject, newProject, effectiveConfig } from '../src/apps/mto/lib/projects.js';
-import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows, setRowsOf, beolOptionsOf, migrateProcess } from '../src/apps/mto/lib/process.js';
+import { exampleProcess, newProcess, parseProcessRows, checkProcess, layersFromRows, setRowsOf, beolOptionsOf, migrateProcess, feolOptionsOf, feolRowsOf, beolRowsOf, layerKind } from '../src/apps/mto/lib/process.js';
 
 let fail = 0;
 let pass = 0;
@@ -155,6 +155,28 @@ const pr = parseProcessRows('Layer\tPart\tType\tModule\tGrade\tCD\nM1\ta\tx\tBEO
 eq('시트 붙여넣기 (열 순서 무관, 새 SPEC 열)', [pr.rows.map((r) => [r.part, r.module, r.layer, r.type, r.spec]), pr.newColumns], [[['FEOL', 'BEOL', 'M1', 'X', { Grade: '1', CD: '40nm' }]], ['CD']]);
 ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part: 'Q', module: '', layer: 'L', type: 'X' }] }, ['X', 'Y', 'Z']).length === 1);
 
+// ── FEOL Option(POR) · Module Option · BEOL 쌓는 순서
+{
+  const e = exampleProcess();
+  const [por, hd] = feolOptionsOf(e);
+  eq('POR이 맨 앞', [por.name, por.por, hd.name], ['POR', true, 'HD']);
+  eq('POR은 MOL Base(A-13), HD는 A-13H', [feolRowsOf(e, por.id).map((r) => r.layer).includes('A-13'), feolRowsOf(e, hd.id).map((r) => r.layer).includes('A-13H'), feolRowsOf(e, hd.id).map((r) => r.layer).includes('A-13'), feolRowsOf(e, por.id).length], [true, true, false, 15]);
+  const b15 = e.rows.filter((r) => r.part === 'BEOL' && r.module === '15M');
+  const e2 = { ...e, beolMeta: { '15M': { concept: '', stack: [b15[2].id, b15[0].id] } } };
+  eq('BEOL 쌓는 순서 반영 (정한 순서 먼저, 나머지 시트 순서)', beolRowsOf(e2, '15M').slice(0, 4).map((r) => r.layer), ['B-3', 'B-1', 'B-2', 'B-4']);
+  eq('Metal / Via 구분', ['M1', 'Mx', 'V0', 'VIA2', 'PC'].map(layerKind), ['metal', 'metal', 'via', 'via', 'etc']);
+  const { mtoReducer: R } = await import('../src/apps/mto/lib/reducer.js');
+  let s0 = { projects: [], processes: [e], config: DEFAULT_CONFIG, section: 'product', activeByKind: { product: null, revision: null }, activeId: null };
+  s0 = R(s0, { type: 'addProject', kind: 'product' });
+  const s1 = R(s0, { type: 'setFeolOption', option: hd.id });
+  const pl = s1.projects[0];
+  eq('FEOL Option 바꾸면 FEOL만 교체, BEOL 그대로', [pl.feolOption, pl.layers.length, pl.layers.map((l) => e.rows.find((r) => r.id === l.ref).layer).includes('A-13H')], [hd.id, 30, true]);
+  const s2 = R(s0, { type: 'addProcess', copyFrom: e.id, name: 'Copy' });
+  eq('Reference Copy', [s2.processes.length, s2.processes[1].name, s2.processes[1].rows.length], [2, 'Copy', e.rows.length]);
+  const s3 = R(s0, { type: 'addProcess' });
+  eq('새로 Setting: 빈 공정 (FEOL · BEOL, POR)', [s3.processes[1].rows.length, s3.processes[1].parts.map((p) => p.name), feolOptionsOf(s3.processes[1])[0].name], [0, ['FEOL', 'BEOL'], 'POR']);
+}
+
 // ── Product 탭 / Revision 탭 (ITEM은 Product에 딸림)
 {
   const { mtoReducer } = await import('../src/apps/mto/lib/reducer.js');
@@ -171,10 +193,10 @@ ok('시트 확인: 모르는 Part', checkProcess({ ...ex, rows: [{ id: 'z', part
   st = mtoReducer(st, { type: 'addProject', kind: 'revision', patch: { parentId: P1.id, gds: '2026-11-02' } });
   const I1 = st.projects[1];
   eq('ITEM: Product에 딸림 · 이름 · 공정 따라감 · Revision 탭으로', [I1.parentId, I1.name, I1.processId, st.section], [P1.id, 'P1 REV01', pr.id, 'revision']);
-  st = mtoReducer(st, { type: 'layers', layers: layersFromRows(pr.rows.slice(20, 23)) });
+  st = mtoReducer(st, { type: 'layers', layers: layersFromRows(pr.rows.filter((r) => r.part === 'BEOL').slice(5, 8)) });
   const ic = computeProject(st.projects[1], DEFAULT_CONFIG, [pr]);
   eq('ITEM 3장 계산 (Part 없이)', [Object.keys(ic.result.step1), ic.result.layers.map((l) => l.layer)], [['R'], ['B-6', 'B-7', 'B-8']]);
-  const mid = computeProject({ ...P1, layers: layersFromRows(pr.rows.slice(15)) }, DEFAULT_CONFIG, [pr]);
+  const mid = computeProject({ ...P1, layers: layersFromRows(pr.rows.filter((r) => r.part === 'BEOL' && r.module === '15M')) }, DEFAULT_CONFIG, [pr]);
   eq('중간부터(BEOL만) 나가면 입력한 GDS = BEOL GDS', [Object.keys(mid.result.step1), mid.result.step1.BEOL.gds], [['BEOL'], '2026-09-21']);
   st = mtoReducer(st, { type: 'section', section: 'product' });
   eq('탭 바꾸면 그 탭의 선택으로', [st.section, st.activeId], ['product', P1.id]);
