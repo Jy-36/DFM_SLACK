@@ -9,23 +9,26 @@ import Overview from './pages/Overview.jsx';
 import LayerList from './pages/LayerList.jsx';
 import ScheduleTable from './pages/ScheduleTable.jsx';
 import Rules from './pages/Rules.jsx';
+import ProcessSheet from './pages/ProcessSheet.jsx';
+import ProcessLayerList from './pages/ProcessLayerList.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.2.0';
+export const MTO_VERSION = '0.3.0';
 
 const NAV = [
   ['all', '전체 일정', 'dashboard'],
   ['overview', '일정 현황', 'gantt'],
   ['layers', 'Layer List', 'layers'],
   ['table', 'Layer별 일정표', 'table'],
+  ['process', '공정 · Layer SPEC', 'apps'],
   ['rules', '규칙', 'settings'],
 ];
 
 /** 모든 묶음의 계산 결과: { [id]: calc } */
 export function useCalcs(state) {
-  return useMemo(() => Object.fromEntries(state.projects.map((p) => [p.id, computeProject(p, state.config)])), [state.projects, state.config]);
+  return useMemo(() => Object.fromEntries(state.projects.map((p) => [p.id, computeProject(p, state.config, state.processes)])), [state.projects, state.processes, state.config]);
 }
 
 export default function Mto({ mode, setMode, widget, setWidget }) {
@@ -108,11 +111,13 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         {NAV.map(([key, label, icon], i) => (
           <div key={key} className="nav-item-wrap">
             {i === 1 && !navMini && <div className="nav-sec">선택한 묶음 · {project.name}</div>}
+            {i === 4 && !navMini && <div className="nav-sec">기준 정보</div>}
             <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
               <Icon name={icon} />
               <span className="nav-label">{label}</span>
               {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
               {key === 'all' && <span className="nav-count num">{state.projects.length}</span>}
+              {key === 'process' && <span className="nav-count num">{state.processes.length}</span>}
             </button>
           </div>
         ))}
@@ -127,8 +132,9 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
       <main className="main">
         {tab === 'all' && <Portfolio {...props} />}
         {tab === 'overview' && <Overview {...props} />}
-        {tab === 'layers' && <LayerList {...props} />}
+        {tab === 'layers' && (project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
         {tab === 'table' && <ScheduleTable {...props} />}
+        {tab === 'process' && <ProcessSheet {...props} />}
         {tab === 'rules' && <Rules {...props} />}
       </main>
       {toastEl}

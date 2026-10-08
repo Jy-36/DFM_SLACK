@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG = Object.freeze({
 export const PARTS = ['A', 'B'];
 /** Revision은 Part A/B 없이 한 묶음: 엔진 안에서는 Part 'R'로 계산한다 */
 export const REVISION_PART = 'R';
-export const partLabel = (p) => (p === REVISION_PART ? 'Revision' : `Part ${p}`);
+export const partLabel = (p) => (p === REVISION_PART ? 'Revision' : /^[A-Z0-9]{1,2}$/.test(p) ? `Part ${p}` : p);
 
 /** 근무일 달력: 대한민국 공휴일 + 주말(선택) + 추가 휴무 */
 export function makeCalendar({ weekendsAreHolidays = true, extraHolidays = [] } = {}) {
@@ -85,12 +85,22 @@ export function buildSchedule(partAGds, layers, config) {
   }
 
   // 규칙 1 (Revision은 GDS 입고일 그대로)
-  const gds = { A: partAGds, B: addDays(partAGds, cfg.partBOffsetDays), [REVISION_PART]: partAGds };
+  // 공정에서 Part를 정의하면 Part별 GDS 간격(cfg.partOffsets)을 쓴다. 없으면 A = GDS, B = GDS + partBOffsetDays
+  const offsets = cfg.partOffsets || {};
+  const gdsOf = (part) => addDays(partAGds, offsets[part] ?? (part === 'B' ? cfg.partBOffsetDays : 0));
+  const gds = { A: gdsOf('A'), B: gdsOf('B'), [REVISION_PART]: partAGds };
+  for (const l of layers) if (!(l.part in gds)) gds[l.part] = gdsOf(l.part);
   const cal = makeCalendar(cfg);
 
   // 규칙 2, 4, 6, 7: STEP1은 Part(GDS) 단위
   const step1 = {};
-  for (const part of [...new Set(layers.map((l) => l.part))].sort()) {
+  const partOrder = cfg.partOrder || [];
+  const parts = [...new Set(layers.map((l) => l.part))].sort((x, y) => {
+    const i = partOrder.indexOf(x);
+    const j = partOrder.indexOf(y);
+    return (i < 0 ? 1e9 : i) - (j < 0 ? 1e9 : j) || (x < y ? -1 : x > y ? 1 : 0);
+  });
+  for (const part of parts) {
     const start = cal.nextWorkingDay(gds[part]);
     step1[part] = { gds: gds[part], start, end: addDays(start, cfg.step1Tat[part] - 1) };
   }

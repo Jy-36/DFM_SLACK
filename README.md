@@ -164,12 +164,23 @@ Part A GDS 입고일과 Layer List를 넣으면 Layer별 **STEP2 시작일**과 
 | 일정 현황 | 위쪽 칩으로 묶음 고르기·추가(Product/Revision)·이름·복제·삭제, Revision은 원래 Product(참고용)·STEP1 TAT, GDS 입고일·하루 MTO 수·STEP2 동시 수 빠른 변경, 최종 MTO, 대기 요약, 병목 분석(최종 MTO 경로 · 원인별 누적 대기), 추천 일정(조건 변경·Layer 순서 재배열·GDS 조정 효과), 리스크, 시나리오 비교(2·3장 × 4·5장, 누르면 적용), 간트 |
 | Layer List | 직접 편집, 엑셀 붙여넣기(머리줄이 있으면 열 순서 무관), CSV 열기, 예시 30장, No 다시 매기기·위아래 이동 |
 | Layer별 일정표 | 날짜별 MTO 묶음, Layer별 표, 엑셀용 복사, CSV 저장 |
+| 공정 · Layer SPEC | Process → Part → Module → Layer 분류 트리, Part별 GDS 간격·STEP1 TAT, Layer SPEC Sheet(Type + SPEC 열 추가·이름 바꾸기·삭제, 엑셀 붙여넣기·복사, 찾기, 쓰는 Product 표시) |
 | 규칙 | STEP1 TAT(Part), STEP2 TAT(Type 추가·삭제), Part B GDS 간격, 하루 MTO 수, STEP2 동시 수, MTO 가능 간격, 주말·회사 휴무일 |
 | App Mode | 묶음 고르기 · 최종 MTO · 빠른 조건 변경 · 전체 묶음 목록 · 다음 MTO · 병목 · 시나리오 |
 | Widget Mode | 선택한 묶음의 최종 MTO · 모든 묶음 중 가장 가까운 MTO · 진행 |
 
 입력이 바뀌면 바로 다시 계산하고, 묶음·규칙은 localStorage(`mto.v2`)에 저장합니다. 예전(`mto.v1`) 입력은 Product 1로 옮겨집니다.
 [규칙]은 모든 묶음의 기본값이고, 하루 MTO 수·STEP2 동시 수는 묶음마다 [일정 현황]에서 따로 바꿀 수 있습니다. Revision STEP1 TAT 기본값은 3일.
+
+## 공정 기준 Product
+
+Product·Revision마다 **기준 공정**을 고르면 Layer List는 그 공정의 Part → Module → Layer 트리에서 체크해서 담습니다.
+- Layer 이름·Part·Module·Type은 공정 시트를 따라가요 (시트를 고치면 그 공정을 쓰는 Product에 바로 반영).
+- Part의 GDS 입고 간격과 STEP1 TAT는 공정의 Part 설정을 씁니다 (Part 이름 자유: A/B, FEOL/BEOL 등).
+- No(= STEP2 투입·MTO 순서)는 Product마다 정하고, [공정 순서로 No 매기기]로 시트 순서대로 맞출 수 있어요.
+- Revision도 공정 Layer를 골라 담을 수 있고, Part 구분 없이 계산합니다.
+- 기준 공정을 "직접 입력"으로 두면 예전처럼 Part A/B Layer를 직접 입력합니다.
+- 처음 실행하면 예시 공정(30장, Part A: FEOL·MOL / Part B: BEOL-1·2)이 하나 들어 있어요.
 
 ## 규칙 (기본값)
 
@@ -209,9 +220,10 @@ src/apps/mto/
     layers.js      예시 Layer, 붙여넣기 파서, 입력 확인
     dates.js       'YYYY-MM-DD' 날짜 계산
     projects.js    Product·Revision 묶음 (묶음별 설정 · 계산)
+    process.js     공정 마스터 (Part·Module·Layer·SPEC, 트리, 붙여넣기, Product Layer 연결)
     store.js       상태 (localStorage, 묶음 목록)
   components/      Gantt(SVG), PortfolioGantt(전체), ProjectBar(묶음 고르기), Insights, Controls
-  pages/           Portfolio(전체 일정), Overview, LayerList, ScheduleTable, Rules, Mini, Widget
+  pages/           Portfolio(전체 일정), Overview, LayerList(직접 입력), ProcessLayerList(공정 기준), ScheduleTable, ProcessSheet(공정·SPEC), Rules, Mini, Widget
 scripts/mto-check.mjs        규칙 테스트 + Python 엔진 결과와 날짜 비교 (npm run test:mto, test:engine·CI에서도 함께 실행)
 scripts/fixtures/mto-golden.json   Python 엔진 결과 (같은 공휴일 표로 생성)
 ```

@@ -42,7 +42,7 @@ const count = (arr) => arr.reduce((m, k) => ({ ...m, [k]: (m[k] || 0) + 1 }), {}
 export function summarize(result) {
   const { layers, config: cfg } = result;
   const byPart = {};
-  for (const part of [...new Set(layers.map((l) => l.part))].sort()) {
+  for (const part of Object.keys(result.step1)) {
     const ls = layers.filter((l) => l.part === part);
     const min = (k) => ls.reduce((m, l) => (l[k] < m ? l[k] : m), ls[0][k]);
     const max = (k) => ls.reduce((m, l) => (l[k] > m ? l[k] : m), ls[0][k]);
