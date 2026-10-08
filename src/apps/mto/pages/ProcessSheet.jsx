@@ -5,6 +5,7 @@ import { Icon, Pill } from '../../../shared/ui.jsx';
 import { beolOptionsOf, beolRowsOf, checkProcess, feolOptionsOf, feolRowsOf, isBeol, layerKind, moduleOptionsOf, modulesOf, parseProcessRows, processToTsv, uid } from '../lib/process.js';
 import { copyText } from './ScheduleTable.jsx';
 import { Confirm, Modal } from '../components/Modal.jsx';
+import { AddBeolOptionModal, AddConceptModal, AddModuleModal, ModOptChangeModal } from '../components/ProcessModals.jsx';
 import ModOptCompare from '../components/ModOptCompare.jsx';
 import { BeolOptionPanel, BeolPanel, FeolOptionPanel, FeolPanel, ModulePanel, RootPanel } from '../components/ProcessEditors.jsx';
 
@@ -92,7 +93,7 @@ function ProcessInfo({ proc, upd, onDelete, processes }) {
 }
 
 /** 왼쪽 분류 트리 (FEOL · BEOL과 그 아래 묶음은 접었다 펼 수 있다) */
-function Tree({ proc, sel, setSel }) {
+function Tree({ proc, sel, setSel, openAdd }) {
   const [closed, setClosed] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('mto.treeClosed') || '{}');
@@ -130,12 +131,15 @@ function Tree({ proc, sel, setSel }) {
       <Icon name="chevron" size={13} />
     </button>
   );
-  const Group = ({ k, label, n }) => (
-    <button type="button" className={`tree-group ${closed[k] ? 'closed' : ''}`} onClick={() => toggle(k)} aria-expanded={!closed[k]}>
-      <Icon name="chevron" size={11} />
-      {label}
-      <span className="num">{n}</span>
-    </button>
+  const Group = ({ k, label, n, add }) => (
+    <div className="tree-group-row">
+      <button type="button" className={`tree-group ${closed[k] ? 'closed' : ''}`} onClick={() => toggle(k)} aria-expanded={!closed[k]}>
+        <Icon name="chevron" size={11} />
+        {label}
+        <span className="num">{n}</span>
+      </button>
+      <button type="button" className="tree-add" onClick={() => openAdd(add)} title={`${label} 추가`} aria-label={`${label} 추가`}><Icon name="plus" size={12} /></button>
+    </div>
   );
   return (
     <section className="panel pr-tree">
@@ -156,13 +160,13 @@ function Tree({ proc, sel, setSel }) {
         </div>
         {!closed.FEOL && (
           <>
-            <Group k="FEOL.concept" label="Concept" n={fo.length} />
+            <Group k="FEOL.concept" label="Concept" n={fo.length} add="concept" />
             {!closed['FEOL.concept'] && fo.map((o) => (
               <button key={o.id} type="button" className={`tree-item module ${on('feolOpt', { id: o.id }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'feolOpt', id: o.id })}>
-                <span>{o.por ? <span className="por-tag">POR</span> : <span className="opt-tag">Con</span>}{o.name}</span><span className="num muted">{feolRowsOf(proc, o.id).length}</span>
+                <span className={o.active === false && !o.por ? 'muted strike-off' : ''}>{o.por ? <span className="por-tag">POR</span> : <span className="opt-tag">Con</span>}{o.name}{o.active === false && !o.por && <small> · 비활성</small>}</span><span className="num muted">{feolRowsOf(proc, o.id).length}</span>
               </button>
             ))}
-            <Group k="FEOL.module" label="Module" n={modulesOf(proc).length} />
+            <Group k="FEOL.module" label="Module" n={modulesOf(proc).length} add="module" />
             {!closed['FEOL.module'] && modulesOf(proc).map((m) => (
               <button key={m} type="button" className={`tree-item module ${on('module', { name: m }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'module', name: m })}>
                 <span>{m}{moduleOptionsOf(proc, m).length > 0 && <small className="muted"> · Option {moduleOptionsOf(proc, m).length}</small>}</span><span className="num muted">{feolRows.filter((r) => r.module === m).length}</span>
@@ -180,7 +184,7 @@ function Tree({ proc, sel, setSel }) {
         </div>
         {!closed.BEOL && (
           <>
-            <Group k="BEOL.option" label="BEOL Option" n={beolOptionsOf(proc).length} />
+            <Group k="BEOL.option" label="BEOL Option" n={beolOptionsOf(proc).length} add="beol" />
             {!closed['BEOL.option'] && beolOptionsOf(proc).map((o) => (
               <button key={o} type="button" className={`tree-item module ${on('beolOpt', { name: o }) ? 'on' : ''}`} onClick={() => setSel({ kind: 'beolOpt', name: o })}>
                 <span><span className="opt-tag">Opt</span>{o}</span><span className="num muted">{beolRows.filter((r) => r.module === o).length}</span>
@@ -217,11 +221,14 @@ function scopeOf(proc, sel) {
   }
 }
 
-export default function ProcessSheet({ state, dispatch, go, notify }) {
+export default function ProcessSheet({ state, dispatch, go, notify, procLoc, setProcLoc }) {
   const { processes, config } = state;
-  const [selId, setSelId] = useState(() => state.lastProcessId || processes[0]?.id);
+  // 고른 공정 · 분류는 MTO가 들고 있다 (뒤로 · 앞으로 가기)
+  const selId = procLoc.procId;
+  const setSelId = (id) => setProcLoc((l) => ({ ...l, procId: id }));
   const proc = processes.find((p) => p.id === selId) || processes.find((p) => p.id === state.lastProcessId) || processes[0];
-  const [sel, setSelRaw] = useState({ kind: 'root' });
+  const sel = procLoc.sel;
+  const setSelRaw = (s) => setProcLoc((l) => ({ ...l, sel: s }));
   const [q, setQ] = useState('');
   const [paste, setPaste] = useState(false);
   const [text, setText] = useState('');
@@ -249,7 +256,27 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
     notify(a.copyFrom ? 'Reference Copy로 새 공정을 만들었어요' : '새 공정을 만들었어요');
   };
 
-  const modalEl = modal === 'new'
+  const openAdd = (kind) => setModal({ add: kind });
+  const askModOpt = (m) => setModal({ modopt: m });
+  const addDone = (next, nextSel) => {
+    dispatch({ type: 'updateProcess', id: proc.id, patch: next });
+    setSel(nextSel);
+    setModal(null);
+  };
+  const addProps = proc && { proc, onClose: () => setModal(null), onDone: addDone };
+  const modalEl = modal?.add === 'concept' ? <AddConceptModal {...addProps} />
+    : modal?.add === 'module' ? <AddModuleModal {...addProps} />
+      : modal?.add === 'beol' ? <AddBeolOptionModal {...addProps} />
+        : modal?.modopt ? (
+          <ModOptChangeModal {...modal.modopt} proc={proc} products={state.projects} onClose={() => setModal(null)}
+            onDone={(next, users) => {
+              dispatch({ type: 'updateProcess', id: proc.id, patch: next });
+              for (const p of users) dispatch({ type: 'setFeolOption', id: p.id, option: modal.modopt.foId });
+              setModal(null);
+              notify(`${modal.modopt.module}: ${modal.modopt.to}로 바꿨어요${users.length ? ` · Product ${users.length}개 Set List 다시 담음` : ''}`);
+            }} />
+        )
+        : modal === 'new'
     ? <NewProcessModal processes={processes} onClose={() => setModal(null)} onCreate={createProcess} />
     : modal?.confirm
       ? <Confirm danger confirmLabel={modal.confirm.confirmLabel || '지우기'} title={modal.confirm.title} message={modal.confirm.message} onConfirm={modal.confirm.onConfirm} onClose={() => setModal(null)} />
@@ -258,7 +285,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
   if (!proc) {
     return (
       <div className="page">
-        <div className="page-head"><div><h1>Process Layer Set</h1><p>Process → FEOL(Option · Module) · BEOL(Option) → Layer로 분류하고 SPEC을 관리합니다.</p></div></div>
+        <div className="page-head"><div><h1>Process Layer Set</h1><p>Process → FEOL(Concept · Module) · BEOL(BEOL Option) → Layer로 분류하고 SPEC을 관리합니다.</p></div></div>
         <section className="panel mto-empty">
           <h2>공정이 없어요</h2>
           <div className="head-actions">
@@ -364,7 +391,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
   const compare = canCompare && view === 'compare';
   const ql = q.trim().toLowerCase();
   const shown = scope.rows.filter((r) => !ql || [r.layer, r.module, r.modOpt, r.part, r.type, ...Object.values(r.spec || {})].some((v) => String(v ?? '').toLowerCase().includes(ql)));
-  const ep = { proc, upd, sel: cur, setSel, dispatch, products, go, askConfirm };
+  const ep = { proc, upd, sel: cur, setSel, dispatch, products, go, askConfirm, openAdd, askModOpt };
   const stackNo = cur.kind === 'beolOpt' ? new Map((proc.beolMeta?.[cur.name]?.stack || []).map((id, i) => [id, i + 1])) : null;
 
   return (
@@ -372,7 +399,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
       <div className="page-head">
         <div>
           <h1>Process Layer Set</h1>
-          <p>Process → FEOL(Option · Module) · BEOL(Option) → Layer. Product는 공정 · FEOL Concept · BEOL Option을 고르면 그 조합의 Layer가 Set List가 돼요.</p>
+          <p>Process → FEOL(Concept · Module) · BEOL(BEOL Option) → Layer. Product는 공정 · FEOL Concept · BEOL Option을 고르면 그 조합의 Layer가 Set List가 돼요.</p>
         </div>
       </div>
 
@@ -391,7 +418,7 @@ export default function ProcessSheet({ state, dispatch, go, notify }) {
       </section>
 
       <div className="pr-grid">
-        <Tree proc={proc} sel={cur} setSel={setSel} />
+        <Tree proc={proc} sel={cur} setSel={setSel} openAdd={openAdd} />
         <section className="panel pr-editor">
           {cur.kind === 'root' && <RootPanel {...ep} />}
           {cur.kind === 'feol' && <FeolPanel {...ep} />}

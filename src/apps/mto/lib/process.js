@@ -66,11 +66,16 @@ export function feolOptionsOf(proc) {
   return [...list.filter((o) => o.por), ...list.filter((o) => !o.por)];
 }
 export const porOf = (proc) => feolOptionsOf(proc)[0];
+/** Product에서 고를 수 있는 FEOL Concept (비활성은 빼되, 지금 쓰는 것은 남긴다) */
+export const activeFeolOptionsOf = (proc, keepId) => feolOptionsOf(proc).filter((o) => o.por || o.active !== false || o.id === keepId);
 export const feolOptionOf = (proc, id) => feolOptionsOf(proc).find((o) => o.id === id) || porOf(proc);
 
 /** FEOL Module 목록 (시트 순서 + 아직 Layer 없는 Module) */
 export function modulesOf(proc) {
+  // moduleOrder: 사용자가 정한 Module 순서 (없으면 시트에 처음 나오는 순서)
   const out = [];
+  const known = new Set([...(proc?.rows || []).filter((r) => !isBeol(r) && r.module).map((r) => r.module), ...(proc?.feolModules || [])]);
+  for (const m of proc?.moduleOrder || []) if (known.has(m) && !out.includes(m)) out.push(m);
   for (const r of proc?.rows || []) if (!isBeol(r) && r.module && !out.includes(r.module)) out.push(r.module);
   for (const m of proc?.feolModules || []) if (!out.includes(m)) out.push(m);
   return out;
@@ -237,8 +242,10 @@ export function checkProcess(proc, types) {
     if (!partNames.has(r.part)) out.push({ id: r.id, field: 'part', msg: `${i + 1}행 ${r.layer || ''}: Part '${r.part}'가 공정에 없습니다.` });
     if (!types.includes(r.type)) out.push({ id: r.id, field: 'type', msg: `${i + 1}행 ${r.layer || ''}: Type '${r.type}'를 모릅니다 (${types.join('/')}).` });
     if (!r.layer) out.push({ id: r.id, field: 'layer', msg: `${i + 1}행: Layer 이름이 비어 있습니다.` });
-    const k = `${r.part}/${r.layer}`;
-    if (r.layer && seen.has(k)) out.push({ id: r.id, field: 'layer', msg: `${r.part} · ${r.layer}가 두 번 있습니다.` });
+    // BEOL은 Option마다, FEOL은 Module Option마다 같은 Layer 이름을 써도 된다
+    const scope = isBeol(r) ? r.module : r.modOpt ? `${r.module}:${r.modOpt}` : '';
+    const k = `${r.part}/${scope}/${r.layer}`;
+    if (r.layer && seen.has(k)) out.push({ id: r.id, field: 'layer', msg: `${r.part}${scope ? ` · ${scope}` : ''} · ${r.layer}가 두 번 있습니다.` });
     seen.set(k, true);
   });
   return out;

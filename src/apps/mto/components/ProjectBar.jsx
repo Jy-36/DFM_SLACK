@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
-import { beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
+import { activeFeolOptionsOf, beolOptionsOf, feolOptionOf, feolOptionsOf } from '../lib/process.js';
 
 export function KindTag({ kind }) {
   return <span className={`kind-tag ${kind}`}>{kind === 'revision' ? 'ITEM' : 'P'}</span>;
@@ -104,7 +104,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
                 dispatch({ type: 'setFeolOption', option: e.target.value });
                 notify?.(`FEOL ${o?.name}로 바꿨어요 · BEOL은 그대로, FEOL Layer만 바뀌었어요${children.length ? ` · ITEM ${children.length}개 확인 필요` : ''}`);
               }}>
-                {feolOptionsOf(proc).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
+                {activeFeolOptionsOf(proc, feolOptionOf(proc, p.feolOption).id).map((o) => <option key={o.id} value={o.id}>{o.name}{o.por && o.name !== 'POR' ? ' (POR)' : ''}</option>)}
               </select>
             </label>
           )}
