@@ -86,8 +86,11 @@ export function buildSchedule(partAGds, layers, config) {
 
   // 규칙 1 (Revision은 GDS 입고일 그대로)
   // 공정에서 Part를 정의하면 Part별 GDS 간격(cfg.partOffsets)을 쓴다. 없으면 A = GDS, B = GDS + partBOffsetDays
+  // 중간부터 나가는 Set(예: Part B부터)은 입력한 GDS 입고일이 그 첫 Part의 GDS가 되도록 간격을 맞춘다
   const offsets = cfg.partOffsets || {};
-  const gdsOf = (part) => addDays(partAGds, offsets[part] ?? (part === 'B' ? cfg.partBOffsetDays : 0));
+  const rawOffset = (part) => (part === REVISION_PART ? 0 : offsets[part] ?? (part === 'B' ? cfg.partBOffsetDays : 0));
+  const base = Math.min(...layers.map((l) => rawOffset(l.part)));
+  const gdsOf = (part) => addDays(partAGds, rawOffset(part) - base);
   const gds = { A: gdsOf('A'), B: gdsOf('B'), [REVISION_PART]: partAGds };
   for (const l of layers) if (!(l.part in gds)) gds[l.part] = gdsOf(l.part);
   const cal = makeCalendar(cfg);
@@ -164,13 +167,13 @@ export function buildSchedule(partAGds, layers, config) {
     if (load.get(n)) step2Load[fromDay(n)] = load.get(n);
   });
   return {
-    partAGds: gds.A,
+    partAGds, // 입력한 GDS = 첫 Part GDS (일정 시작)
     partBGds: gds.B,
     step1,
     layers: out,
     config: cfg,
     finalMto,
-    leadTimeDays: diffDays(finalMto, gds.A),
+    leadTimeDays: diffDays(finalMto, partAGds),
     holidaysInWindow: cal.holidaysBetween(partAGds, finalMto),
     step2Load,
   };

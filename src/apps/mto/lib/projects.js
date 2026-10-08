@@ -20,6 +20,7 @@ export function newProject(kind, projects = [], patch = {}) {
     layers: [],
     base: '', // Revision: 참고용 원래 Product 이름 (계산에는 안 씀)
     step1Tat: null, // Revision: STEP1 TAT (비우면 규칙의 기본값)
+    parentId: null, // Revision ITEM: 딸린 Product
     processId: null, // 기준 공정 (있으면 Layer는 공정 시트에서 골라 담고 Part 설정도 공정을 따름)
     override: {}, // 묶음별 하루 MTO 수 · STEP2 동시 진행 수 (없으면 규칙의 기본값)
     ...patch,

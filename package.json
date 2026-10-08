@@ -1,7 +1,7 @@
 {
   "name": "dfm-slack",
   "private": true,
-  "version": "0.17.0-prototype",
+  "version": "0.18.0-prototype",
   "type": "module",
   "scripts": {
     "dev": "vite",
