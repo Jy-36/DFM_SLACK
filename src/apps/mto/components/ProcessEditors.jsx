@@ -1,4 +1,4 @@
-// Process Layer Set 오른쪽 편집 화면: 왼쪽 분류에서 고른 것(공정 · FEOL · FEOL Option · Module · BEOL · BEOL Option)에 따라 바뀐다.
+// Process Layer Set 오른쪽 편집 화면: 왼쪽 분류에서 고른 것(공정 · FEOL · FEOL Concept · Module · BEOL · BEOL Option)에 따라 바뀐다.
 import { useState } from 'react';
 import { Icon, InfoTip } from '../../../shared/ui.jsx';
 import { beolMetaOf, beolOptionsOf, beolRowsOf, chosenModOpt, feolOptionsOf, feolRowsOf, isBeol, layerKind, moduleOptionsOf, modulesOf } from '../lib/process.js';
@@ -67,7 +67,7 @@ export function RootPanel({ proc, upd, products, go }) {
             {proc.parts.map((p, i) => (
               <tr key={p.name}>
                 <td><b>{p.name}</b></td>
-                <td className="small muted">{p.name === 'FEOL' ? `FEOL Option ${feolOptionsOf(proc).length} · Module ${modulesOf(proc).length}` : `BEOL Option ${beolOptionsOf(proc).length}개 중 하나`}</td>
+                <td className="small muted">{p.name === 'FEOL' ? `FEOL Concept ${feolOptionsOf(proc).length} · Module ${modulesOf(proc).length}` : `BEOL Option ${beolOptionsOf(proc).length}개 중 하나`}</td>
                 <td><div className="num-field"><input className="input num cell" type="number" min={0} max={365} value={p.gdsOffset} onChange={(e) => editPart(i, { gdsOffset: Math.max(0, parseInt(e.target.value, 10) || 0) })} /><span className="muted small">일 뒤</span></div></td>
                 <td><div className="num-field"><input className="input num cell" type="number" min={1} max={60} value={p.step1Tat} onChange={(e) => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= 60) editPart(i, { step1Tat: v }); }} /><span className="muted small">일</span></div></td>
                 <td className="num r">{count(proc.rows, (r) => r.part === p.name)}</td>
@@ -83,7 +83,7 @@ export function RootPanel({ proc, upd, products, go }) {
   );
 }
 
-/** FEOL Option 칩 (POR 맨 앞, 색 다름) */
+/** FEOL Concept 칩 (POR 맨 앞, 색 다름) */
 function FeolOptionStrip({ proc, sel, setSel, upd }) {
   const [n, setN] = useState('');
   const add = () => {
@@ -102,7 +102,7 @@ function FeolOptionStrip({ proc, sel, setSel, upd }) {
           <span className="num small">{feolRowsOf(proc, o.id).length}장</span>
         </button>
       ))}
-      <span className="nchip add"><input className="col-name" value={n} placeholder="+ FEOL Option" onChange={(e) => setN(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} aria-label="새 FEOL Option" /></span>
+      <span className="nchip add"><input className="col-name" value={n} placeholder="+ FEOL Concept" onChange={(e) => setN(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} aria-label="새 FEOL Concept" /></span>
     </div>
   );
 }
@@ -140,11 +140,11 @@ function ModuleList({ proc, upd, setSel, sel }) {
   );
 }
 
-/** FEOL 전체: FEOL Option(맨 위) + Module 목록 */
+/** FEOL 전체: FEOL Concept(맨 위) + Module 목록 */
 export function FeolPanel({ proc, upd, sel, setSel }) {
   return (
     <>
-      <h2>FEOL Option <span className="small muted">Module마다 어떤 Module Option을 쓸지 정한 조합 · POR이 기본</span></h2>
+      <h2>FEOL Concept <span className="small muted">Module마다 어떤 Module Option을 쓸지 정한 조합 · POR이 기본</span></h2>
       <FeolOptionStrip proc={proc} sel={sel} setSel={setSel} upd={upd} />
       <h3 className="sub-h">FEOL Module <span className="small muted">Module Option은 [편집]으로 추가·이름 바꾸기 · 첫 번째가 기본 · Module Option이 빈 Layer는 공통</span></h3>
       <ModuleList proc={proc} upd={upd} sel={sel} setSel={setSel} />
@@ -152,7 +152,7 @@ export function FeolPanel({ proc, upd, sel, setSel }) {
   );
 }
 
-/** FEOL Option 하나: 이름 · POR · Module별 Module Option 고르기 */
+/** FEOL Concept 하나: 이름 · POR · Module별 Module Option 고르기 */
 export function FeolOptionPanel({ proc, upd, sel, setSel, products, askConfirm }) {
   const fo = feolOptionsOf(proc).find((o) => o.id === sel.id);
   if (!fo) return null;
@@ -161,12 +161,12 @@ export function FeolOptionPanel({ proc, upd, sel, setSel, products, askConfirm }
     <>
       <FeolOptionStrip proc={proc} sel={sel} setSel={setSel} upd={upd} />
       <div className="fo-head">
-        <EditableText value={fo.name} big label="FEOL Option 이름" onSave={(v) => v && !feolOptionsOf(proc).some((o) => o.name === v && o.id !== fo.id) && upd(ops.updateFeolOption(proc, fo.id, { name: v }))} />
+        <EditableText value={fo.name} big label="FEOL Concept 이름" onSave={(v) => v && !feolOptionsOf(proc).some((o) => o.name === v && o.id !== fo.id) && upd(ops.updateFeolOption(proc, fo.id, { name: v }))} />
         {fo.por ? <span className="por-tag big">POR</span> : <button type="button" className="btn small-btn" onClick={() => upd(ops.setPor(proc, fo.id))}>POR로 지정</button>}
         <span className="small muted">{feolRowsOf(proc, fo.id).length}장 · 쓰는 Product {users.length}</span>
         {!fo.por && (
           <button type="button" className="btn small-btn ghost danger" disabled={users.length > 0} title={users.length ? '쓰는 Product가 있어 지울 수 없어요' : ''}
-            onClick={() => askConfirm({ title: 'FEOL Option 지우기', message: `'${fo.name}'을 지울까요?`, onConfirm: () => { upd(ops.deleteFeolOption(proc, fo.id)); setSel({ kind: 'feol' }); } })}>
+            onClick={() => askConfirm({ title: 'FEOL Concept 지우기', message: `'${fo.name}'을 지울까요?`, onConfirm: () => { upd(ops.deleteFeolOption(proc, fo.id)); setSel({ kind: 'feol' }); } })}>
             <Icon name="trash" size={13} /> 지우기
           </button>
         )}

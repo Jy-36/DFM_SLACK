@@ -18,7 +18,7 @@ import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.6.0';
+export const MTO_VERSION = '0.7.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -169,7 +169,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
           </div>
         ))}
         <div className="nav-common">
-          {!navMini && <div className="nav-sec common">Common · Product · Revision 공통</div>}
+          {!navMini && <div className="nav-sec common">Common</div>}
           {COMMON_NAV.map(([key, label, icon]) => (
             <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
               <Icon name={icon} />

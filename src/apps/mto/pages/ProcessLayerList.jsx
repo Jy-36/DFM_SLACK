@@ -9,8 +9,7 @@ import ProjectBar from '../components/ProjectBar.jsx';
 export default function ProcessLayerList({ state, dispatch, project, calc, calcs, go, notify }) {
   const proc = state.processes.find((x) => x.id === project.processId);
   const rev = project.kind === 'revision';
-  // Product는 FEOL 전체 + 고른 BEOL Option만 보여 준다
-  // Product는 고른 FEOL Option의 Layer + 고른 BEOL Option만 보여 준다
+  // Product는 고른 FEOL Concept의 Layer + 고른 BEOL Option만 보여 준다
   const tree = useMemo(() => {
     if (rev) return processTree(proc);
     const feolIds = new Set(feolRowsOf(proc, project.feolOption).map((r) => r.id));
@@ -125,7 +124,7 @@ export default function ProcessLayerList({ state, dispatch, project, calc, calcs
                   <div className="pick-part-h">
                     <button type="button" className="fold-btn" aria-expanded={!closed[p.name]} onClick={() => setClosed((c) => ({ ...c, [p.name]: !c[p.name] }))}><Icon name="chevron" size={14} /></button>
                     <Check rows={prow} label={<b>{/^[A-Z0-9]{1,2}$/.test(p.name) ? `Part ${p.name}` : p.name}</b>} />
-                    {!rev && !p.orphan && <span className="small muted">GDS +{p.gdsOffset}일 · STEP1 {p.step1Tat}일{p.name === 'BEOL' ? ` · Option ${project.beolOption || '-'}` : p.name === 'FEOL' ? ` · Option ${feolOptionOf(proc, project.feolOption).name}` : ''}</span>}
+                    {!rev && !p.orphan && <span className="small muted">GDS +{p.gdsOffset}일 · STEP1 {p.step1Tat}일{p.name === 'BEOL' ? ` · Option ${project.beolOption || '-'}` : p.name === 'FEOL' ? ` · Concept ${feolOptionOf(proc, project.feolOption).name}` : ''}</span>}
                     <span className="num small muted pick-n">{prow.filter((r) => picked.has(r.id)).length}/{prow.length}</span>
                   </div>
                   {!closed[p.name] && p.modules.map((m) => (
