@@ -29,24 +29,14 @@ export function changesGds(changes) {
   return dates.length ? dates.sort().at(-1) : null;
 }
 
-/** 항목 고르기 + 항목마다 날짜 (여러 개를 한 날짜로 묶기 · 풀기) */
+/** 항목 고르기 + 항목마다 날짜. 끌어서 묶기: 항목(칩)이나 줄(⋮⋮)을 다른 줄 위에 놓으면 같은 날짜로 묶이고,
+ *  항목을 '따로' 칸에 놓으면 혼자 떨어진다. (창 안 파일 끌기와 겹치지 않게 pointer 이벤트로 직접 처리) */
 function GroupDates({ options, groups, setGroups, tone, addSlot }) {
-  const [checked, setChecked] = useState([]);
+  const [drag, setDrag] = useState(null); // { kind: 'row'|'item', gid, item, x, y, moved, over }
   const picked = groups.flatMap((g) => g.items);
   const toggleItem = (x) => {
     if (picked.includes(x)) setGroups(groups.map((g) => ({ ...g, items: g.items.filter((y) => y !== x) })).filter((g) => g.items.length));
     else setGroups([...groups, { id: gid(), items: [x], date: '' }]);
-    setChecked([]);
-  };
-  const merge = () => {
-    const sel = groups.filter((g) => checked.includes(g.id));
-    if (sel.length < 2) return;
-    const merged = { id: gid(), items: sel.flatMap((g) => g.items), date: sel.find((g) => g.date)?.date || '' };
-    const first = groups.findIndex((g) => checked.includes(g.id));
-    const rest = groups.filter((g) => !checked.includes(g.id));
-    rest.splice(first, 0, merged);
-    setGroups(rest);
-    setChecked([]);
   };
   const split = (g) => {
     const i = groups.indexOf(g);
@@ -55,8 +45,44 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
   const setDate = (g, date) => setGroups(groups.map((x) => (x.id === g.id ? { ...x, date } : x)));
   const order = (g) => [...g.items].sort((a, b) => options.indexOf(a) - options.indexOf(b));
 
+  const targetAt = (x, y) => {
+    const el = document.elementFromPoint(x, y)?.closest?.('[data-gd-drop]');
+    return el ? el.getAttribute('data-gd-drop') : null;
+  };
+  const start = (e, kind, g, item) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const d0 = { kind, gid: g.id, item, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, over: null };
+    setDrag(d0);
+    const move = (ev) => setDrag((d) => d && { ...d, x: ev.clientX, y: ev.clientY, moved: d.moved || Math.hypot(ev.clientX - d.sx, ev.clientY - d.sy) > 4, over: targetAt(ev.clientX, ev.clientY) });
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      const over = targetAt(ev.clientX, ev.clientY);
+      setDrag(null);
+      if (!over || over === g.id) return;
+      const src = groups.find((q) => q.id === g.id);
+      if (!src) return;
+      if (over === 'solo') {
+        if (kind !== 'item' || src.items.length < 2) return;
+        const i = groups.indexOf(src);
+        const next = [...groups];
+        next.splice(i, 1, { ...src, items: src.items.filter((x) => x !== item) }, { id: gid(), items: [item], date: src.date });
+        setGroups(next);
+        return;
+      }
+      const moving = kind === 'row' ? src.items : [item];
+      setGroups(groups
+        .map((q) => (q.id === over ? { ...q, items: [...q.items, ...moving], date: q.date || src.date } : q.id === src.id ? { ...q, items: q.items.filter((x) => !moving.includes(x)) } : q))
+        .filter((q) => q.items.length));
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   return (
-    <div className={`gd ${tone}`}>
+    <div className={`gd ${tone} ${drag?.moved ? 'dragging' : ''}`}>
       <div className="chg-step-line">
         {options.map((x) => (
           <button key={x} type="button" className={`chg-chip ${picked.includes(x) ? 'on' : ''}`} aria-pressed={picked.includes(x)} onClick={() => toggleItem(x)}>
@@ -69,12 +95,12 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
       {groups.length > 0 && (
         <div className="gd-rows">
           {groups.map((g) => (
-            <div key={g.id} className={`gd-row ${checked.includes(g.id) ? 'sel' : ''}`}>
-              {groups.length > 1 && (
-                <input type="checkbox" checked={checked.includes(g.id)} onChange={() => setChecked(checked.includes(g.id) ? checked.filter((x) => x !== g.id) : [...checked, g.id])} aria-label={`${g.items.join(', ')} 묶기 선택`} title="체크해서 한 날짜로 묶기" />
-              )}
+            <div key={g.id} data-gd-drop={g.id} className={`gd-row ${drag?.moved && drag.over === g.id && drag.gid !== g.id ? 'drop' : ''} ${drag?.moved && drag.gid === g.id && drag.kind === 'row' ? 'src' : ''}`}>
+              {groups.length > 1 && <span className="gd-handle" onPointerDown={(e) => start(e, 'row', g)} title="끌어서 다른 줄에 묶기" aria-label="끌어서 묶기">⋮⋮</span>}
               <span className="gd-items">
-                {order(g).map((x) => <span key={x} className="gd-item">{x}</span>)}
+                {order(g).map((x) => (
+                  <span key={x} className={`gd-item ${groups.length > 1 || g.items.length > 1 ? 'grab' : ''} ${drag?.moved && drag.kind === 'item' && drag.item === x ? 'src' : ''}`} onPointerDown={groups.length > 1 || g.items.length > 1 ? (e) => start(e, 'item', g, x) : undefined}>{x}</span>
+                ))}
               </span>
               <label className="gd-date">
                 <input type="date" className={`input num ${g.date ? '' : 'empty'}`} value={g.date || ''} onChange={(e) => setDate(g, e.target.value)} aria-label={`${g.items.join(', ')} 준비 날짜`} />
@@ -82,13 +108,15 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
               <span className="gd-split">{g.items.length > 1 && <button type="button" className="btn small-btn ghost" onClick={() => split(g)}>풀기</button>}</span>
             </div>
           ))}
-          {groups.length > 1 && (
-            <div className="gd-merge small">
-              <button type="button" className="btn small-btn" disabled={checked.length < 2} onClick={merge}>
-                <Icon name="layers" size={13} /> 날짜 묶기{checked.length ? ` (${checked.length})` : ''}
-              </button>
-            </div>
+          {drag?.moved && drag.kind === 'item' && groups.find((q) => q.id === drag.gid)?.items.length > 1 && (
+            <div data-gd-drop="solo" className={`gd-solo ${drag.over === 'solo' ? 'drop' : ''}`}>여기에 놓으면 따로</div>
           )}
+          {(groups.length > 1 || groups[0].items.length > 1) && !drag?.moved && <div className="gd-hint small muted">끌어서 묶기 · 떼기</div>}
+        </div>
+      )}
+      {drag?.moved && (
+        <div className={`gd-ghost ${tone}`} style={{ left: drag.x + 10, top: drag.y + 10 }}>
+          {(drag.kind === 'row' ? groups.find((q) => q.id === drag.gid)?.items || [] : [drag.item]).map((x) => <span key={x} className="gd-item">{x}</span>)}
         </div>
       )}
     </div>

@@ -79,6 +79,26 @@ export default function Shell() {
     if (active === id) setActive(null);
   };
 
+  // 위젯에서 빈 곳을 두 번 누르면 창 모드로 (버튼 · 입력 위는 제외, 창 최대화 대신)
+  useEffect(() => {
+    if (mode !== 'widget') return undefined;
+    const interactive = (t) => t instanceof Element && t.closest('button, input, select, textarea, a, [role="slider"], label');
+    const down = (e) => {
+      if (e.detail >= 2 && !interactive(e.target)) e.stopPropagation();
+    };
+    const dbl = (e) => {
+      if (interactive(e.target)) return;
+      e.preventDefault();
+      setMode('full');
+    };
+    window.addEventListener('mousedown', down, true);
+    window.addEventListener('dblclick', dbl, true);
+    return () => {
+      window.removeEventListener('mousedown', down, true);
+      window.removeEventListener('dblclick', dbl, true);
+    };
+  }, [mode, setMode]);
+
   const App = current?.component;
   // 위젯: 상단 바 없이 앱의 위젯 화면만 (탭이 없으면 요약 화면으로)
   if (mode === 'widget' && App) {

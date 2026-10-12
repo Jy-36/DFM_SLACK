@@ -12,14 +12,14 @@ import ScheduleTable from './pages/ScheduleTable.jsx';
 import Rules from './pages/Rules.jsx';
 import ProcessSheet from './pages/ProcessSheet.jsx';
 import ProcessLayerList from './pages/ProcessLayerList.jsx';
-import ItemLayerList from './pages/ItemLayerList.jsx';
+import RevisionTimeline from './pages/RevisionTimeline.jsx';
 import ProductInfo from './pages/ProductInfo.jsx';
 import { NoneCard } from './pages/Overview.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.12.0';
+export const MTO_VERSION = '0.13.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -147,7 +147,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   const products = state.projects.filter((p) => p.kind === 'product');
   const items = state.projects.filter((p) => p.kind === 'revision');
   const navItems = NAV[section];
-  const perProject = ['overview', 'layers', 'table'].includes(tab);
+  const perProject = ['overview', 'layers', 'table'].includes(tab) && !(section === 'revision' && tab === 'overview');
   const area = COMMON_TABS.includes(tab) ? 'common' : section;
   return (
     <div className={`app mto fade-in ${navMini ? 'nav-mini' : ''}`}>
@@ -173,8 +173,8 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         </div>
         {navItems.map(([key, label, icon], i) => (
           <div key={key} className="nav-item-wrap">
-            {i === 1 && !navMini && <div className="nav-sec sel-name" title={project ? project.name : undefined}>{project ? project.name : '선택 없음'}</div>}
-            <button className="nav-btn" aria-current={tab === key || (key === 'overview' && tab === 'table' && section === 'revision') ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+            {i === (section === 'revision' ? 2 : 1) && !navMini && <div className="nav-sec sel-name" title={project ? project.name : undefined}>{project ? project.name : '선택 없음'}</div>}
+            <button className="nav-btn" aria-current={tab === key || (key === 'layers' && tab === 'table' && section === 'revision') ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
               <Icon name={icon} />
               <span className="nav-label">{label}</span>
               {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
@@ -204,8 +204,10 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
       <main className="main">
         {tab === 'all' && <Portfolio {...props} />}
         {perProject && !project && <NoneCard {...props} />}
-        {project && (tab === 'overview' || (tab === 'table' && section === 'revision')) && <Overview {...props} />}
-        {project && tab === 'layers' && (section === 'revision' ? <ItemLayerList key={project.id} {...props} /> : project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
+        {section === 'revision' && tab === 'overview' && <RevisionTimeline {...props} />}
+        {project && section === 'revision' && (tab === 'layers' || tab === 'table') && <Overview key={project.id} {...props} />}
+        {project && section !== 'revision' && tab === 'overview' && <Overview {...props} />}
+        {project && tab === 'layers' && section !== 'revision' && (project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
         {project && tab === 'table' && section !== 'revision' && <ScheduleTable {...props} />}
         {tab === 'products' && <ProductInfo {...props} />}
         {tab === 'process' && <ProcessSheet {...props} procLoc={procLoc} setProcLoc={setProcLoc} />}

@@ -8,6 +8,7 @@ import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js'
 import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
+import RevisionInfo from '../components/RevisionInfo.jsx';
 import RevisionReference, { referenceOf } from '../components/RevisionReference.jsx';
 import { ItemLayerPicker } from './ItemLayerList.jsx';
 import { LayerSchedule } from './ScheduleTable.jsx';
@@ -103,7 +104,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
       {rev && <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} collapsible />}
       <div className="page-head">
         <div>
-          <h1>{project.name} {rev ? 'Revision ' : ''}일정 현황</h1>
+          <h1>{rev ? <>{state.projects.find((x) => x.id === project.parentId)?.name || 'Product 없음'} <span className="h1-sep">·</span> {project.name}</> : `${project.name} 일정 현황`}</h1>
           {!rev && <p>{'Product · GDS + Set List(FEOL + BEOL Option) → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>}
         </div>
       </div>
@@ -112,6 +113,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {rev && (
         <>
+          <RevisionInfo project={project} result={result} dispatch={dispatch} />
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)}
