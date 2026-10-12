@@ -721,3 +721,66 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .rt-card-st { grid-column: 2 / 4; color: var(--muted); }
 .rt-card .pill { grid-row: 1; grid-column: 3; }
 .rt-help { margin: 8px 0 0; }
+/* v0.28: 날짜 칸 · Changes 정리 · Links */
+.date-field { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 34px; min-width: 132px; padding: 0 10px 0 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s, background 0.12s; flex: none; }
+.date-field:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.date-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.date-field svg { color: var(--accent); flex: none; }
+.date-field .df-text { font-weight: 700; font-size: 13.5px; letter-spacing: 0.01em; white-space: nowrap; }
+.date-field.empty .df-text { color: var(--faint); font-weight: 500; }
+.date-field.empty svg { color: var(--faint); }
+.date-field.warn { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
+.date-field.warn svg { color: var(--warn); }
+.df-input { position: absolute; inset: 0; opacity: 0; pointer-events: none; width: 100%; height: 100%; }
+.df-clear { margin-left: auto; display: inline-grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: none; color: var(--faint); cursor: pointer; opacity: 0; }
+.date-field:hover .df-clear { opacity: 1; }
+.df-clear:hover { background: var(--surface-3); color: var(--fg); }
+.rv-target .date-field { width: 100%; height: 38px; }
+
+.chg-kinds { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.chg-kind { display: inline-flex; align-items: center; gap: 8px; padding: 0 14px 0 10px; height: 34px; border-radius: 9px; font-weight: 700; font-size: 13px; }
+.chg-kind .chg-box { width: 18px; height: 18px; border-radius: 5px; }
+.chg-area { padding: 0; border-left-width: 4px; overflow: hidden; }
+.chg-area-h { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 10px 14px; border: 0; background: none; font: inherit; color: var(--fg); text-align: left; cursor: pointer; min-height: 46px; }
+.chg-area-h:hover { background: var(--surface-2); }
+.chg-area-h > svg { color: var(--muted); transform: rotate(90deg); transition: transform 0.15s; flex: none; }
+.chg-area.closed .chg-area-h > svg { transform: rotate(0deg); }
+.chg-area-h > b { min-width: 56px; }
+.cv-brief { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; min-width: 0; }
+.chg-latest { margin-left: auto; padding: 3px 10px; border-radius: 7px; font-weight: 800; font-size: 13px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.chg-area.runset .chg-latest { background: var(--leave-soft); color: var(--leave); }
+.chg-area.spec .chg-latest { background: var(--good-soft); color: var(--good); }
+.chg-latest.none { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.chg-area-b { padding: 0 14px 12px; }
+.gd-rows { margin-top: 8px; gap: 4px; }
+.gd-row { display: grid; grid-template-columns: 18px minmax(150px, 0.55fr) auto minmax(140px, 1.6fr) 120px 52px; gap: 8px; padding: 5px 8px; }
+.gd-row .input { height: 34px; }
+.gd-row.stepx { background: color-mix(in srgb, var(--warn) 6%, var(--surface-2)); }
+.gd-off { grid-column: span 3; }
+.sx-target { height: 26px; min-width: 28px; padding: 0 8px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-weight: 800; font-size: 12px; cursor: pointer; }
+.sx-target.on { border-color: var(--warn); background: var(--warn); color: #fff; }
+.gd-item.stepx { background: var(--warn); }
+.gd-item.spec { background: var(--good); }
+.gd-row .chg-toggle { height: 28px; }
+.gd-solo { padding: 6px; font-weight: 700; }
+.cv-line { display: grid; grid-template-columns: minmax(150px, 0.55fr) 110px minmax(0, 1.6fr) 110px; gap: 10px; align-items: center; padding: 6px 4px; border-top: 1px solid var(--line); font-size: 13px; }
+.cv-line:first-child { border-top: 0; }
+.cv-items { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cv-label { font-size: 11.5px; font-weight: 800; color: var(--warn); margin-right: 2px; }
+.cv-date { font-weight: 700; }
+.cv-comment { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-owner { color: var(--muted); }
+.cv-legacy { padding: 4px; }
+.cv-group .gd-item { height: 22px; min-width: 24px; font-size: 11.5px; }
+@media (max-width: 900px) { .gd-row { grid-template-columns: 18px 1fr auto; } .gd-row .gd-comment, .gd-row .gd-owner { grid-column: 2 / 4; } .cv-line { grid-template-columns: 1fr auto; } }
+
+.links .chg-title { margin-bottom: 8px; }
+.lk-list { display: flex; flex-direction: column; margin-bottom: 8px; }
+.lk-row { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) 28px; align-items: center; gap: 8px; padding: 6px 4px; border-top: 1px solid var(--line); }
+.lk-row:first-child { border-top: 0; }
+.lk-row > svg { color: var(--accent); }
+.lk-title { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--accent); cursor: pointer; text-align: left; }
+.lk-title:hover { text-decoration: underline; }
+.lk-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lk-add { display: grid; grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1.6fr) auto; gap: 8px; }
+.lk-add .input { height: 34px; }

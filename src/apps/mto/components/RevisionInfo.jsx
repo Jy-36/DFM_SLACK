@@ -1,5 +1,6 @@
 // Revision 기본 정보: MTO Target · 요청자 · Comment (바로 저장)
 import { fmtShort, diffDays } from '../lib/dates.js';
+import DateField from './DateField.jsx';
 
 export default function RevisionInfo({ project, result, dispatch }) {
   const meta = project.meta || {};
@@ -9,7 +10,7 @@ export default function RevisionInfo({ project, result, dispatch }) {
     <section className="panel rv-info">
       <label className="field rv-target">
         <span>MTO Target</span>
-        <input type="date" className="input num" value={meta.target || ''} onChange={(e) => set({ target: e.target.value })} />
+        <DateField value={meta.target} onChange={(target) => set({ target })} label="MTO Target" />
       </label>
       <span className="rv-gap">
         {gap == null ? <span className="small muted">예상 MTO {result ? fmtShort(result.finalMto) : '-'}</span> : (

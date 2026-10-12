@@ -1,9 +1,10 @@
-// Revision 변경점: DB · Runset · SPEC 중 바뀌는 것을 고르고 날짜를 적는다.
-// DB(A · B · C)와 Runset STEP은 하나씩 준비 날짜를 갖고, 여러 개를 한 날짜로 묶을 수 있다.
-// GDS 입고일은 따로 넣지 않고, 고른 변경점의 준비 날짜 중 가장 늦은 날로 정한다.
+// Revision Changes: DB · Runset · SPEC 중 바뀌는 것을 고르고 줄마다 준비 날짜 · 코멘트 · 담당자를 적는다.
+// DB(A · B · C)와 Runset STEP은 끌어서 한 날짜로 묶을 수 있고, DB에는 Step X(대상 A · B · C) 줄이 있다.
+// 항목마다 오른쪽 위에 가장 늦은 날짜, GDS 입고일은 전체에서 가장 늦은 날. 저장해야 일정에 반영된다.
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
-import { fmtShort, todayIso } from '../lib/dates.js';
+import { fmtShort } from '../lib/dates.js';
+import DateField from './DateField.jsx';
 
 export const CHANGE_KINDS = [
   ['db', 'DB'],
@@ -12,6 +13,7 @@ export const CHANGE_KINDS = [
 ];
 const DB_PARTS = ['A', 'B', 'C'];
 const gid = () => `g${Math.random().toString(36).slice(2, 8)}`;
+const latest = (dates) => dates.filter(Boolean).sort().at(-1) || null;
 
 /** 예전 저장 형태(parts/steps + date 하나)를 날짜 묶음으로 */
 export function groupsOf(c, listKey) {
@@ -20,19 +22,33 @@ export function groupsOf(c, listKey) {
   return items.length ? [{ id: 'g0', items, date: c.date || '' }] : [];
 }
 
-/** 고른 변경점의 준비 날짜 중 가장 늦은 날 (없으면 null) */
-export function changesGds(changes) {
-  const dates = [];
-  if (changes?.db?.on) for (const g of groupsOf(changes.db, 'parts')) if (g.date) dates.push(g.date);
-  if (changes?.runset?.on) for (const g of groupsOf(changes.runset, 'steps')) if (g.date) dates.push(g.date);
-  if (changes?.spec?.on && changes.spec.date) dates.push(changes.spec.date);
-  return dates.length ? dates.sort().at(-1) : null;
+/** 항목별 가장 늦은 준비 날짜 */
+export function kindLatest(changes, kind) {
+  const c = changes?.[kind];
+  if (!c?.on) return null;
+  if (kind === 'db') return latest([...groupsOf(c, 'parts').map((g) => g.date), c.stepX?.on ? c.stepX.date : null]);
+  if (kind === 'runset') return latest(groupsOf(c, 'steps').map((g) => g.date));
+  return c.date || null;
 }
 
-/** 항목 고르기 + 항목마다 날짜. 끌어서 묶기: 항목(칩)이나 줄(⋮⋮)을 다른 줄 위에 놓으면 같은 날짜로 묶이고,
- *  항목을 '따로' 칸에 놓으면 혼자 떨어진다. (창 안 파일 끌기와 겹치지 않게 pointer 이벤트로 직접 처리) */
-function GroupDates({ options, groups, setGroups, tone, addSlot }) {
-  const [drag, setDrag] = useState(null); // { kind: 'row'|'item', gid, item, x, y, moved, over }
+/** 고른 변경점의 준비 날짜 중 가장 늦은 날 = GDS 입고 (없으면 null) */
+export function changesGds(changes) {
+  return latest(CHANGE_KINDS.map(([k]) => kindLatest(changes, k)));
+}
+
+/** 줄 오른쪽: 코멘트 · 담당자 (편집) */
+function NoteInputs({ row, set }) {
+  return (
+    <>
+      <input className="input gd-comment" value={row.comment || ''} placeholder="코멘트" onChange={(e) => set({ comment: e.target.value })} aria-label="코멘트" />
+      <input className="input gd-owner" value={row.owner || ''} placeholder="담당자" onChange={(e) => set({ owner: e.target.value })} aria-label="담당자" />
+    </>
+  );
+}
+
+/** 항목 고르기 + 줄마다 날짜 · 코멘트 · 담당자. 칩이나 ⋮⋮를 다른 줄에 끌어 놓으면 묶기, '따로' 칸에 놓으면 떼기 */
+function GroupDates({ options, groups, setGroups, tone, addSlot, extraRow }) {
+  const [drag, setDrag] = useState(null);
   const picked = groups.flatMap((g) => g.items);
   const toggleItem = (x) => {
     if (picked.includes(x)) setGroups(groups.map((g) => ({ ...g, items: g.items.filter((y) => y !== x) })).filter((g) => g.items.length));
@@ -40,30 +56,25 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
   };
   const split = (g) => {
     const i = groups.indexOf(g);
-    setGroups([...groups.slice(0, i), ...g.items.map((x) => ({ id: gid(), items: [x], date: g.date })), ...groups.slice(i + 1)]);
+    setGroups([...groups.slice(0, i), ...g.items.map((x) => ({ ...g, id: gid(), items: [x] })), ...groups.slice(i + 1)]);
   };
-  const setDate = (g, date) => setGroups(groups.map((x) => (x.id === g.id ? { ...x, date } : x)));
+  const setRow = (g, patch) => setGroups(groups.map((x) => (x.id === g.id ? { ...x, ...patch } : x)));
   const order = (g) => [...g.items].sort((a, b) => options.indexOf(a) - options.indexOf(b));
 
-  const targetAt = (x, y) => {
-    const el = document.elementFromPoint(x, y)?.closest?.('[data-gd-drop]');
-    return el ? el.getAttribute('data-gd-drop') : null;
-  };
+  const targetAt = (x, y) => document.elementFromPoint(x, y)?.closest?.('[data-gd-drop]')?.getAttribute('data-gd-drop') || null;
   const start = (e, kind, g, item) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    const d0 = { kind, gid: g.id, item, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, over: null };
-    setDrag(d0);
+    setDrag({ kind, gid: g.id, item, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, over: null });
     const move = (ev) => setDrag((d) => d && { ...d, x: ev.clientX, y: ev.clientY, moved: d.moved || Math.hypot(ev.clientX - d.sx, ev.clientY - d.sy) > 4, over: targetAt(ev.clientX, ev.clientY) });
     const up = (ev) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       const over = targetAt(ev.clientX, ev.clientY);
       setDrag(null);
-      if (!over || over === g.id) return;
       const src = groups.find((q) => q.id === g.id);
-      if (!src) return;
+      if (!over || over === g.id || !src) return;
       if (over === 'solo') {
         if (kind !== 'item' || src.items.length < 2) return;
         const i = groups.indexOf(src);
@@ -80,6 +91,7 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
+  const canDrag = (g) => groups.length > 1 || g.items.length > 1;
 
   return (
     <div className={`gd ${tone} ${drag?.moved ? 'dragging' : ''}`}>
@@ -92,26 +104,25 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
         ))}
         {addSlot}
       </div>
-      {groups.length > 0 && (
+      {(groups.length > 0 || extraRow) && (
         <div className="gd-rows">
           {groups.map((g) => (
             <div key={g.id} data-gd-drop={g.id} className={`gd-row ${drag?.moved && drag.over === g.id && drag.gid !== g.id ? 'drop' : ''} ${drag?.moved && drag.gid === g.id && drag.kind === 'row' ? 'src' : ''}`}>
-              {groups.length > 1 && <span className="gd-handle" onPointerDown={(e) => start(e, 'row', g)} title="끌어서 다른 줄에 묶기" aria-label="끌어서 묶기">⋮⋮</span>}
+              <span className="gd-handle" onPointerDown={groups.length > 1 ? (e) => start(e, 'row', g) : undefined} style={groups.length > 1 ? undefined : { visibility: 'hidden' }} aria-label="끌어서 묶기">⋮⋮</span>
               <span className="gd-items">
                 {order(g).map((x) => (
-                  <span key={x} className={`gd-item ${groups.length > 1 || g.items.length > 1 ? 'grab' : ''} ${drag?.moved && drag.kind === 'item' && drag.item === x ? 'src' : ''}`} onPointerDown={groups.length > 1 || g.items.length > 1 ? (e) => start(e, 'item', g, x) : undefined}>{x}</span>
+                  <span key={x} className={`gd-item ${canDrag(g) ? 'grab' : ''} ${drag?.moved && drag.kind === 'item' && drag.item === x ? 'src' : ''}`} onPointerDown={canDrag(g) ? (e) => start(e, 'item', g, x) : undefined}>{x}</span>
                 ))}
               </span>
-              <label className="gd-date">
-                <input type="date" className={`input num ${g.date ? '' : 'empty'}`} value={g.date || ''} onChange={(e) => setDate(g, e.target.value)} aria-label={`${g.items.join(', ')} 준비 날짜`} />
-              </label>
+              <DateField value={g.date} onChange={(date) => setRow(g, { date })} label={`${g.items.join(', ')} 준비 날짜`} warnEmpty />
+              <NoteInputs row={g} set={(p) => setRow(g, p)} />
               <span className="gd-split">{g.items.length > 1 && <button type="button" className="btn small-btn ghost" onClick={() => split(g)}>풀기</button>}</span>
             </div>
           ))}
+          {extraRow}
           {drag?.moved && drag.kind === 'item' && groups.find((q) => q.id === drag.gid)?.items.length > 1 && (
-            <div data-gd-drop="solo" className={`gd-solo ${drag.over === 'solo' ? 'drop' : ''}`}>여기에 놓으면 따로</div>
+            <div data-gd-drop="solo" className={`gd-solo ${drag.over === 'solo' ? 'drop' : ''}`}>따로</div>
           )}
-          {(groups.length > 1 || groups[0].items.length > 1) && !drag?.moved && <div className="gd-hint small muted">끌어서 묶기 · 떼기</div>}
         </div>
       )}
       {drag?.moved && (
@@ -123,43 +134,38 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
   );
 }
 
-/** 저장된 변경점 보기 (한 줄씩) */
-function ChangesView({ changes }) {
-  const on = CHANGE_KINDS.filter(([k]) => changes[k]?.on);
-  if (!on.length) return <div className="chg-empty small muted">없음</div>;
-  const Groups = ({ groups, tone }) => groups.map((g) => (
-    <span key={g.id} className="cv-group">
-      {g.items.map((x) => <span key={x} className={`gd-item ${tone}`}>{x}</span>)}
-      <span className={`num ${g.date ? '' : 'tone-warn'}`}>{g.date ? fmtShort(g.date) : '날짜 없음'}</span>
-    </span>
-  ));
+/** 보기용 한 줄 */
+function ViewRow({ items, tone, label, row }) {
   return (
-    <div className="cv">
-      {changes.db?.on && (
-        <div className="cv-row db">
-          <b>DB</b>
-          <span className="cv-body">
-            <Groups groups={groupsOf(changes.db, 'parts')} tone="db" />
-            {changes.db.stepX?.on && <span className="cv-stepx">Step X <span className="num">{changes.db.stepX.date ? fmtShort(changes.db.stepX.date) : '-'}</span></span>}
-          </span>
-          {changes.db.comment && <span className="cv-comment small muted">{changes.db.comment}</span>}
-        </div>
-      )}
-      {changes.runset?.on && (
-        <div className="cv-row runset">
-          <b>Runset</b>
-          <span className="cv-body"><Groups groups={groupsOf(changes.runset, 'steps')} tone="runset" /></span>
-          {changes.runset.comment && <span className="cv-comment small muted">{changes.runset.comment}</span>}
-        </div>
-      )}
-      {changes.spec?.on && (
-        <div className="cv-row spec">
-          <b>SPEC</b>
-          <span className="cv-body"><span className={`num ${changes.spec.date ? '' : 'tone-warn'}`}>{changes.spec.date ? fmtShort(changes.spec.date) : '날짜 없음'}</span></span>
-          {changes.spec.comment && <span className="cv-comment small muted">{changes.spec.comment}</span>}
-        </div>
-      )}
+    <div className="cv-line">
+      <span className="cv-items">
+        {label && <span className="cv-label">{label}</span>}
+        {items.map((x) => <span key={x} className={`gd-item ${tone}`}>{x}</span>)}
+      </span>
+      <span className={`cv-date num ${row.date ? '' : 'tone-warn'}`}>{row.date ? fmtShort(row.date) : '날짜 없음'}</span>
+      <span className="cv-comment">{row.comment || <span className="muted">-</span>}</span>
+      <span className="cv-owner">{row.owner || <span className="muted">-</span>}</span>
     </div>
+  );
+}
+
+/** 접었을 때 한 줄 요약 */
+function Brief({ kind, c }) {
+  if (kind === 'spec') return <span className="cv-group"><span className={`num ${c.date ? '' : 'tone-warn'}`}>{c.date ? fmtShort(c.date) : '날짜 없음'}</span></span>;
+  const groups = groupsOf(c, kind === 'db' ? 'parts' : 'steps');
+  return (
+    <>
+      {groups.map((g) => (
+        <span key={g.id} className="cv-group">
+          {g.items.map((x) => <span key={x} className={`gd-item ${kind}`}>{x}</span>)}
+          <span className={`num ${g.date ? '' : 'tone-warn'}`}>{g.date ? fmtShort(g.date) : '-'}</span>
+        </span>
+      ))}
+      {kind === 'db' && c.stepX?.on && (
+        <span className="cv-group"><span className="cv-label">Step X</span>{(c.stepX.targets || []).map((x) => <span key={x} className="gd-item stepx">{x}</span>)}<span className="num">{c.stepX.date ? fmtShort(c.stepX.date) : '-'}</span></span>
+      )}
+      {!groups.length && !(kind === 'db' && c.stepX?.on) && <span className="muted small">고른 것 없음</span>}
+    </>
   );
 }
 
@@ -171,6 +177,9 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
   const steps = state.runsetSteps || [];
   const [newStep, setNewStep] = useState('');
   const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState({}); // { 'view:db': true, 'edit:db': false }
+  const isOpen = (k) => open[`${editing ? 'edit' : 'view'}:${k}`] ?? editing;
+  const toggleOpen = (k) => setOpen((o) => ({ ...o, [`${editing ? 'edit' : 'view'}:${k}`]: !isOpen(k) }));
 
   const save = (kind, patch) => setDraft({ ...changes, [kind]: { ...(changes[kind] || {}), ...patch } });
   const commit = () => {
@@ -182,6 +191,7 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
   const dbGroups = groupsOf(changes.db, 'parts');
   const rsGroups = groupsOf(changes.runset, 'steps');
   const stepX = changes.db?.stepX || {};
+  const setStepX = (patch) => save('db', { stepX: { ...stepX, ...patch } });
   const addStep = () => {
     const v = newStep.trim();
     if (!v) return;
@@ -193,6 +203,50 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
   const gds = changesGds(changes);
   const savedGds = changesGds(saved);
   const dirty = editing && JSON.stringify(draft) !== JSON.stringify(saved);
+  const onKinds = CHANGE_KINDS.filter(([k]) => changes[k]?.on);
+
+  const stepXRow = (
+    <div className={`gd-row stepx ${stepX.on ? 'on' : ''}`}>
+      <span className="gd-handle" style={{ visibility: 'hidden' }}>⋮⋮</span>
+      <span className="gd-items">
+        <button type="button" className={`chg-toggle ${stepX.on ? 'on' : ''}`} aria-pressed={!!stepX.on} onClick={() => setStepX({ on: !stepX.on })}>
+          <span className="chg-box sm">{stepX.on && <Icon name="check" size={11} />}</span>
+          Step X
+        </button>
+        {stepX.on && DB_PARTS.map((x) => {
+          const on = (stepX.targets || []).includes(x);
+          return <button key={x} type="button" className={`sx-target ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setStepX({ targets: on ? stepX.targets.filter((y) => y !== x) : [...(stepX.targets || []), x].sort() })}>{x}</button>;
+        })}
+      </span>
+      {stepX.on ? (
+        <>
+          <DateField value={stepX.date} onChange={(date) => setStepX({ date })} label="Step X 적용 날짜" warnEmpty />
+          <NoteInputs row={stepX} set={setStepX} />
+        </>
+      ) : <span className="gd-off" />}
+      <span className="gd-split" />
+    </div>
+  );
+
+  const block = (k, label, body, viewBody) => {
+    const c = changes[k];
+    const d = kindLatest(changes, k);
+    const o = isOpen(k);
+    return (
+      <div key={k} className={`chg-area ${k} ${o ? 'open' : 'closed'}`}>
+        <button type="button" className="chg-area-h" onClick={() => toggleOpen(k)} aria-expanded={o}>
+          <Icon name="chevron" size={13} />
+          <b>{label}</b>
+          {!o && <span className="cv-brief"><Brief kind={k} c={c} /></span>}
+          <span className={`chg-latest num ${d ? '' : 'none'}`}>{d ? fmtShort(d) : '날짜 없음'}</span>
+        </button>
+        {o && <div className="chg-area-b">{editing ? body : viewBody}</div>}
+      </div>
+    );
+  };
+
+  const viewGroups = (groups, tone) => groups.map((g) => <ViewRow key={g.id} items={[...g.items]} tone={tone} row={g} />);
+  const legacy = (c) => c?.comment && <div className="cv-legacy small muted">{c.comment}</div>;
 
   return (
     <section className={`panel chg ${editing ? 'editing' : ''}`}>
@@ -215,60 +269,53 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
         </span>
       </div>
 
-      {!editing ? <ChangesView changes={saved} /> : (
-        <>
-          <div className="chg-kinds" role="group" aria-label="변경점 고르기">
-            {CHANGE_KINDS.map(([k, label]) => (
-              <button key={k} type="button" className={`chg-kind ${k} ${changes[k]?.on ? 'on' : ''}`} aria-pressed={!!changes[k]?.on} onClick={() => save(k, { on: !changes[k]?.on })}>
-                <span className="chg-box">{changes[k]?.on && <Icon name="check" size={13} />}</span>
-                <b>{label}</b>
-              </button>
-            ))}
-          </div>
-          <div className="chg-areas">
-            {changes.db?.on && (
-              <div className="chg-area db">
-                <div className="chg-area-h">
-                  <b>DB</b>
-                  <span className="chg-stepx">
-                    <button type="button" className={`chg-toggle ${stepX.on ? 'on' : ''}`} aria-pressed={!!stepX.on} onClick={() => save('db', { stepX: stepX.on ? { on: false, date: stepX.date } : { on: true, date: stepX.date || todayIso() } })}>
-                      <span className="chg-box sm">{stepX.on && <Icon name="check" size={11} />}</span>
-                      Step X
-                    </button>
-                    {stepX.on && <input type="date" className="input num" value={stepX.date || ''} onChange={(e) => save('db', { stepX: { on: true, date: e.target.value } })} aria-label="Step X 적용 날짜" />}
-                  </span>
-                </div>
-                <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" />
-                <input className="input chg-comment" value={changes.db.comment || ''} placeholder="코멘트" onChange={(e) => save('db', { comment: e.target.value })} aria-label="DB 코멘트" />
+      {editing && (
+        <div className="chg-kinds" role="group" aria-label="변경점 고르기">
+          {CHANGE_KINDS.map(([k, label]) => (
+            <button key={k} type="button" className={`chg-kind ${k} ${changes[k]?.on ? 'on' : ''}`} aria-pressed={!!changes[k]?.on} onClick={() => save(k, { on: !changes[k]?.on })}>
+              <span className="chg-box">{changes[k]?.on && <Icon name="check" size={12} />}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!onKinds.length ? (!editing && <div className="chg-empty small muted">없음</div>) : (
+        <div className="chg-areas">
+          {changes.db?.on && block('db', 'DB',
+            <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" extraRow={stepXRow} />,
+            <>
+              {viewGroups(dbGroups, 'db')}
+              {stepX.on && <ViewRow label="Step X" items={stepX.targets || []} tone="stepx" row={stepX} />}
+              {legacy(changes.db)}
+            </>)}
+          {changes.runset?.on && block('runset', 'Runset',
+            <GroupDates options={[...new Set([...steps, ...rsGroups.flatMap((g) => g.items)])]} groups={rsGroups} setGroups={(groups) => save('runset', { groups })} tone="runset"
+              addSlot={adding ? (
+                <span className="chg-add">
+                  <input className="input" value={newStep} autoFocus placeholder="STEP" onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') setAdding(false); }} aria-label="새 Runset STEP" />
+                  <button type="button" className="btn small-btn primary" onClick={addStep}>추가</button>
+                  <button type="button" className="btn small-btn ghost" onClick={() => setAdding(false)}>취소</button>
+                </span>
+              ) : (
+                <button type="button" className="chg-chip add" onClick={() => setAdding(true)} aria-label="Runset STEP 추가"><Icon name="plus" size={12} /> STEP</button>
+              )} />,
+            <>
+              {viewGroups(rsGroups, 'runset')}
+              {legacy(changes.runset)}
+            </>)}
+          {changes.spec?.on && block('spec', 'SPEC',
+            <div className="gd-rows">
+              <div className="gd-row">
+                <span className="gd-handle" style={{ visibility: 'hidden' }}>⋮⋮</span>
+                <span className="gd-items"><span className="gd-item spec">SPEC</span></span>
+                <DateField value={changes.spec.date} onChange={(date) => save('spec', { date })} label="SPEC 준비 날짜" warnEmpty />
+                <NoteInputs row={changes.spec} set={(p) => save('spec', p)} />
+                <span className="gd-split" />
               </div>
-            )}
-            {changes.runset?.on && (
-              <div className="chg-area runset">
-                <div className="chg-area-h"><b>Runset</b></div>
-                <GroupDates options={[...new Set([...steps, ...rsGroups.flatMap((g) => g.items)])]} groups={rsGroups} setGroups={(groups) => save('runset', { groups })} tone="runset"
-                  addSlot={adding ? (
-                    <span className="chg-add">
-                      <input className="input" value={newStep} autoFocus placeholder="STEP" onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') setAdding(false); }} aria-label="새 Runset STEP" />
-                      <button type="button" className="btn small-btn primary" onClick={addStep}>추가</button>
-                      <button type="button" className="btn small-btn ghost" onClick={() => setAdding(false)}>취소</button>
-                    </span>
-                  ) : (
-                    <button type="button" className="chg-chip add" onClick={() => setAdding(true)} aria-label="Runset STEP 추가"><Icon name="plus" size={12} /> STEP</button>
-                  )} />
-                <input className="input chg-comment" value={changes.runset.comment || ''} placeholder="코멘트" onChange={(e) => save('runset', { comment: e.target.value })} aria-label="Runset 코멘트" />
-              </div>
-            )}
-            {changes.spec?.on && (
-              <div className="chg-area spec">
-                <div className="chg-area-h"><b>SPEC</b></div>
-                <div className="chg-row">
-                  <input type="date" className="input num chg-date" value={changes.spec.date || ''} onChange={(e) => save('spec', { date: e.target.value })} aria-label="SPEC 준비 날짜" />
-                  <input className="input chg-comment" value={changes.spec.comment || ''} placeholder="코멘트" onChange={(e) => save('spec', { comment: e.target.value })} aria-label="SPEC 코멘트" />
-                </div>
-              </div>
-            )}
-          </div>
-        </>
+            </div>,
+            <ViewRow items={['SPEC']} tone="spec" row={changes.spec} />)}
+        </div>
       )}
     </section>
   );

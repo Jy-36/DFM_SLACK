@@ -20,6 +20,7 @@
     "core:window:allow-is-maximized",
     "core:window:allow-unmaximize",
     "core:window:allow-close",
-    "allow-open-attendance-window"
+    "allow-open-attendance-window",
+    "allow-open-external"
   ]
 }

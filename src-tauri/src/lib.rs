@@ -39,12 +39,30 @@ fn submit_attendance_html(app: AppHandle, html: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 관련 자료 링크를 기본 브라우저 · 탐색기로 연다 (http · https · file · \\공유 폴더만)
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    let u = url.trim();
+    let ok = u.starts_with("http://") || u.starts_with("https://") || u.starts_with("file://") || u.starts_with("\\\\");
+    if !ok || u.contains('\n') {
+        return Err("열 수 없는 주소예요".into());
+    }
+    #[cfg(target_os = "windows")]
+    let r = std::process::Command::new("explorer").arg(u).spawn();
+    #[cfg(target_os = "macos")]
+    let r = std::process::Command::new("open").arg(u).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let r = std::process::Command::new("xdg-open").arg(u).spawn();
+    r.map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             open_attendance_window,
-            submit_attendance_html
+            submit_attendance_html,
+            open_external
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 중 오류가 발생했습니다");

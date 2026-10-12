@@ -9,6 +9,7 @@ import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
 import RevisionInfo from '../components/RevisionInfo.jsx';
+import RevisionLinks from '../components/RevisionLinks.jsx';
 import RevisionReference, { referenceOf } from '../components/RevisionReference.jsx';
 import { ItemLayerPicker } from './ItemLayerList.jsx';
 import { LayerSchedule } from './ScheduleTable.jsx';
@@ -114,6 +115,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
       {rev && (
         <>
           <RevisionInfo project={project} result={result} dispatch={dispatch} />
+          <RevisionLinks project={project} dispatch={dispatch} notify={notify} />
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)}

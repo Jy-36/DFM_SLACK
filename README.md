@@ -190,7 +190,7 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
   DB는 바뀌는 것(A · B · C), Runset은 변경 STEP(없으면 + STEP으로 추가), 각각 준비 날짜 · 코멘트. SPEC은 준비 날짜 · 코멘트.
   GDS 입고일은 따로 넣지 않고 고른 변경점의 준비 날짜 중 가장 늦은 날로 계산해요 (하루 MTO · STEP2 동시는 규칙 기본값).
 - **Revision 일정 현황**: 날짜 기준으로 모든 ITEM을 Product별로 한 화면에 — ITEM마다 준비 날짜(DB · Runset · SPEC · Step X) → GDS → STEP1 → STEP2 → MTO를 한 줄로 잇고, MTO Target 깃발, Reference로 이어진 ITEM은 곡선으로. 날짜를 누르면 그날 ITEM별 단계.
-- **Revision Concept**: 제목 `Product · ITEM`, 아래 MTO Target(예상 MTO와 여유/늦음) · 요청자 · Comment → **Changes**(보기 → [수정] → 저장, 날짜는 끌어서 묶기 · 떼기, DB Step X) → **Reference** → **Layer List** → 결과 · 간트 · Layer별 일정표.
+- **Revision Concept**: 제목 `Product · ITEM`, 아래 MTO Target(예상 MTO와 여유/늦음) · 요청자 · Comment → **Links**(관련 자료 링크, 누르면 브라우저 · 탐색기로) → **Changes**(보기 → [수정] → 저장. DB · Runset · SPEC은 접고 펴기, 오른쪽에 가장 늦은 날짜. 줄마다 날짜 · 코멘트 · 담당자, 끌어서 묶기 · 떼기, DB Step X는 대상 A · B · C) → **Reference** → **Layer List** → 결과 · 간트 · Layer별 일정표.
 - 위젯 모드에서 빈 곳을 두 번 누르면 창 모드로.
 - **BEOL Option**: 컨셉(예: 1X 6층 + 2X 4층 …)과 **Metal · Via 쌓는 순서**를 가져요. 순서가 없으면 [편집]에서 Layer를 아래부터 차례로 골라 정하고, Set List도 그 순서로 담겨요.
 - 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.
