@@ -60,11 +60,11 @@ export function ItemLayerPicker({ state, dispatch, project, calc, go, notify, fr
           <h2>
             <span className="layer-sum">
               {title || `${from.name} Set List`}
-              <Pill tone={n > ITEM_TYPICAL ? 'warn' : 'accent'}>{n}장 선택{n > ITEM_TYPICAL ? ` · 보통 ${ITEM_TYPICAL}장 이하` : ''}</Pill>
+              <Pill tone={n > ITEM_TYPICAL ? 'warn' : 'accent'}>{n}장</Pill>
             </span>
             <span className="head-actions">
-              {from.kind === 'revision' && source.length > 0 && <button type="button" className="btn small-btn" onClick={takeAll}><Icon name="copy" size={14} /> {from.name} Layer 그대로 담기</button>}
-              {n > 0 && <button type="button" className="btn small-btn ghost danger" onClick={() => set([], '선택을 모두 뺐어요')}><Icon name="trash" size={14} /> 모두 빼기</button>}
+              {from.kind === 'revision' && source.length > 0 && <button type="button" className="btn small-btn" onClick={takeAll}><Icon name="copy" size={14} /> 전부 담기</button>}
+              {n > 0 && <button type="button" className="btn small-btn ghost danger" onClick={() => set([], '선택을 모두 뺐어요')}><Icon name="trash" size={14} /> 비우기</button>}
             </span>
           </h2>
           {source.length ? (
@@ -103,7 +103,7 @@ function PickedTable({ calc, rows, n, mtoOf, move, set, project }) {
 
       {n > 0 && (
         <section className="panel">
-          <h2>ITEM Layer {n}장 <span className="small muted">No 순서 = STEP2 투입 · MTO 순서</span></h2>
+          <h2>선택 {n}장</h2>
           <div className="table-wrap">
             <table className="data-table layer-edit">
               <thead>

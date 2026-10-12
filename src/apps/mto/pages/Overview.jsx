@@ -104,7 +104,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
       <div className="page-head">
         <div>
           <h1>{project.name} {rev ? 'Revision ' : ''}일정 현황</h1>
-          <p>{rev ? 'Revision · GDS → STEP1 → STEP2 → MTO (Part 구분 없음)' : 'Product · GDS + Set List(FEOL + BEOL Option) → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>
+          {!rev && <p>{'Product · GDS + Set List(FEOL + BEOL Option) → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>}
         </div>
       </div>
 
@@ -112,10 +112,10 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {rev && (
         <>
+          <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference state={state} dispatch={dispatch} project={project} calcs={calcs} />
-          <RevisionChanges project={project} state={state} dispatch={dispatch} notify={notify} />
           <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)}
-            title={<>Layer 고르기 <span className="small muted">· {referenceOf(state, project)?.name || '-'}에서</span></>} />
+            title={<>Layer List <span className="small muted">{referenceOf(state, project)?.name || ''}</span></>} />
         </>
       )}
 

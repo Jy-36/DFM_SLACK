@@ -3,12 +3,12 @@
 // GDS 입고일은 따로 넣지 않고, 고른 변경점의 준비 날짜 중 가장 늦은 날로 정한다.
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
-import { fmtLong, todayIso } from '../lib/dates.js';
+import { fmtShort, todayIso } from '../lib/dates.js';
 
 export const CHANGE_KINDS = [
-  ['db', 'DB', 'A · B · C 중 바뀌는 DB'],
-  ['runset', 'Runset', '바뀌는 Runset STEP'],
-  ['spec', 'SPEC', 'SPEC 변경'],
+  ['db', 'DB'],
+  ['runset', 'Runset'],
+  ['spec', 'SPEC'],
 ];
 const DB_PARTS = ['A', 'B', 'C'];
 const gid = () => `g${Math.random().toString(36).slice(2, 8)}`;
@@ -75,21 +75,18 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
               )}
               <span className="gd-items">
                 {order(g).map((x) => <span key={x} className="gd-item">{x}</span>)}
-                {g.items.length > 1 && <span className="small muted">묶음</span>}
               </span>
               <label className="gd-date">
-                <span className="small muted">준비 날짜</span>
                 <input type="date" className={`input num ${g.date ? '' : 'empty'}`} value={g.date || ''} onChange={(e) => setDate(g, e.target.value)} aria-label={`${g.items.join(', ')} 준비 날짜`} />
               </label>
-              {g.items.length > 1 && <button type="button" className="btn small-btn ghost" onClick={() => split(g)}>풀기</button>}
+              <span className="gd-split">{g.items.length > 1 && <button type="button" className="btn small-btn ghost" onClick={() => split(g)}>풀기</button>}</span>
             </div>
           ))}
           {groups.length > 1 && (
             <div className="gd-merge small">
               <button type="button" className="btn small-btn" disabled={checked.length < 2} onClick={merge}>
-                <Icon name="layers" size={13} /> 체크한 {checked.length || ''}개 한 날짜로 묶기
+                <Icon name="layers" size={13} /> 날짜 묶기{checked.length ? ` (${checked.length})` : ''}
               </button>
-              <span className="muted">예: A · B는 같은 날, C는 따로</span>
             </div>
           )}
         </div>
@@ -98,17 +95,62 @@ function GroupDates({ options, groups, setGroups, tone, addSlot }) {
   );
 }
 
+/** 저장된 변경점 보기 (한 줄씩) */
+function ChangesView({ changes }) {
+  const on = CHANGE_KINDS.filter(([k]) => changes[k]?.on);
+  if (!on.length) return <div className="chg-empty small muted">없음</div>;
+  const Groups = ({ groups, tone }) => groups.map((g) => (
+    <span key={g.id} className="cv-group">
+      {g.items.map((x) => <span key={x} className={`gd-item ${tone}`}>{x}</span>)}
+      <span className={`num ${g.date ? '' : 'tone-warn'}`}>{g.date ? fmtShort(g.date) : '날짜 없음'}</span>
+    </span>
+  ));
+  return (
+    <div className="cv">
+      {changes.db?.on && (
+        <div className="cv-row db">
+          <b>DB</b>
+          <span className="cv-body">
+            <Groups groups={groupsOf(changes.db, 'parts')} tone="db" />
+            {changes.db.stepX?.on && <span className="cv-stepx">Step X <span className="num">{changes.db.stepX.date ? fmtShort(changes.db.stepX.date) : '-'}</span></span>}
+          </span>
+          {changes.db.comment && <span className="cv-comment small muted">{changes.db.comment}</span>}
+        </div>
+      )}
+      {changes.runset?.on && (
+        <div className="cv-row runset">
+          <b>Runset</b>
+          <span className="cv-body"><Groups groups={groupsOf(changes.runset, 'steps')} tone="runset" /></span>
+          {changes.runset.comment && <span className="cv-comment small muted">{changes.runset.comment}</span>}
+        </div>
+      )}
+      {changes.spec?.on && (
+        <div className="cv-row spec">
+          <b>SPEC</b>
+          <span className="cv-body"><span className={`num ${changes.spec.date ? '' : 'tone-warn'}`}>{changes.spec.date ? fmtShort(changes.spec.date) : '날짜 없음'}</span></span>
+          {changes.spec.comment && <span className="cv-comment small muted">{changes.spec.comment}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RevisionChanges({ project, state, dispatch, notify }) {
-  const changes = project.changes || {};
+  const saved = project.changes || {};
+  const [draft, setDraft] = useState(null); // null = 보기, 객체 = 수정 중
+  const editing = !!draft;
+  const changes = draft || saved;
   const steps = state.runsetSteps || [];
   const [newStep, setNewStep] = useState('');
   const [adding, setAdding] = useState(false);
 
-  const saveAll = (next) => {
-    const gds = changesGds(next);
-    dispatch({ type: 'updateProject', id: project.id, patch: { changes: next, ...(gds ? { gds } : {}) } });
+  const save = (kind, patch) => setDraft({ ...changes, [kind]: { ...(changes[kind] || {}), ...patch } });
+  const commit = () => {
+    const gds = changesGds(draft);
+    dispatch({ type: 'updateProject', id: project.id, patch: { changes: draft, ...(gds ? { gds } : {}) } });
+    setDraft(null);
+    notify?.(gds ? `Changes 저장 · GDS ${fmtShort(gds)}` : 'Changes 저장');
   };
-  const save = (kind, patch) => saveAll({ ...changes, [kind]: { ...(changes[kind] || {}), ...patch } });
   const dbGroups = groupsOf(changes.db, 'parts');
   const rsGroups = groupsOf(changes.runset, 'steps');
   const stepX = changes.db?.stepX || {};
@@ -119,79 +161,87 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
     if (!rsGroups.some((g) => g.items.includes(v))) save('runset', { groups: [...rsGroups, { id: gid(), items: [v], date: '' }] });
     setNewStep('');
     setAdding(false);
-    notify?.(`Runset STEP '${v}'을 추가했어요`);
   };
   const gds = changesGds(changes);
-  const onCount = CHANGE_KINDS.filter(([k]) => changes[k]?.on).length;
+  const savedGds = changesGds(saved);
+  const dirty = editing && JSON.stringify(draft) !== JSON.stringify(saved);
 
   return (
-    <section className="panel chg">
+    <section className={`panel chg ${editing ? 'editing' : ''}`}>
       <div className="chg-title">
-        <div>
-          <h2>이번 Revision, 뭐가 바뀌나요?</h2>
-          <p className="small muted">바뀌는 것을 켜면 아래에 준비 날짜를 적는 칸이 열려요. 가장 늦게 준비되는 날이 GDS 입고일이 돼요.</p>
-        </div>
-        <span className={`chg-gds ${gds ? 'on' : ''}`}>
-          <span className="small">GDS 입고</span>
-          <b className="num">{gds ? fmtLong(gds) : '날짜 대기'}</b>
+        <h2>Changes</h2>
+        <span className="chg-head-r">
+          <span className={`chg-gds ${gds ? 'on' : ''}`}>
+            <span className="small">GDS</span>
+            <b className="num">{gds ? fmtShort(gds) : '-'}</b>
+            {editing && gds !== savedGds && <span className="small">저장 전</span>}
+          </span>
+          {editing ? (
+            <>
+              <button type="button" className="btn small-btn ghost" onClick={() => setDraft(null)}>취소</button>
+              <button type="button" className="btn small-btn primary" disabled={!dirty} onClick={commit}>저장</button>
+            </>
+          ) : (
+            <button type="button" className="btn small-btn" onClick={() => setDraft(structuredClone(saved))}><Icon name="settings" size={13} /> 수정</button>
+          )}
         </span>
       </div>
-      <div className="chg-kinds" role="group" aria-label="변경점 고르기">
-        {CHANGE_KINDS.map(([k, label, desc]) => (
-          <button key={k} type="button" className={`chg-kind ${k} ${changes[k]?.on ? 'on' : ''}`} aria-pressed={!!changes[k]?.on} onClick={() => save(k, { on: !changes[k]?.on })}>
-            <span className="chg-box">{changes[k]?.on && <Icon name="check" size={13} />}</span>
-            <b>{label}</b>
-            <span className="small muted">{desc}</span>
-          </button>
-        ))}
-      </div>
 
-      {onCount > 0 && (
-        <div className="chg-areas">
-          {changes.db?.on && (
-            <div className="chg-area db">
-              <div className="chg-area-h">
-                <b>DB</b><span className="small muted">바뀌는 DB를 고르고 각각 준비 날짜</span>
-                <span className="chg-stepx">
-                  <button type="button" className={`chg-toggle ${stepX.on ? 'on' : ''}`} aria-pressed={!!stepX.on} onClick={() => save('db', { stepX: stepX.on ? { on: false, date: stepX.date } : { on: true, date: stepX.date || todayIso() } })}>
-                    <span className="chg-box sm">{stepX.on && <Icon name="check" size={11} />}</span>
-                    Step X 적용
-                  </button>
-                  {stepX.on && <input type="date" className="input num" value={stepX.date || ''} onChange={(e) => save('db', { stepX: { on: true, date: e.target.value } })} aria-label="Step X 적용 날짜" />}
-                </span>
-              </div>
-              <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" />
-              <label className="field chg-comment"><span>코멘트</span><input className="input" value={changes.db.comment || ''} placeholder="예: A/C DB 갱신, B는 Fab 확인 후" onChange={(e) => save('db', { comment: e.target.value })} /></label>
-            </div>
-          )}
-          {changes.runset?.on && (
-            <div className="chg-area runset">
-              <div className="chg-area-h"><b>Runset</b><span className="small muted">변경 STEP을 고르고 각각 준비 날짜 · 여러 STEP을 한 날짜로 묶을 수 있어요</span></div>
-              <GroupDates options={[...new Set([...steps, ...rsGroups.flatMap((g) => g.items)])]} groups={rsGroups} setGroups={(groups) => save('runset', { groups })} tone="runset"
-                addSlot={adding ? (
-                  <span className="chg-add">
-                    <input className="input" value={newStep} autoFocus placeholder="STEP 이름" onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') setAdding(false); }} aria-label="새 Runset STEP" />
-                    <button type="button" className="btn small-btn primary" onClick={addStep}>추가</button>
-                    <button type="button" className="btn small-btn ghost" onClick={() => setAdding(false)}>취소</button>
+      {!editing ? <ChangesView changes={saved} /> : (
+        <>
+          <div className="chg-kinds" role="group" aria-label="변경점 고르기">
+            {CHANGE_KINDS.map(([k, label]) => (
+              <button key={k} type="button" className={`chg-kind ${k} ${changes[k]?.on ? 'on' : ''}`} aria-pressed={!!changes[k]?.on} onClick={() => save(k, { on: !changes[k]?.on })}>
+                <span className="chg-box">{changes[k]?.on && <Icon name="check" size={13} />}</span>
+                <b>{label}</b>
+              </button>
+            ))}
+          </div>
+          <div className="chg-areas">
+            {changes.db?.on && (
+              <div className="chg-area db">
+                <div className="chg-area-h">
+                  <b>DB</b>
+                  <span className="chg-stepx">
+                    <button type="button" className={`chg-toggle ${stepX.on ? 'on' : ''}`} aria-pressed={!!stepX.on} onClick={() => save('db', { stepX: stepX.on ? { on: false, date: stepX.date } : { on: true, date: stepX.date || todayIso() } })}>
+                      <span className="chg-box sm">{stepX.on && <Icon name="check" size={11} />}</span>
+                      Step X
+                    </button>
+                    {stepX.on && <input type="date" className="input num" value={stepX.date || ''} onChange={(e) => save('db', { stepX: { on: true, date: e.target.value } })} aria-label="Step X 적용 날짜" />}
                   </span>
-                ) : (
-                  <button type="button" className="chg-chip add" onClick={() => setAdding(true)} aria-label="Runset STEP 추가"><Icon name="plus" size={12} /> STEP</button>
-                )} />
-              <label className="field chg-comment"><span>코멘트</span><input className="input" value={changes.runset.comment || ''} placeholder="예: OPC Recipe 변경" onChange={(e) => save('runset', { comment: e.target.value })} /></label>
-            </div>
-          )}
-          {changes.spec?.on && (
-            <div className="chg-area spec">
-              <div className="chg-area-h"><b>SPEC</b><span className="small muted">SPEC 변경</span></div>
-              <div className="chg-row">
-                <label className="field chg-date"><span>준비 날짜</span><input type="date" className="input num" value={changes.spec.date || ''} onChange={(e) => save('spec', { date: e.target.value })} /></label>
-                <label className="field chg-comment"><span>코멘트</span><input className="input" value={changes.spec.comment || ''} placeholder="예: CD Target 변경" onChange={(e) => save('spec', { comment: e.target.value })} /></label>
+                </div>
+                <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" />
+                <input className="input chg-comment" value={changes.db.comment || ''} placeholder="코멘트" onChange={(e) => save('db', { comment: e.target.value })} aria-label="DB 코멘트" />
               </div>
-            </div>
-          )}
-        </div>
+            )}
+            {changes.runset?.on && (
+              <div className="chg-area runset">
+                <div className="chg-area-h"><b>Runset</b></div>
+                <GroupDates options={[...new Set([...steps, ...rsGroups.flatMap((g) => g.items)])]} groups={rsGroups} setGroups={(groups) => save('runset', { groups })} tone="runset"
+                  addSlot={adding ? (
+                    <span className="chg-add">
+                      <input className="input" value={newStep} autoFocus placeholder="STEP" onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') setAdding(false); }} aria-label="새 Runset STEP" />
+                      <button type="button" className="btn small-btn primary" onClick={addStep}>추가</button>
+                      <button type="button" className="btn small-btn ghost" onClick={() => setAdding(false)}>취소</button>
+                    </span>
+                  ) : (
+                    <button type="button" className="chg-chip add" onClick={() => setAdding(true)} aria-label="Runset STEP 추가"><Icon name="plus" size={12} /> STEP</button>
+                  )} />
+                <input className="input chg-comment" value={changes.runset.comment || ''} placeholder="코멘트" onChange={(e) => save('runset', { comment: e.target.value })} aria-label="Runset 코멘트" />
+              </div>
+            )}
+            {changes.spec?.on && (
+              <div className="chg-area spec">
+                <div className="chg-area-h"><b>SPEC</b></div>
+                <div className="chg-row">
+                  <input type="date" className="input num chg-date" value={changes.spec.date || ''} onChange={(e) => save('spec', { date: e.target.value })} aria-label="SPEC 준비 날짜" />
+                  <input className="input chg-comment" value={changes.spec.comment || ''} placeholder="코멘트" onChange={(e) => save('spec', { comment: e.target.value })} aria-label="SPEC 코멘트" />
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
-      {!gds && project.gds && <div className="chg-foot small muted">준비 날짜가 없어서 이전에 넣은 GDS {fmtLong(project.gds)} 기준으로 계산하고 있어요.</div>}
     </section>
   );
 }

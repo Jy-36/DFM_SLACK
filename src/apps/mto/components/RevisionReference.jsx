@@ -25,24 +25,19 @@ export default function RevisionReference({ state, dispatch, project, calcs }) {
 
   return (
     <section className="panel ref">
-      <div className="chg-title">
-        <div>
-          <h2>무엇을 기준으로 하나요? <span className="ref-tag">Reference</span></h2>
-          <p className="small muted">기존 Product의 Layer나 앞서 나간 Revision을 기준으로 잡아요. 아래 Layer 고르기가 이 기준에서 출발해요.</p>
-        </div>
-      </div>
+      <div className="chg-title"><h2>Reference</h2></div>
       <div className="ref-grid">
         <div className="ref-pick">
           <div className="seg" role="group" aria-label="Reference 종류">
-            <button type="button" aria-pressed={kind === 'product'} onClick={() => save({ kind: 'product', id: ref.kind === 'product' ? ref.id : project.parentId })}>기존 Product Layer</button>
-            <button type="button" aria-pressed={kind === 'revision'} onClick={() => save({ kind: 'revision', id: ref.kind === 'revision' ? ref.id : revisions.find((r) => r.parentId === project.parentId)?.id || revisions[0]?.id })} disabled={!revisions.length}>다른 Revision</button>
+            <button type="button" aria-pressed={kind === 'product'} onClick={() => save({ kind: 'product', id: ref.kind === 'product' ? ref.id : project.parentId })}>Product</button>
+            <button type="button" aria-pressed={kind === 'revision'} onClick={() => save({ kind: 'revision', id: ref.kind === 'revision' ? ref.id : revisions.find((r) => r.parentId === project.parentId)?.id || revisions[0]?.id })} disabled={!revisions.length}>Revision</button>
           </div>
           {kind === 'product' ? (
             <label className="field">
               <span>Product</span>
               <select className="input" value={target?.id || ''} onChange={(e) => save({ id: e.target.value })}>
                 {!target && <option value="">Product 고르기</option>}
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === project.parentId ? ' (딸린 Product)' : ''} · {p.layers.length}장</option>)}
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.layers.length}장</option>)}
               </select>
             </label>
           ) : (
@@ -62,10 +57,7 @@ export default function RevisionReference({ state, dispatch, project, calcs }) {
               </select>
             </label>
           )}
-          <label className="field">
-            <span>Reference 메모</span>
-            <textarea className="input" rows={2} value={ref.note || ''} placeholder="예: REV01 대비 A DB만 변경, Layer 구성 동일" onChange={(e) => save({ note: e.target.value })} />
-          </label>
+          <textarea className="input" rows={2} value={ref.note || ''} placeholder="메모" onChange={(e) => save({ note: e.target.value })} aria-label="Reference 메모" />
         </div>
         <div className="ref-card">
           {target ? (
@@ -92,7 +84,7 @@ export default function RevisionReference({ state, dispatch, project, calcs }) {
               )}
             </>
           ) : (
-            <div className="small muted"><Icon name="layers" size={14} /> 기준을 고르면 여기에 요약이 보여요.</div>
+            <div className="small muted"><Icon name="layers" size={14} /> -</div>
           )}
         </div>
       </div>
