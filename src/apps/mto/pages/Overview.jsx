@@ -26,7 +26,7 @@ export function EmptyCard({ project, dispatch, notify, go }) {
   const rev = project.kind === 'revision';
   return (
     <section className="panel mto-empty">
-      <h2>{project.name} · {rev ? 'ITEM Layer를 고르면' : 'Set List를 넣으면'} 바로 계산해요</h2>
+      <h2>{project.name} · {rev ? 'Revision Concept을 고르면' : 'Set List를 넣으면'} 바로 계산해요</h2>
       <p className="muted">
         {rev
           ? 'Product의 Layer 중 이번 ITEM에 들어오는 Layer(보통 1~5장)를 고르고 GDS 입고일을 넣으면 STEP1 → STEP2 → MTO 일정을 계산합니다. Part 구분은 없습니다.'
@@ -35,7 +35,7 @@ export function EmptyCard({ project, dispatch, notify, go }) {
       </p>
       <div className="head-actions">
         <button type="button" className="btn primary" onClick={() => go('layers')}>
-          <Icon name="layers" size={16} /> {rev ? 'ITEM Layer 고르기' : 'Set List 입력'}
+          <Icon name="layers" size={16} /> {rev ? 'Revision Concept 고르기' : 'Set List 입력'}
         </button>
         {!rev && <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? '공정 Set List 모두 담기' : '예시 30장 불러오기'}</button>}
       </div>
@@ -98,7 +98,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{project.name} 일정 현황</h1>
+          <h1>{project.name} {rev ? 'Revision ' : ''}일정 현황</h1>
           <p>{rev ? 'Revision · GDS → STEP1 → STEP2 → MTO (Part 구분 없음)' : 'Product · GDS + Set List(FEOL + BEOL Option) → Layer별 STEP2 시작일 · MTO 날짜 · 병목'}</p>
         </div>
       </div>

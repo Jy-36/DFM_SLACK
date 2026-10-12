@@ -935,15 +935,17 @@ html.tauri[data-mode='compact'] .shell {
 /* ── 왼쪽 메뉴 접기 버튼: 위쪽에 작게 ── */
 .nav-toggle { display: none; }
 .nav { position: sticky; }
-.nav-collapse {
-  position: absolute; top: 24px; right: 10px; width: 26px; height: 26px; border-radius: 8px; border: 1px solid transparent;
-  background: none; color: var(--faint); display: grid; place-items: center; cursor: pointer;
-}
-.nav-collapse:hover { color: var(--fg); background: var(--surface-2); border-color: var(--line); }
-.app.nav-mini .nav-collapse { position: static; margin: -10px auto 10px; }
-.app:not(.nav-mini) .brand { padding-right: 30px; }
 .app:not(.nav-mini) .nav-foot { margin-top: auto; }
-@media (max-width: 900px) { .nav-collapse { display: none; } }
+/* 앱 이름 아래 도구줄: 뒤로 · 앞으로 | 메뉴 접기 */
+.nav-tools { display: flex; align-items: center; gap: 2px; margin: -8px 4px 14px; padding: 3px; border-radius: 10px; background: var(--surface-2); }
+.nav-tools-gap { flex: 1; }
+.nav-tool { width: 30px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; transition: background 0.12s, color 0.12s; }
+.nav-tool:hover:not(:disabled) { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(16, 38, 84, 0.1); }
+.nav-tool:disabled { opacity: 0.32; cursor: default; }
+.nav-tool.back svg { transform: rotate(180deg); }
+.nav-tools.mini { flex-direction: column; margin: -10px auto 12px; width: 36px; }
+.nav-tools.mini .nav-tools-gap { height: 4px; flex: none; border-top: 1px solid var(--line); width: 60%; margin-top: 2px; }
+@media (max-width: 900px) { .nav-tools { display: none; } }
 
 /* ── App Mode: 접는 카드 · 오늘 현황 조금 작게 ── */
 .fold-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 2px 0; color: inherit; cursor: pointer; min-width: 0; }

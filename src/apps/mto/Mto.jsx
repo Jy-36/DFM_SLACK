@@ -1,6 +1,7 @@
 // MTO: DFM Slack 안의 탭. 여러 Product(Part A/B)와 Revision(Product와 별개, 몇 장만)의 STEP2·MTO 일정을 묶음별로 계산한다.
 // 계산은 lib/scheduler.js (mto-scheduling-agent 규칙 엔진을 옮긴 것), 입력이 바뀌면 바로 다시 계산한다.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { NavTools, useNavHistory } from '../../shared/navHistory.jsx';
 import { useMtoStore } from './lib/store.js';
 import { computeProject } from './lib/projects.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
@@ -18,7 +19,7 @@ import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.8.0';
+export const MTO_VERSION = '0.9.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -28,11 +29,11 @@ const NAV = {
     ['layers', 'Set List', 'layers'],
     ['table', 'Layer별 일정표', 'table'],
   ],
+  // Revision: Dashboard · 일정 현황(Layer별 일정표는 그 안에서 전환) · Concept(ITEM Layer 고르기)
   revision: [
-    ['all', '전체 Revision', 'dashboard'],
-    ['overview', 'ITEM 일정 현황', 'gantt'],
-    ['layers', 'ITEM Layer', 'layers'],
-    ['table', 'Layer별 일정표', 'table'],
+    ['all', 'Revision Dashboard', 'dashboard'],
+    ['overview', 'Revision 일정 현황', 'gantt'],
+    ['layers', 'Revision Concept', 'layers'],
   ],
 };
 // Common: Product 정보 · 공정 · 규칙 (Product · Revision이 같이 쓰는 기준 정보)
@@ -61,49 +62,16 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
 
   // 뒤로 · 앞으로 가기: 메뉴 · Product/Revision · 고른 묶음 · 공정 분류가 바뀔 때마다 기록
   const here = { tab, section, activeId: state.activeId, ...(tab === 'process' ? procLoc : {}) };
-  const hereKey = JSON.stringify(here);
-  const [hist, setHist] = useState(() => ({ list: [here], idx: 0 }));
-  useEffect(() => {
-    setHist((h) => {
-      if (JSON.stringify(h.list[h.idx]) === hereKey) return h;
-      const list = [...h.list.slice(0, h.idx + 1), JSON.parse(hereKey)].slice(-100);
-      return { list, idx: list.length - 1 };
-    });
-  }, [hereKey]);
-  const travel = useCallback(
-    (d) => {
-      const i = hist.idx + d;
-      const e = hist.list[i];
-      if (!e) return;
-      setHist((h) => ({ ...h, idx: i }));
-      if (e.section !== section) dispatch({ type: 'section', section: e.section });
+  const nav = useNavHistory(
+    here,
+    (e) => {
+      if (e.section !== state.section) dispatch({ type: 'section', section: e.section });
       if (e.activeId && e.activeId !== state.activeId && state.projects.some((p) => p.id === e.activeId)) dispatch({ type: 'select', id: e.activeId });
       setTab(e.tab);
       if (e.tab === 'process') setProcLoc({ procId: e.procId, sel: e.sel || { kind: 'root' } });
     },
-    [hist, section, state.activeId, state.projects, dispatch],
+    mode === 'full',
   );
-  const canBack = hist.idx > 0;
-  const canFwd = hist.idx < hist.list.length - 1;
-  useEffect(() => {
-    if (mode !== 'full') return undefined;
-    const key = (e) => {
-      if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
-      e.preventDefault();
-      travel(e.key === 'ArrowLeft' ? -1 : 1);
-    };
-    const mouse = (e) => {
-      if (e.button !== 3 && e.button !== 4) return;
-      e.preventDefault();
-      travel(e.button === 3 ? -1 : 1);
-    };
-    window.addEventListener('keydown', key);
-    window.addEventListener('mouseup', mouse);
-    return () => {
-      window.removeEventListener('keydown', key);
-      window.removeEventListener('mouseup', mouse);
-    };
-  }, [mode, travel]);
   const [navMini, setNavMini] = useState(() => {
     try {
       return localStorage.getItem('mto.navMini') === '1';
@@ -178,7 +146,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   const done = ofKind.filter((p) => calcs[p.id].result);
   const products = state.projects.filter((p) => p.kind === 'product');
   const items = state.projects.filter((p) => p.kind === 'revision');
-  const nav = NAV[section];
+  const navItems = NAV[section];
   const perProject = ['overview', 'layers', 'table'].includes(tab);
   const area = COMMON_TABS.includes(tab) ? 'common' : section;
   return (
@@ -191,14 +159,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
             <div className="brand-sub">Product · Revision 일정 · v{MTO_VERSION}</div>
           </div>
         </div>
-        <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
-          <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
-        </button>
-        <div className={`nav-hist ${navMini ? 'mini' : ''}`}>
-          <button type="button" className="icon-btn sm back" disabled={!canBack} onClick={() => travel(-1)} title="뒤로 (Alt + ←)" aria-label="뒤로"><Icon name="chevron" size={15} /></button>
-          <button type="button" className="icon-btn sm" disabled={!canFwd} onClick={() => travel(1)} title="앞으로 (Alt + →)" aria-label="앞으로"><Icon name="chevron" size={15} /></button>
-          {!navMini && <span className="small muted">뒤로 · 앞으로</span>}
-        </div>
+        <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         <div className={`sec-switch two ${navMini ? 'mini' : ''}`} role="tablist" aria-label="Product · Revision">
           {[['product', 'Product'], ['revision', 'Revision']].map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={section === k} className={`${k} ${area === 'common' ? 'dim' : ''}`}
@@ -210,10 +171,10 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
             </button>
           ))}
         </div>
-        {nav.map(([key, label, icon], i) => (
+        {navItems.map(([key, label, icon], i) => (
           <div key={key} className="nav-item-wrap">
-            {i === 1 && !navMini && <div className="nav-sec">선택 · {project ? project.name : '없음'}</div>}
-            <button className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+            {i === 1 && !navMini && <div className="nav-sec sel-name" title={project ? project.name : undefined}>{project ? project.name : '선택 없음'}</div>}
+            <button className="nav-btn" aria-current={tab === key || (key === 'overview' && tab === 'table' && section === 'revision') ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
               <Icon name={icon} />
               <span className="nav-label">{label}</span>
               {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
@@ -243,6 +204,14 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
       <main className="main">
         {tab === 'all' && <Portfolio {...props} />}
         {perProject && !project && <NoneCard {...props} />}
+        {project && section === 'revision' && (tab === 'overview' || tab === 'table') && (
+          <div className="sub-switch">
+            <div className="seg" role="tablist" aria-label="Revision 일정 보기">
+              <button type="button" role="tab" aria-pressed={tab === 'overview'} onClick={() => go('overview')}>일정 현황</button>
+              <button type="button" role="tab" aria-pressed={tab === 'table'} onClick={() => go('table')}>Layer별 일정표</button>
+            </div>
+          </div>
+        )}
         {project && tab === 'overview' && <Overview {...props} />}
         {project && tab === 'layers' && (section === 'revision' ? <ItemLayerList key={project.id} {...props} /> : project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
         {project && tab === 'table' && <ScheduleTable {...props} />}

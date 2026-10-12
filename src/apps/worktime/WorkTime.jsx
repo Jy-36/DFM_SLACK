@@ -1,5 +1,6 @@
 // WorkTime: DFM Slack 안의 탭 하나. 요약(휴대폰 크기)·확장 화면 전환은 셸이 정한 mode를 따른다.
 import { useEffect, useMemo, useState } from 'react';
+import { NavTools, useNavHistory } from '../../shared/navHistory.jsx';
 import { useAppStore } from './lib/store.js';
 import { summarizeMonth } from './lib/engine.js';
 import { fmtClock, minutesOfDay } from './lib/time.js';
@@ -12,7 +13,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.22.0';
+export const WORKTIME_VERSION = '0.23.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -77,6 +78,12 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
     setMode('full');
   };
 
+  // 뒤로 · 앞으로 가기: 메뉴와 근무기록에서 보던 달
+  const nav = useNavHistory({ tab, ...(tab === 'records' ? view : {}) }, (e) => {
+    if (e.y != null) setView({ y: e.y, m: e.m });
+    setTab(e.tab);
+  }, mode === 'full');
+
   const props = { state, dispatch, summary, now, go, notify: setToast };
   const toastEl = toast && <div className="toast" role="status">{toast}</div>;
 
@@ -103,9 +110,7 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
             <div className="brand-sub">선택근무제 근무시간 · v{WORKTIME_VERSION}</div>
           </div>
         </div>
-        <button type="button" className="nav-collapse" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
-          <Icon name={navMini ? 'navOpen' : 'navClose'} size={15} />
-        </button>
+        <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         {NAV.map(([key, label]) => (
           <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
             <Icon name={key} />

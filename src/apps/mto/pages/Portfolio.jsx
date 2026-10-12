@@ -48,7 +48,7 @@ export default function Portfolio({ state, dispatch, calcs, go, notify, section 
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{rev ? '전체 Revision' : '전체 Product'}</h1>
+          <h1>{rev ? 'Revision Dashboard' : '전체 Product'}</h1>
           <p>{rev ? `Revision ITEM ${projects.length}개 · Product별로 묶음 · ITEM 단위(보통 1~5장 Set)로 따로 계산` : `Product ${projects.length}개 — Set List 전체(또는 중간부터) · Product마다 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)`}</p>
         </div>
         <div className="head-actions">

@@ -51,7 +51,7 @@ export default function ItemLayerList({ state, dispatch, project, calc, calcs, g
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{project.name} · ITEM Layer</h1>
+          <h1>{project.name} · Revision Concept</h1>
           <p>
             {parent ? <><b>{parent.name}</b>의 Set List에서</> : 'Product를 먼저 고르고'} 이번 ITEM에 들어오는 Layer를 고르세요. 보통 1~5장이 한 Set로 들어와요. Part 구분 없이 GDS → STEP1 → STEP2 → MTO로 계산합니다.
           </p>

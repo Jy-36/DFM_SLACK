@@ -545,3 +545,8 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .stack-chip.in { background: var(--good-soft); color: var(--good); border-color: transparent; }
 .check { display: flex; align-items: flex-start; gap: 6px; cursor: pointer; }
 .check input { margin-top: 2px; }
+/* v0.23 */
+.nav-sec.sel-name { color: var(--fg); font-weight: 700; font-size: 12px; text-transform: none; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub-switch { max-width: 1180px; margin: 0 auto 14px; }
+.sec-switch.two.mini { display: flex; flex-direction: column; align-items: stretch; width: 40px; padding: 3px; margin-inline: auto; }
+.sec-switch.mini button { padding: 7px 0; width: 100%; min-width: 0; justify-self: stretch; }

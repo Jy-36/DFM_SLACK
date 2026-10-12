@@ -65,7 +65,7 @@ export default function Mini({ state, dispatch, project, calc, calcs, notify, ex
             <p className="small muted">{rev ? 'GDS 입고일과 다시 만들 Layer를' : 'GDS 입고일과 Set List를'} 넣으면 최종 MTO와 병목을 보여 줘요.</p>
           )}
           <div className="mini-btns">
-            <button type="button" className="btn primary" onClick={() => expand('layers')}><Icon name="layers" size={15} /> {rev ? 'ITEM Layer 고르기' : 'Set List 입력'}</button>
+            <button type="button" className="btn primary" onClick={() => expand('layers')}><Icon name="layers" size={15} /> {rev ? 'Revision Concept 고르기' : 'Set List 입력'}</button>
             {!rev && <button type="button" className="btn" onClick={() => loadExample(project, dispatch, notify)}>{project.processId ? "공정 Layer 모두 담기" : `예시 ${rev ? 5 : 30}장`}</button>}
           </div>
         </section>
