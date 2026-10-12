@@ -189,6 +189,7 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
 - Revision 일정 현황: 맨 위 Product · ITEM 고르기(접기/펼치기) → **변경점** DB · Runset · SPEC을 고르면 칸이 생겨요.
   DB는 바뀌는 것(A · B · C), Runset은 변경 STEP(없으면 + STEP으로 추가), 각각 준비 날짜 · 코멘트. SPEC은 준비 날짜 · 코멘트.
   GDS 입고일은 따로 넣지 않고 고른 변경점의 준비 날짜 중 가장 늦은 날로 계산해요 (하루 MTO · STEP2 동시는 규칙 기본값).
+- Revision 일정 현황 순서: **Reference**(기존 Product Layer 또는 다른 Revision + 메모) → **변경점**(DB A·B·C와 Runset STEP마다 준비 날짜, 체크해서 한 날짜로 묶기/풀기, DB Step X 적용 날짜) → **Layer 고르기**(Reference의 Layer에서) → 결과 · 간트 · Layer별 일정표.
 - **BEOL Option**: 컨셉(예: 1X 6층 + 2X 4층 …)과 **Metal · Via 쌓는 순서**를 가져요. 순서가 없으면 [편집]에서 Layer를 아래부터 차례로 골라 정하고, Set List도 그 순서로 담겨요.
 - 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.
 - **Product**: 새로 만들면 기준 공정의 **Set List 전체**가 담겨요. 중간부터 나가는 경우 [Set List]의 "중간부터"에서 시작 Layer를 고르면 그 Layer부터 끝까지 담깁니다.

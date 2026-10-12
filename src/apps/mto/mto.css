@@ -589,3 +589,43 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .chg-add .input { height: 32px; width: 140px; }
 .chg-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 @media (max-width: 760px) { .chg-kinds { grid-template-columns: 1fr; } }
+/* v0.25: Reference · 변경점 날짜 묶음 */
+.chg-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.chg-title h2 { margin: 0 0 2px; font-size: 18px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.chg-title p { margin: 0; }
+.chg-gds { display: flex; flex-direction: column; align-items: flex-end; padding: 8px 14px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); flex: none; }
+.chg-gds b { font-size: 15px; color: var(--muted); }
+.chg-gds.on { background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); color: var(--hero-muted); }
+.chg-gds.on b { color: #fff; }
+.ref-tag { font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.ref-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ref-pick { display: flex; flex-direction: column; gap: 10px; }
+.ref-pick .seg { align-self: flex-start; }
+.ref-pick textarea { resize: vertical; min-height: 54px; font-family: var(--font-body); font-size: 14px; padding: 8px 12px; height: auto; }
+.ref-card { border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); min-height: 100%; }
+.ref-card-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.ref-kv { display: grid; grid-template-columns: 56px 1fr; gap: 8px; align-items: center; }
+.ref-chg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.ref-chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.ref-chip.runset { background: var(--leave-soft); color: var(--leave); }
+.ref-chip.spec { background: var(--good-soft); color: var(--good); }
+.ref-note { color: var(--muted); font-style: italic; }
+.chg-area .chg-comment { margin-top: 10px; }
+.chg-area-h { flex-wrap: wrap; }
+.chg-stepx { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.chg-stepx .input { height: 32px; width: 160px; }
+.chg-toggle { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; }
+.chg-toggle.on { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.chg-box.sm { width: 16px; height: 16px; border-radius: 5px; grid-row: auto; }
+.chg-toggle.on .chg-box { background: var(--warn); border-color: var(--warn); }
+.gd-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.gd-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); }
+.gd-row.sel { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.gd-items { display: inline-flex; align-items: center; gap: 4px; min-width: 120px; flex-wrap: wrap; }
+.gd-item { display: inline-grid; place-items: center; min-width: 28px; height: 24px; padding: 0 8px; border-radius: 6px; font-weight: 800; font-size: 12.5px; background: var(--accent); color: #fff; }
+.gd.runset .gd-item { background: var(--leave); }
+.gd-date { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.gd-date .input { height: 32px; width: 160px; }
+.gd-date .input.empty { border-color: var(--warn); }
+.gd-merge { display: flex; align-items: center; gap: 10px; padding-top: 2px; }
+@media (max-width: 900px) { .ref-grid { grid-template-columns: 1fr; } }

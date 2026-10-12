@@ -8,6 +8,8 @@ import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js'
 import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
+import RevisionReference, { referenceOf } from '../components/RevisionReference.jsx';
+import { ItemLayerPicker } from './ItemLayerList.jsx';
 import { LayerSchedule } from './ScheduleTable.jsx';
 
 export function loadExample(project, dispatch, notify) {
@@ -108,7 +110,14 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {!rev && <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />}
 
-      {rev && <RevisionChanges project={project} state={state} dispatch={dispatch} notify={notify} />}
+      {rev && (
+        <>
+          <RevisionReference state={state} dispatch={dispatch} project={project} calcs={calcs} />
+          <RevisionChanges project={project} state={state} dispatch={dispatch} notify={notify} />
+          <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)}
+            title={<>Layer 고르기 <span className="small muted">· {referenceOf(state, project)?.name || '-'}에서</span></>} />
+        </>
+      )}
 
       {!rev && <section className="panel mto-bar">
         <QuickControls project={project} cfg={cfg} dispatch={dispatch} />
@@ -123,8 +132,8 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
         </div>
       </section>}
 
-      {calc.empty && <EmptyCard project={project} dispatch={dispatch} notify={notify} go={go} />}
-      {calc.issues && <IssueBanner issues={calc.issues} go={go} />}
+      {!rev && calc.empty && <EmptyCard project={project} dispatch={dispatch} notify={notify} go={go} />}
+      {!rev && calc.issues && <IssueBanner issues={calc.issues} go={go} />}
 
       {result && an && (
         <>

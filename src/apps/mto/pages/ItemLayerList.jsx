@@ -4,15 +4,15 @@ import { useMemo } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
 import { projectLayers } from '../lib/projects.js';
-import { QuickControls } from '../components/Controls.jsx';
 import ProjectBar from '../components/ProjectBar.jsx';
+import { referenceOf } from '../components/RevisionReference.jsx';
 
 const keyOf = (l) => (l.ref ? `r:${l.ref}` : `m:${l.layer}`);
 const ITEM_TYPICAL = 5;
 
-export default function ItemLayerList({ state, dispatch, project, calc, calcs, go, notify }) {
-  const parent = state.projects.find((p) => p.id === project.parentId && p.kind === 'product');
-  const source = useMemo(() => (parent ? projectLayers(parent, state.processes).filter((l) => !l.missing).sort((a, b) => a.no - b.no) : []), [parent, state.processes]);
+/** Revision Layer 고르기: source(Reference의 Layer)에서 이번 ITEM Layer를 고르고 순서를 정한다 */
+export function ItemLayerPicker({ state, dispatch, project, calc, go, notify, from, title }) {
+  const source = useMemo(() => (from ? projectLayers(from, state.processes).filter((l) => !l.missing).sort((a, b) => a.no - b.no) : []), [from, state.processes]);
   const mine = useMemo(() => projectLayers(project, state.processes), [project, state.processes]);
   const picked = new Set(mine.map(keyOf));
   const mtoOf = useMemo(() => new Map((calc.result?.layers || []).map((l) => [l.no, l])), [calc.result]);
@@ -46,42 +46,26 @@ export default function ItemLayerList({ state, dispatch, project, calc, calcs, g
     set(project.layers.map((l, k) => (k === a ? { ...l, no: project.layers[b].no } : k === b ? { ...l, no: project.layers[a].no } : l)));
   };
   const n = project.layers.length;
+  const takeAll = () => set(source.map((l, i) => (l.ref ? { no: i + 1, ref: l.ref } : { no: i + 1, part: 'R', layer: l.layer, type: l.type })), `${from.name}의 Layer ${source.length}장을 그대로 담았어요`);
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{project.name} · Revision Concept</h1>
-          <p>
-            {parent ? <><b>{parent.name}</b>의 Set List에서</> : 'Product를 먼저 고르고'} 이번 ITEM에 들어오는 Layer를 고르세요. 보통 1~5장이 한 Set로 들어와요. Part 구분 없이 GDS → STEP1 → STEP2 → MTO로 계산합니다.
-          </p>
-        </div>
-        {parent && (
-          <div className="head-actions">
-            <button type="button" className="btn" onClick={() => go('layers', parent.id)}>{parent.name} Set List 보기</button>
-          </div>
-        )}
-      </div>
-
-      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
-
-      <section className="panel mto-bar">
-        <QuickControls project={project} cfg={calc.config} dispatch={dispatch} />
-      </section>
-
-      {!parent ? (
+    <>
+      {!from ? (
         <section className="panel mto-empty">
-          <h2>딸린 Product가 없어요</h2>
-          <p className="muted">위 설정에서 이 ITEM이 딸릴 Product를 고르세요.</p>
+          <h2>Layer를 고를 곳이 없어요</h2>
+          <p className="muted">Reference에서 Product나 다른 Revision을 고르세요.</p>
         </section>
       ) : (
         <section className="panel picker">
           <h2>
             <span className="layer-sum">
-              {parent.name} Set List
+              {title || `${from.name} Set List`}
               <Pill tone={n > ITEM_TYPICAL ? 'warn' : 'accent'}>{n}장 선택{n > ITEM_TYPICAL ? ` · 보통 ${ITEM_TYPICAL}장 이하` : ''}</Pill>
             </span>
-            {n > 0 && <button type="button" className="btn small-btn ghost danger" onClick={() => set([], '선택을 모두 뺐어요')}><Icon name="trash" size={14} /> 모두 빼기</button>}
+            <span className="head-actions">
+              {from.kind === 'revision' && source.length > 0 && <button type="button" className="btn small-btn" onClick={takeAll}><Icon name="copy" size={14} /> {from.name} Layer 그대로 담기</button>}
+              {n > 0 && <button type="button" className="btn small-btn ghost danger" onClick={() => set([], '선택을 모두 뺐어요')}><Icon name="trash" size={14} /> 모두 빼기</button>}
+            </span>
           </h2>
           {source.length ? (
             <div className="pick-grid">
@@ -101,11 +85,18 @@ export default function ItemLayerList({ state, dispatch, project, calc, calcs, g
               ))}
             </div>
           ) : (
-            <p className="empty">{parent.name}의 Set List가 비어 있어요. <button type="button" className="link-btn" onClick={() => go('layers', parent.id)}>Set List 채우기</button></p>
+            <p className="empty">{from.name}에 Layer가 없어요.{from.kind === 'product' && <> <button type="button" className="link-btn" onClick={() => go('layers', from.id)}>Set List 채우기</button></>}</p>
           )}
         </section>
       )}
+      <PickedTable {...{ calc, rows, n, mtoOf, move, set, project }} />
+    </>
+  );
+}
 
+function PickedTable({ calc, rows, n, mtoOf, move, set, project }) {
+  return (
+    <>
       {calc.issues && calc.issues.some((i) => i.field !== 'gds') && (
         <div className="banner warn-banner" role="alert"><span><b>입력 확인</b> · {calc.issues.filter((i) => i.field !== 'gds').slice(0, 3).map((i) => i.msg).join(' / ')}</span></div>
       )}
@@ -142,6 +133,32 @@ export default function ItemLayerList({ state, dispatch, project, calc, calcs, g
           </div>
         </section>
       )}
+    </>
+  );
+}
+
+export default function ItemLayerList({ state, dispatch, project, calc, calcs, go, notify }) {
+  const parent = state.projects.find((p) => p.id === project.parentId && p.kind === 'product');
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1>{project.name} · Revision Concept</h1>
+          <p>
+            {parent ? <><b>{parent.name}</b>의 Set List에서</> : 'Product를 먼저 고르고'} 이번 ITEM에 들어오는 Layer를 고르세요. 보통 1~5장이 한 Set로 들어와요. Part 구분 없이 GDS → STEP1 → STEP2 → MTO로 계산합니다.
+          </p>
+        </div>
+        {parent && (
+          <div className="head-actions">
+            <button type="button" className="btn" onClick={() => go('layers', parent.id)}>{parent.name} Set List 보기</button>
+          </div>
+        )}
+      </div>
+
+      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
+
+
+      <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)} />
     </div>
   );
 }
