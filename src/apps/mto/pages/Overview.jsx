@@ -7,6 +7,8 @@ import { fmtLong, fmtShort } from '../lib/dates.js';
 import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js';
 import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
+import RevisionChanges from '../components/RevisionChanges.jsx';
+import { LayerSchedule } from './ScheduleTable.jsx';
 
 export function loadExample(project, dispatch, notify) {
   const rev = project.kind === 'revision';
@@ -96,6 +98,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
   return (
     <div className="page">
+      {rev && <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} collapsible />}
       <div className="page-head">
         <div>
           <h1>{project.name} {rev ? 'Revision ' : ''}일정 현황</h1>
@@ -103,9 +106,11 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
         </div>
       </div>
 
-      <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />
+      {!rev && <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} />}
 
-      <section className="panel mto-bar">
+      {rev && <RevisionChanges project={project} state={state} dispatch={dispatch} notify={notify} />}
+
+      {!rev && <section className="panel mto-bar">
         <QuickControls project={project} cfg={cfg} dispatch={dispatch} />
         <div className="mto-bar-rules small muted">
           {rev
@@ -116,7 +121,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
           <span> · 이 {rev ? 'Revision' : 'Product'}만 따로 계산 (STEP2 슬롯·MTO 장수 공유 안 함)</span>
           <button type="button" className="link-btn" onClick={() => go('rules')}>규칙 바꾸기</button>
         </div>
-      </section>
+      </section>}
 
       {calc.empty && <EmptyCard project={project} dispatch={dispatch} notify={notify} go={go} />}
       {calc.issues && <IssueBanner issues={calc.issues} go={go} />}
@@ -133,7 +138,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
               <div className="hero-pills">
                 <Pill tone="neutral">리드타임 {result.leadTimeDays}일</Pill>
                 <Pill tone="neutral">Layer {result.layers.length}장</Pill>
-                <Pill tone="neutral">MTO {result.config.mtoPerDay}장/일 · STEP2 동시 {result.config.step2Concurrency ?? '무제한'}</Pill>
+                {!rev && <Pill tone="neutral">MTO {result.config.mtoPerDay}장/일 · STEP2 동시 {result.config.step2Concurrency ?? '무제한'}</Pill>}
               </div>
               <p className="hero-line">{an.headline}</p>
             </div>
@@ -178,10 +183,10 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
             </section>
           </div>
 
-          <section className="panel">
+          {!rev && <section className="panel">
             <h2>시나리오 비교 <span className="small muted">하루 MTO 수 × STEP2 동시 진행 수 · 행을 누르면 그 조건으로 바뀝니다</span></h2>
             <Scenarios grid={an.grid} result={result} onPick={pickScenario} />
-          </section>
+          </section>}
 
           <section className="panel">
             <h2>
@@ -190,6 +195,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
             </h2>
             <Gantt result={result} />
           </section>
+          {rev && <LayerSchedule project={project} result={result} notify={notify} />}
         </>
       )}
     </div>

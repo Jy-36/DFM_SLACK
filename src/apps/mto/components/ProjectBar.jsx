@@ -1,4 +1,4 @@
-// 묶음 고르기: Product 탭은 Product 칩, Revision 탭은 Product별로 묶인 ITEM 칩 + 추가 · 이름 · 복제 · 삭제 · 순서
+// 묶음 고르기: Product 탭은 Product 칩, Revision 탭은 Product별로 묶인 ITEM 칩 + 추가 · 이름 · 복사 · 삭제 · 순서
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
@@ -39,7 +39,28 @@ export function AddItem({ state, dispatch, defaultParent, compact }) {
   );
 }
 
-export default function ProjectBar({ state, dispatch, calcs, notify, showSettings = true }) {
+function usePickerOpen() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem('mto.pickerOpen') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const toggle = () =>
+    setOpen((v) => {
+      try {
+        localStorage.setItem('mto.pickerOpen', v ? '0' : '1');
+      } catch {
+        /* 저장 불가 */
+      }
+      return !v;
+    });
+  return [open, toggle];
+}
+
+export default function ProjectBar({ state, dispatch, calcs, notify, showSettings = true, collapsible = false }) {
+  const [open, toggleOpen] = usePickerOpen();
   const section = state.section;
   const list = state.projects.filter((x) => x.kind === section);
   const p = list.find((x) => x.id === state.activeId) || list[0];
@@ -65,9 +86,24 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
   const parentOf = (x) => products.find((q) => q.id === x.parentId);
   const proc = state.processes.find((x) => x.id === p.processId);
 
+  const st = projectStatus(calcs[p.id]);
+  const isOpen = !collapsible || open;
   return (
-    <section className="panel project-bar">
-      {section === 'product' ? (
+    <section className={`panel project-bar ${collapsible ? 'collapsible' : ''} ${isOpen ? '' : 'closed'}`}>
+      {collapsible && (
+        <button type="button" className="pb-fold" onClick={toggleOpen} aria-expanded={isOpen}>
+          <Icon name="chevron" size={14} />
+          <span className="small muted">{section === 'product' ? 'Product 고르기' : 'Product · Revision ITEM 고르기'}</span>
+          {!isOpen && (
+            <span className="pb-fold-cur">
+              {p.kind === 'revision' && parentOf(p) && <span className="small muted">{parentOf(p).name} ›</span>}
+              <KindTag kind={p.kind} /> <b>{p.name}</b> <span className={`pb-st ${st.tone} num`}>{st.text}</span>
+            </span>
+          )}
+          <span className="small muted pb-fold-hint">{isOpen ? '접기' : '펼치기'}</span>
+        </button>
+      )}
+      {isOpen && (section === 'product' ? (
         <div className="pb-row" role="tablist" aria-label="Product">
           {list.map(chip)}
           <span className="pb-add">
@@ -88,9 +124,9 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
           })}
           <div className="pb-row"><AddItem state={state} dispatch={dispatch} defaultParent={p.parentId} /></div>
         </div>
-      )}
+      ))}
 
-      {showSettings && (
+      {showSettings && isOpen && (
         <div className="pb-settings">
           <label className="field pb-title">
             <span>{p.kind === 'revision' ? 'ITEM 이름' : 'Product 이름'}</span>
@@ -165,7 +201,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
           <span className="pb-tools">
             <button type="button" className="icon-btn sm" disabled={idx === 0} onClick={() => dispatch({ type: 'moveProject', id: p.id, dir: -1 })} title="앞으로" aria-label="앞으로"><Icon name="left" size={15} /></button>
             <button type="button" className="icon-btn sm" disabled={idx === list.length - 1} onClick={() => dispatch({ type: 'moveProject', id: p.id, dir: 1 })} title="뒤로" aria-label="뒤로"><Icon name="right" size={15} /></button>
-            <button type="button" className="btn small-btn" onClick={() => dispatch({ type: 'duplicateProject', id: p.id })}><Icon name="copy" size={14} /> 복제</button>
+            <button type="button" className="btn small-btn" onClick={() => dispatch({ type: 'duplicateProject', id: p.id })}><Icon name="copy" size={14} /> 복사</button>
             <button type="button" className="btn small-btn ghost danger" onClick={remove}><Icon name="trash" size={14} /> 삭제</button>
           </span>
           {editing && <span className="small muted pb-hint">이름은 바로 저장돼요</span>}

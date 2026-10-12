@@ -138,6 +138,8 @@ export function mtoReducer(state, a) {
     }
     case 'updateProject': // 목록 화면(Product 정보)에서 아무 Product나 고칠 때
       return { ...state, projects: state.projects.map((p) => (p.id === a.id ? { ...p, ...a.patch, info: a.patch.info ? { ...(p.info || {}), ...a.patch.info } : p.info } : p)) };
+    case 'runsetSteps':
+      return { ...state, runsetSteps: a.steps };
     case 'productColumns':
       return { ...state, productColumns: a.columns };
     case 'renameBeolOption': {

@@ -6,6 +6,8 @@ import { newProject } from './projects.js';
 import { exampleProcess, isBeol, migrateProcess } from './process.js';
 import { mtoReducer } from './reducer.js';
 
+export const DEFAULT_RUNSET_STEPS = ['OPC', 'MRC', 'MDP'];
+
 const KEY = 'mto.v2';
 const LEGACY = 'mto.v1'; // 0.15.x: Product 하나 { gds, layers, config }
 
@@ -42,7 +44,9 @@ function init() {
   };
   const section = s?.section === 'revision' ? 'revision' : 'product';
   const productColumns = Array.isArray(s?.productColumns) ? s.productColumns : ['Code', '고객', '담당', '비고'];
-  return { projects, processes, config, section, activeByKind, activeId: activeByKind[section], productColumns, prevLayers: null };
+  // Revision 변경점: Runset 변경 STEP 목록 (사용자가 추가)
+  const runsetSteps = Array.isArray(s?.runsetSteps) && s.runsetSteps.length ? s.runsetSteps : [...DEFAULT_RUNSET_STEPS];
+  return { projects, processes, config, section, activeByKind, activeId: activeByKind[section], productColumns, runsetSteps, prevLayers: null };
 }
 
 /** 예전 Product: Part A/B → FEOL/BEOL, 공정 기준이면 담은 BEOL Layer로 BEOL Option을 정한다 */
@@ -62,11 +66,11 @@ export function useMtoStore() {
   const [state, dispatch] = useReducer(mtoReducer, undefined, init);
   useEffect(() => {
     try {
-      const { projects, processes, activeId, activeByKind, section, config, productColumns } = state;
-      localStorage.setItem(KEY, JSON.stringify({ projects, processes, activeId, activeByKind, section, config, productColumns }));
+      const { projects, processes, activeId, activeByKind, section, config, productColumns, runsetSteps } = state;
+      localStorage.setItem(KEY, JSON.stringify({ projects, processes, activeId, activeByKind, section, config, productColumns, runsetSteps }));
     } catch {
       /* 저장 불가 환경에서는 메모리에만 유지 */
     }
-  }, [state.projects, state.processes, state.activeId, state.section, state.config, state.productColumns]);
+  }, [state.projects, state.processes, state.activeId, state.section, state.config, state.productColumns, state.runsetSteps]);
   return [state, dispatch];
 }

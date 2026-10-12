@@ -19,7 +19,7 @@ import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.9.0';
+export const MTO_VERSION = '0.10.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -29,7 +29,7 @@ const NAV = {
     ['layers', 'Set List', 'layers'],
     ['table', 'Layer별 일정표', 'table'],
   ],
-  // Revision: Dashboard · 일정 현황(Layer별 일정표는 그 안에서 전환) · Concept(ITEM Layer 고르기)
+  // Revision: Dashboard · 일정 현황(아래에 Layer별 일정표) · Concept(ITEM Layer 고르기)
   revision: [
     ['all', 'Revision Dashboard', 'dashboard'],
     ['overview', 'Revision 일정 현황', 'gantt'],
@@ -204,17 +204,9 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
       <main className="main">
         {tab === 'all' && <Portfolio {...props} />}
         {perProject && !project && <NoneCard {...props} />}
-        {project && section === 'revision' && (tab === 'overview' || tab === 'table') && (
-          <div className="sub-switch">
-            <div className="seg" role="tablist" aria-label="Revision 일정 보기">
-              <button type="button" role="tab" aria-pressed={tab === 'overview'} onClick={() => go('overview')}>일정 현황</button>
-              <button type="button" role="tab" aria-pressed={tab === 'table'} onClick={() => go('table')}>Layer별 일정표</button>
-            </div>
-          </div>
-        )}
-        {project && tab === 'overview' && <Overview {...props} />}
+        {project && (tab === 'overview' || (tab === 'table' && section === 'revision')) && <Overview {...props} />}
         {project && tab === 'layers' && (section === 'revision' ? <ItemLayerList key={project.id} {...props} /> : project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}
-        {project && tab === 'table' && <ScheduleTable {...props} />}
+        {project && tab === 'table' && section !== 'revision' && <ScheduleTable {...props} />}
         {tab === 'products' && <ProductInfo {...props} />}
         {tab === 'process' && <ProcessSheet {...props} procLoc={procLoc} setProcLoc={setProcLoc} />}
         {tab === 'rules' && <Rules {...props} />}
