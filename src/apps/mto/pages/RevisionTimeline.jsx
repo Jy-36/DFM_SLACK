@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { makeCalendar } from '../lib/scheduler.js';
 import { addDays, fmtShort, fromDay, toDay, todayIso, weekdayOf } from '../lib/dates.js';
-import { CHANGE_KINDS, groupsOf } from '../components/RevisionChanges.jsx';
+import { CHANGE_KINDS, groupsOf, pendingKinds, prepText } from '../components/RevisionChanges.jsx';
 import { referenceOf } from '../components/RevisionReference.jsx';
 
 const LABEL_W = 200;
@@ -28,11 +28,14 @@ const maxD = (a, b) => (!a ? b : !b ? a : a > b ? a : b);
 
 /** 그날 이 ITEM은 어느 단계인지 */
 export function stageOn(item, d) {
-  const { result: r, marks } = item;
+  const { result: r, project } = item;
+  const changes = project?.changes;
+  const pend = pendingKinds(changes, d);
+  // 준비(DB · Runset · SPEC)가 안 끝났으면 준비 단계: 'Runset 준비중' · '2/3 준비중'
+  if (pend.length) return { key: 'prep', text: prepText(changes, d), short: prepText(changes, d), detail: pend.map(([, l]) => l).join(' · ') };
   if (!r) return { key: 'none', text: '계산 전' };
   const L = r.layers;
-  const pendingPrep = marks.filter((m) => m.date > d && m.kind !== 'stepx');
-  if (d < r.partAGds) return { key: 'prep', text: pendingPrep.length ? `준비 중 · ${pendingPrep.map((m) => m.label).join(', ')}` : 'GDS 대기' };
+  if (d < r.partAGds) return { key: 'prep', text: 'GDS 대기', short: 'GDS 대기' };
   const s1End = L.reduce((m, l) => maxD(m, l.step1End), null);
   if (d <= s1End) return { key: 'step1', text: 'STEP1' };
   const inS2 = L.filter((l) => l.step2Start <= d && d <= l.step2End).length;

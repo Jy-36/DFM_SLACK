@@ -170,7 +170,7 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
               <tbody>
                 {list.map((p) => {
                   const c = calcs[p.id];
-                  const st = stageOn({ result: c?.result, marks: prepMarks(p) }, day);
+                  const st = stageOn({ result: c?.result, marks: prepMarks(p), project: p }, day);
                   const iss = openIssues(p).length;
                   return (
                     <tr key={p.id} className={`${open === p.id ? 'cur' : ''} ${isDone(p) ? 'done' : ''}`} onClick={() => pick(p.id)}>
@@ -187,7 +187,7 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
                         </span>
                       </td>
                       <td className="num r">{p.layers.length}</td>
-                      <td><span className={`rt-st ${st.key}`} title={st.text}>{STAGE_LABEL[st.key]}</span></td>
+                      <td><span className={`rt-st ${st.key}`} title={st.detail || st.text}>{st.short || STAGE_LABEL[st.key]}</span></td>
                       <td className="num r">{iss ? <Pill tone="warn">{iss}</Pill> : <span className="muted">-</span>}</td>
                       <td className="small">{p.meta?.requester || <span className="muted">-</span>}</td>
                       <td className="row-act-cell" onClick={(e) => e.stopPropagation()}>

@@ -869,3 +869,11 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .done-tag { margin-left: 6px; padding: 1px 6px; border-radius: 5px; background: var(--good-soft); color: var(--good); font-size: 10.5px; font-weight: 800; white-space: nowrap; }
 .rd-table .icon-btn.on { color: var(--good); background: var(--good-soft); }
 .rd-table .row-act-cell { width: 104px; }
+/* v0.31: 준비 상태 */
+.chg-area-top { display: flex; align-items: center; }
+.chg-area-top .chg-area-h { flex: 1; min-width: 0; }
+.chg-ready { flex: none; margin-right: 12px; height: 26px; padding: 0 10px; border-radius: 7px; border: 1.5px dashed var(--warn); background: var(--warn-soft); color: var(--warn); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chg-ready.on { border: 1.5px solid transparent; background: var(--good-soft); color: var(--good); }
+.chg-ready.on.manual { border-color: var(--good); }
+.prep-st { padding: 4px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-weight: 800; font-size: 12.5px; white-space: nowrap; }
+.prep-st.ok { background: var(--good-soft); color: var(--good); }

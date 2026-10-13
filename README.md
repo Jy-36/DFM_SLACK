@@ -189,6 +189,7 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
 - Revision 일정 현황: 맨 위 Product · ITEM 고르기(접기/펼치기) → **변경점** DB · Runset · SPEC을 고르면 칸이 생겨요.
   DB는 바뀌는 것(A · B · C), Runset은 변경 STEP(없으면 + STEP으로 추가), 각각 준비 날짜 · 코멘트. SPEC은 준비 날짜 · 코멘트.
   GDS 입고일은 따로 넣지 않고 고른 변경점의 준비 날짜 중 가장 늦은 날로 계산해요 (하루 MTO · STEP2 동시는 규칙 기본값).
+- **준비 상태**: Changes의 DB · Runset · SPEC마다 [준비중 / 준비 완료] (날짜가 다 지나면 자동 완료, 눌러서 직접 지정). Changes 제목 옆과 Dashboard 단계 칸에 'Runset 준비중' · '2/3 준비중'처럼 표시.
 - ITEM **완료 · 삭제**: Dashboard 목록 · 오른쪽 패널 · Concept 설정에서 완료 처리(목록 · 타임라인 · ITEM 고르기에서 숨김, 상태 필터 [진행 · 완료 · 전체]로 다시 보기), 삭제는 확인 팝업 + 되돌리기. 이슈 삭제도 되돌리기.
 - **Revision Dashboard**: ITEM 목록(필터: Product · ITEM/요청자 · MTO Target 기간) + 걸러진 ITEM만 일정 타임라인(준비 → GDS → STEP1 → STEP2 → MTO, Target 깃발, Reference 곡선, 기준일 단계). ITEM을 누르면 오른쪽에 Concept 정보 패널, **+ ITEM**은 Concept 정보(Product · 이름 · Target · 요청자 · Comment · Changes · Reference · Layer)를 한 번에 넣는 창.
 - **Revision Concept**: 위 ITEM 고르기는 스크롤해도 위에 고정. 제목 `Product · ITEM` → 기본 정보 · Changes · Reference(접기) · Layer List(고른 것만) 모두 보기 → [수정] → 저장 → **Issues**(상태 Open/진행/완료 · 내용 · 담당자 · 기한) → 결과 · 간트 · Layer별 일정표 → **관련 자료**(링크).

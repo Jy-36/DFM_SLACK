@@ -3,7 +3,7 @@
 // 항목마다 오른쪽 위에 가장 늦은 날짜, GDS 입고일은 전체에서 가장 늦은 날. 저장해야 일정에 반영된다.
 import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
-import { fmtShort } from '../lib/dates.js';
+import { fmtShort, todayIso } from '../lib/dates.js';
 import DateField from './DateField.jsx';
 
 export const CHANGE_KINDS = [
@@ -29,6 +29,28 @@ export function kindLatest(changes, kind) {
   if (kind === 'db') return latest([...groupsOf(c, 'parts').map((g) => g.date), c.stepX?.on ? c.stepX.date : null]);
   if (kind === 'runset') return latest(groupsOf(c, 'steps').map((g) => g.date));
   return c.date || null;
+}
+
+/** 그날 기준 준비 상태: 직접 '준비 완료'로 정했거나, 날짜가 다 있고 가장 늦은 날이 지났으면 완료 */
+export function kindReady(changes, kind, day) {
+  const c = changes?.[kind];
+  if (!c?.on) return true;
+  if (c.ready) return true;
+  const d = kindLatest(changes, kind);
+  return !!d && d <= day;
+}
+/** 아직 준비 중인 항목: [['db','DB'], …] */
+export function pendingKinds(changes, day) {
+  return CHANGE_KINDS.filter(([k]) => changes?.[k]?.on && !kindReady(changes, k, day));
+}
+/** 준비 상태 한 줄: 'DB 준비중' · '2/3 준비중' · '준비 완료' */
+export function prepText(changes, day) {
+  const on = CHANGE_KINDS.filter(([k]) => changes?.[k]?.on);
+  const pend = pendingKinds(changes, day);
+  if (!on.length) return null;
+  if (!pend.length) return '준비 완료';
+  if (pend.length === 1) return `${pend[0][1]} 준비중`;
+  return `${pend.length}/${on.length} 준비중`;
 }
 
 /** 고른 변경점의 준비 날짜 중 가장 늦은 날 = GDS 입고 (없으면 null) */
@@ -182,6 +204,14 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
   const isOpen = (k) => open[`${editing ? 'edit' : 'view'}:${k}`] ?? editing;
   const toggleOpen = (k) => setOpen((o) => ({ ...o, [`${editing ? 'edit' : 'view'}:${k}`]: !isOpen(k) }));
 
+  // 준비 완료 표시는 보기 화면에서도 바로 저장
+  const toggleReady = (k) => {
+    const cur = changes[k] || {};
+    const patch = { ...cur, ready: !cur.ready };
+    if (live || draft) save(k, { ready: !cur.ready });
+    else dispatch({ type: 'updateProject', id: project.id, patch: { changes: { ...saved, [k]: { ...(saved[k] || {}), ready: !cur.ready } } } });
+    void patch;
+  };
   const save = (kind, patch) => {
     const next = { ...changes, [kind]: { ...(changes[kind] || {}), ...patch } };
     if (live) dispatch({ type: 'updateProject', id: project.id, patch: { changes: next } });
@@ -239,12 +269,18 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
     const o = isOpen(k);
     return (
       <div key={k} className={`chg-area ${k} ${o ? 'open' : 'closed'}`}>
+        <div className="chg-area-top">
         <button type="button" className="chg-area-h" onClick={() => toggleOpen(k)} aria-expanded={o}>
           <Icon name="chevron" size={13} />
           <b>{label}</b>
           {!o && <span className="cv-brief"><Brief kind={k} c={c} /></span>}
           <span className={`chg-latest num ${d ? '' : 'none'}`}>{d ? fmtShort(d) : '날짜 없음'}</span>
         </button>
+        <button type="button" className={`chg-ready ${kindReady(changes, k, todayIso()) ? 'on' : ''} ${c.ready ? 'manual' : ''}`} onClick={() => toggleReady(k)}
+          title={c.ready ? '눌러서 준비중으로' : kindReady(changes, k, todayIso()) ? '날짜가 지나 자동 완료 · 눌러서 완료로 고정' : '눌러서 준비 완료로'}>
+          {kindReady(changes, k, todayIso()) ? <><Icon name="check" size={12} /> 준비 완료</> : '준비중'}
+        </button>
+        </div>
         {o && <div className="chg-area-b">{editing ? body : viewBody}</div>}
       </div>
     );
@@ -258,6 +294,7 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
       <div className="chg-title">
         <h2>Changes</h2>
         <span className="chg-head-r">
+          {prepText(changes, todayIso()) && <span className={`prep-st ${pendingKinds(changes, todayIso()).length ? '' : 'ok'}`}>{prepText(changes, todayIso())}</span>}
           <span className={`chg-gds ${gds ? 'on' : ''}`}>
             <span className="small">GDS</span>
             <b className="num">{gds ? fmtShort(gds) : '-'}</b>
