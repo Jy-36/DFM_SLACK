@@ -863,3 +863,9 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .ai-comment { grid-column: 1 / -1; }
 .ai-sum { margin-right: auto; }
 .modal-body:has(.ai-body) { background: var(--bg); padding-top: 12px; }
+/* v0.30: ITEM 완료 · 삭제 */
+.rd-table tr.done td { color: var(--muted); }
+.rd-table tr.done td b { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.done-tag { margin-left: 6px; padding: 1px 6px; border-radius: 5px; background: var(--good-soft); color: var(--good); font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+.rd-table .icon-btn.on { color: var(--good); background: var(--good-soft); }
+.rd-table .row-act-cell { width: 104px; }

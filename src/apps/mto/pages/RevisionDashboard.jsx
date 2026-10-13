@@ -15,11 +15,12 @@ import RevisionReference from '../components/RevisionReference.jsx';
 import RevisionIssues from '../components/RevisionIssues.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
 import { LayerListPanel } from './ItemLayerList.jsx';
+import { Confirm } from '../components/Modal.jsx';
 
 const STAGE_LABEL = { prep: '준비', step1: 'STEP1', step2: 'STEP2', mto: 'MTO', done: '완료', none: '-' };
 
 /** 오른쪽 패널: 고른 ITEM의 Concept 정보 */
-function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose }) {
+function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose, actions }) {
   useEffect(() => {
     const k = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', k);
@@ -36,6 +37,7 @@ function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose
             <h2>{project.name}</h2>
           </div>
           <span className="chg-head-r">
+            {actions}
             <button type="button" className="btn small-btn primary" onClick={() => go('layers', project.id)}>Concept 열기</button>
             <button type="button" className="icon-btn sm" onClick={onClose} aria-label="닫기"><Icon name="close" size={15} /></button>
           </span>
@@ -51,7 +53,7 @@ function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose
           <RevisionChanges key={`c${project.id}`} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />
-          <RevisionIssues project={project} dispatch={dispatch} />
+          <RevisionIssues project={project} dispatch={dispatch} notify={notify} />
           <RevisionLinks project={project} dispatch={dispatch} notify={notify} />
         </div>
       </aside>
@@ -69,11 +71,17 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
   const [fText, setFText] = useState('');
   const [fFrom, setFFrom] = useState('');
   const [fTo, setFTo] = useState('');
+  const [fStatus, setFStatus] = useState('active'); // active | done | all
+  const [confirm, setConfirm] = useState(null);
   const [day, setDay] = useState(todayIso());
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const q = fText.trim().toLowerCase();
+  const isDone = (p) => p.status === 'done';
+  const doneCount = all.filter(isDone).length;
   const list = all.filter((p) => {
+    if (fStatus === 'active' && isDone(p)) return false;
+    if (fStatus === 'done' && !isDone(p)) return false;
     if (fProduct && p.parentId !== fProduct) return false;
     if (q && !p.name.toLowerCase().includes(q) && !(p.meta?.requester || '').toLowerCase().includes(q)) return false;
     const t = p.meta?.target;
@@ -89,6 +97,26 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
     setOpen(id);
   };
   const openP = open && state.projects.find((p) => p.id === open);
+  const setDone = (p, done) => {
+    dispatch({ type: 'updateProject', id: p.id, patch: { status: done ? 'done' : 'active', doneAt: done ? todayIso() : null } });
+    notify(done ? `${p.name} 완료 · 목록에서 숨겼어요` : `${p.name} 다시 진행`, { label: '되돌리기', run: () => dispatch({ type: 'updateProject', id: p.id, patch: { status: done ? 'active' : 'done' } }) });
+    if (done && fStatus === 'active' && open === p.id) setOpen(null);
+  };
+  const askDelete = (p) => setConfirm({
+    title: 'ITEM 삭제',
+    message: <><b>{p.name}</b>을 지울까요? Changes · Layer · Issues · 관련 자료가 함께 지워져요. 지운 뒤 알림의 [되돌리기]로 되살릴 수 있어요.</>,
+    onConfirm: () => {
+      dispatch({ type: 'removeProject', id: p.id });
+      if (open === p.id) setOpen(null);
+      notify(`${p.name}을 지웠어요`, { label: '되돌리기', run: () => dispatch({ type: 'restoreProject' }) });
+    },
+  });
+  const rowActs = (p) => (
+    <>
+      <button type="button" className={`icon-btn sm ${isDone(p) ? 'on' : ''}`} onClick={() => setDone(p, !isDone(p))} title={isDone(p) ? '다시 진행' : '완료'} aria-label={isDone(p) ? '다시 진행' : '완료'}><Icon name="check" size={14} /></button>
+      <button type="button" className="icon-btn sm" onClick={() => askDelete(p)} title="삭제" aria-label="삭제"><Icon name="trash" size={14} /></button>
+    </>
+  );
 
   return (
     <div className="page">
@@ -120,8 +148,16 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
               <DateField value={fTo} onChange={setFTo} label="Target 끝" placeholder="까지" />
             </span>
           </div>
+          <div className="field">
+            <span>상태</span>
+            <div className="seg" role="group" aria-label="상태">
+              {[['active', '진행'], ['done', `완료${doneCount ? ` ${doneCount}` : ''}`], ['all', '전체']].map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={fStatus === k} onClick={() => setFStatus(k)}>{label}</button>
+              ))}
+            </div>
+          </div>
           <span className="rd-count small muted">{list.length}/{all.length}</span>
-          {filtered && <button type="button" className="btn small-btn ghost" onClick={() => { setFProduct(''); setFText(''); setFFrom(''); setFTo(''); }}>초기화</button>}
+          {(filtered || fStatus !== 'active') && <button type="button" className="btn small-btn ghost" onClick={() => { setFProduct(''); setFText(''); setFFrom(''); setFTo(''); setFStatus('active'); }}>초기화</button>}
         </div>
         {all.length ? (
           <div className="table-wrap">
@@ -137,9 +173,9 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
                   const st = stageOn({ result: c?.result, marks: prepMarks(p) }, day);
                   const iss = openIssues(p).length;
                   return (
-                    <tr key={p.id} className={open === p.id ? 'cur' : ''} onClick={() => pick(p.id)}>
+                    <tr key={p.id} className={`${open === p.id ? 'cur' : ''} ${isDone(p) ? 'done' : ''}`} onClick={() => pick(p.id)}>
                       <td className="small">{parentName(p) || <span className="tone-warn">Product 없음</span>}</td>
-                      <td><b>{p.name}</b></td>
+                      <td><b>{p.name}</b>{isDone(p) && <span className="done-tag">완료{p.doneAt ? ` ${fmtShort(p.doneAt)}` : ''}</span>}</td>
                       <td className="num">{p.meta?.target ? fmtShort(p.meta.target) : <span className="muted">-</span>}</td>
                       <td><TargetGap target={p.meta?.target} result={c?.result} /></td>
                       <td>
@@ -155,12 +191,15 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
                       <td className="num r">{iss ? <Pill tone="warn">{iss}</Pill> : <span className="muted">-</span>}</td>
                       <td className="small">{p.meta?.requester || <span className="muted">-</span>}</td>
                       <td className="row-act-cell" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="icon-btn sm" onClick={() => go('layers', p.id)} title="Concept 열기" aria-label="Concept 열기"><Icon name="layers" size={14} /></button>
+                        <div className="row-act">
+                          <button type="button" className="icon-btn sm" onClick={() => go('layers', p.id)} title="Concept 열기" aria-label="Concept 열기"><Icon name="layers" size={14} /></button>
+                          {rowActs(p)}
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
-                {!list.length && <tr><td colSpan={10} className="muted small">조건에 맞는 ITEM이 없어요</td></tr>}
+                {!list.length && <tr><td colSpan={10} className="muted small">{fStatus === 'active' && doneCount ? `진행 중인 ITEM이 없어요 · 완료 ${doneCount}개는 [완료]에서` : '조건에 맞는 ITEM이 없어요'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -180,7 +219,12 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
         </section>
       )}
 
-      {openP && <ItemDrawer state={state} dispatch={dispatch} project={openP} calc={calcs[openP.id]} calcs={calcs} go={go} notify={notify} onClose={() => setOpen(null)} />}
+      {openP && <ItemDrawer state={state} dispatch={dispatch} project={openP} calc={calcs[openP.id]} calcs={calcs} go={go} notify={notify} onClose={() => setOpen(null)}
+        actions={<>
+          <button type="button" className={`btn small-btn ${isDone(openP) ? '' : 'ghost'}`} onClick={() => setDone(openP, !isDone(openP))}><Icon name="check" size={13} /> {isDone(openP) ? '다시 진행' : '완료'}</button>
+          <button type="button" className="btn small-btn ghost danger" onClick={() => askDelete(openP)}><Icon name="trash" size={13} /> 삭제</button>
+        </>} />}
+      {confirm && <Confirm danger confirmLabel="삭제" title={confirm.title} message={confirm.message} onConfirm={confirm.onConfirm} onClose={() => setConfirm(null)} />}
       {adding && <AddItemModal state={state} dispatch={dispatch} calcs={calcs} defaultParent={fProduct || undefined} onClose={() => setAdding(false)} onCreated={(name) => notify(`${name}을 만들었어요`)} />}
     </div>
   );

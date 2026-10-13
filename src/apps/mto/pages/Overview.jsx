@@ -119,7 +119,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />
-          <RevisionIssues project={project} dispatch={dispatch} />
+          <RevisionIssues project={project} dispatch={dispatch} notify={notify} />
         </>
       )}
 

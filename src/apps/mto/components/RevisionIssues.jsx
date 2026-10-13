@@ -17,7 +17,7 @@ export function openIssues(project) {
   return (project.issues || []).filter((i) => i.status !== 'done');
 }
 
-export default function RevisionIssues({ project, dispatch }) {
+export default function RevisionIssues({ project, dispatch, notify }) {
   const issues = project.issues || [];
   const [text, setText] = useState('');
   const [owner, setOwner] = useState('');
@@ -69,7 +69,7 @@ export default function RevisionIssues({ project, dispatch }) {
                 <input className="input is-owner ghost-in" value={i.owner || ''} placeholder="담당자" onChange={(e) => upd(i.id, { owner: e.target.value })} aria-label="담당자" />
                 <span className={over ? 'is-over' : ''}><DateField small value={i.due} onChange={(d) => upd(i.id, { due: d })} label="기한" placeholder="기한" /></span>
                 <span className="is-meta small muted num">{fmtShort(i.created)}{i.status === 'done' && i.closed ? ` → ${fmtShort(i.closed)}` : ''}</span>
-                <button type="button" className="icon-btn sm" onClick={() => set(issues.filter((x) => x.id !== i.id))} aria-label="이슈 지우기"><Icon name="close" size={13} /></button>
+                <button type="button" className="icon-btn sm" onClick={() => { const prev = issues; set(issues.filter((x) => x.id !== i.id)); notify?.('이슈를 지웠어요', { label: '되돌리기', run: () => set(prev) }); }} aria-label="이슈 지우기"><Icon name="close" size={13} /></button>
               </div>
             );
           })}
