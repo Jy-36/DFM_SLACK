@@ -9,6 +9,7 @@ import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
 import RevisionInfo from '../components/RevisionInfo.jsx';
+import RevisionFlow from '../components/RevisionFlow.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
 import RevisionReference from '../components/RevisionReference.jsx';
 import { LayerListPanel } from './ItemLayerList.jsx';
@@ -116,6 +117,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
       {rev && (
         <>
           <RevisionInfo key={`i${project.id}`} project={project} result={result} dispatch={dispatch} />
+          <RevisionFlow project={project} dispatch={dispatch} notify={notify} />
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />

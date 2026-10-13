@@ -16,6 +16,7 @@ import RevisionIssues from '../components/RevisionIssues.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
 import { LayerListPanel } from './ItemLayerList.jsx';
 import { Confirm } from '../components/Modal.jsx';
+import RevisionFlow, { StepChip } from '../components/RevisionFlow.jsx';
 
 const STAGE_LABEL = { prep: '준비', step1: 'STEP1', step2: 'STEP2', mto: 'MTO', done: '완료', none: '-' };
 
@@ -50,6 +51,7 @@ function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose
         </div>
         <div className="drawer-body">
           <RevisionInfo key={`i${project.id}`} project={project} result={r} dispatch={dispatch} />
+          <RevisionFlow project={project} dispatch={dispatch} notify={notify} />
           <RevisionChanges key={`c${project.id}`} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />
@@ -97,11 +99,7 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
     setOpen(id);
   };
   const openP = open && state.projects.find((p) => p.id === open);
-  const setDone = (p, done) => {
-    dispatch({ type: 'updateProject', id: p.id, patch: { status: done ? 'done' : 'active', doneAt: done ? todayIso() : null } });
-    notify(done ? `${p.name} 완료 · 목록에서 숨겼어요` : `${p.name} 다시 진행`, { label: '되돌리기', run: () => dispatch({ type: 'updateProject', id: p.id, patch: { status: done ? 'active' : 'done' } }) });
-    if (done && fStatus === 'active' && open === p.id) setOpen(null);
-  };
+
   const askDelete = (p) => setConfirm({
     title: 'ITEM 삭제',
     message: <><b>{p.name}</b>을 지울까요? Changes · Layer · Issues · 관련 자료가 함께 지워져요. 지운 뒤 알림의 [되돌리기]로 되살릴 수 있어요.</>,
@@ -113,7 +111,6 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
   });
   const rowActs = (p) => (
     <>
-      <button type="button" className={`icon-btn sm ${isDone(p) ? 'on' : ''}`} onClick={() => setDone(p, !isDone(p))} title={isDone(p) ? '다시 진행' : '완료'} aria-label={isDone(p) ? '다시 진행' : '완료'}><Icon name="check" size={14} /></button>
       <button type="button" className="icon-btn sm" onClick={() => askDelete(p)} title="삭제" aria-label="삭제"><Icon name="trash" size={14} /></button>
     </>
   );
@@ -164,7 +161,7 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
             <table className="data-table rd-table">
               <thead>
                 <tr>
-                  <th>Product</th><th>ITEM</th><th>MTO Target</th><th>예상 MTO</th><th>Changes</th><th className="r">Layer</th><th>{fmtShort(day)} 단계</th><th className="r">Issue</th><th>요청자</th><th />
+                  <th>Product</th><th>ITEM</th><th>MTO Target</th><th>예상 MTO</th><th>Changes</th><th className="r">Layer</th><th>Step</th><th>{fmtShort(day)} 일정</th><th className="r">Issue</th><th>요청자</th><th />
                 </tr>
               </thead>
               <tbody>
@@ -187,7 +184,8 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
                         </span>
                       </td>
                       <td className="num r">{p.layers.length}</td>
-                      <td><span className={`rt-st ${st.key}`} title={st.detail || st.text}>{st.short || STAGE_LABEL[st.key]}</span></td>
+                      <td><StepChip project={p} /></td>
+                      <td><span className={`rt-st ${st.key}`} title={st.detail || st.text}>{st.key === 'prep' ? '준비' : STAGE_LABEL[st.key]}</span></td>
                       <td className="num r">{iss ? <Pill tone="warn">{iss}</Pill> : <span className="muted">-</span>}</td>
                       <td className="small">{p.meta?.requester || <span className="muted">-</span>}</td>
                       <td className="row-act-cell" onClick={(e) => e.stopPropagation()}>
@@ -199,7 +197,7 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
                     </tr>
                   );
                 })}
-                {!list.length && <tr><td colSpan={10} className="muted small">{fStatus === 'active' && doneCount ? `진행 중인 ITEM이 없어요 · 완료 ${doneCount}개는 [완료]에서` : '조건에 맞는 ITEM이 없어요'}</td></tr>}
+                {!list.length && <tr><td colSpan={11} className="muted small">{fStatus === 'active' && doneCount ? `진행 중인 ITEM이 없어요 · 완료 ${doneCount}개는 [완료]에서` : '조건에 맞는 ITEM이 없어요'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -221,7 +219,6 @@ export default function RevisionDashboard({ state, dispatch, calcs, go, notify }
 
       {openP && <ItemDrawer state={state} dispatch={dispatch} project={openP} calc={calcs[openP.id]} calcs={calcs} go={go} notify={notify} onClose={() => setOpen(null)}
         actions={<>
-          <button type="button" className={`btn small-btn ${isDone(openP) ? '' : 'ghost'}`} onClick={() => setDone(openP, !isDone(openP))}><Icon name="check" size={13} /> {isDone(openP) ? '다시 진행' : '완료'}</button>
           <button type="button" className="btn small-btn ghost danger" onClick={() => askDelete(openP)}><Icon name="trash" size={13} /> 삭제</button>
         </>} />}
       {confirm && <Confirm danger confirmLabel="삭제" title={confirm.title} message={confirm.message} onConfirm={confirm.onConfirm} onClose={() => setConfirm(null)} />}

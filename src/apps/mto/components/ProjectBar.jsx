@@ -202,13 +202,6 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
             <button type="button" className="icon-btn sm" disabled={idx === 0} onClick={() => dispatch({ type: 'moveProject', id: p.id, dir: -1 })} title="앞으로" aria-label="앞으로"><Icon name="left" size={15} /></button>
             <button type="button" className="icon-btn sm" disabled={idx === list.length - 1} onClick={() => dispatch({ type: 'moveProject', id: p.id, dir: 1 })} title="뒤로" aria-label="뒤로"><Icon name="right" size={15} /></button>
             <button type="button" className="btn small-btn" onClick={() => dispatch({ type: 'duplicateProject', id: p.id })}><Icon name="copy" size={14} /> 복사</button>
-            {p.kind === 'revision' && (
-              <button type="button" className={`btn small-btn ${p.status === 'done' ? '' : 'ghost'}`} onClick={() => {
-                const done = p.status !== 'done';
-                dispatch({ type: 'updateProject', id: p.id, patch: { status: done ? 'done' : 'active', doneAt: done ? new Date().toISOString().slice(0, 10) : null } });
-                notify?.(done ? `${p.name} 완료 · Dashboard에서 숨겨져요` : `${p.name} 다시 진행`);
-              }}><Icon name="check" size={14} /> {p.status === 'done' ? '완료됨 · 다시 열기' : '완료'}</button>
-            )}
             <button type="button" className="btn small-btn ghost danger" onClick={remove}><Icon name="trash" size={14} /> 삭제</button>
           </span>
           {editing && <span className="small muted pb-hint">이름은 바로 저장돼요</span>}

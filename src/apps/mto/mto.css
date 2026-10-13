@@ -877,3 +877,35 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .chg-ready.on.manual { border-color: var(--good); }
 .prep-st { padding: 4px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-weight: 800; font-size: 12.5px; white-space: nowrap; }
 .prep-st.ok { background: var(--good-soft); color: var(--good); }
+/* v0.32: 진행 Step */
+.flow-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; font-weight: 800; white-space: nowrap; background: var(--surface-3); color: var(--muted); }
+.flow-chip.prep { background: var(--warn-soft); color: var(--warn); }
+.flow-chip.stepx { background: color-mix(in srgb, var(--warn) 22%, var(--surface)); color: var(--warn); }
+.flow-chip.dwr { background: var(--bad-soft); color: var(--bad); }
+.flow-chip.dp { background: var(--sky-soft); color: var(--sky); }
+.flow-chip.ebeam { background: var(--leave-soft); color: var(--leave); }
+.flow-chip.mto { background: var(--good-soft); color: var(--good); }
+.flow .chg-title h2 { gap: 10px; }
+.flow .chg-title h2 .flow-chip { height: 24px; font-size: 12.5px; }
+.flow-bar { list-style: none; margin: 4px 0 12px; padding: 0; display: flex; align-items: stretch; gap: 0; overflow-x: auto; }
+.flow-step { position: relative; flex: 1; min-width: 104px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 6px; text-align: center; }
+.flow-step::before { content: ''; position: absolute; top: 15px; left: -50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
+.flow-step:first-child::before { display: none; }
+.flow-step.done::before, .flow-step.now::before { background: var(--good); }
+.flow-dot { position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--surface); border: 2px solid var(--line-strong); color: var(--muted); }
+.flow-step.done .flow-dot { background: var(--good); border-color: var(--good); color: #fff; }
+.flow-step.now .flow-dot { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+.flow-name { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.flow-step.now .flow-name { color: var(--accent); }
+.flow-step.done .flow-name { color: var(--fg); }
+.flow-date { font-size: 11px; color: var(--muted); }
+.flow-act { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+.flow-act .input { flex: 1; min-width: 180px; height: 34px; }
+.flow-act-t { min-width: 96px; color: var(--accent); }
+.flow-act.prep { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
+.flow-act.mto { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.flow-act.mto .flow-act-t { color: var(--good); }
+.flow-log { margin-top: 10px; display: flex; flex-direction: column; }
+.flow-rec { display: grid; grid-template-columns: 150px auto minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px 2px; border-top: 1px solid var(--line); }
+.flow-rec:first-child { border-top: 0; }
+.flow-rec-k { font-size: 12.5px; font-weight: 700; }
