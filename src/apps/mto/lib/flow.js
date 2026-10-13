@@ -46,3 +46,15 @@ export function stepBack(p) {
   delete f[last];
   return { patch: { flow: f, ...(last === 'ebeam' ? { status: 'active', doneAt: null } : {}) }, key: last };
 }
+
+/** 간트 위쪽 Step 줄: Changes 준비(기간) · 각 Step 예상/실제 · MTO(Target/완료) */
+export function flowMilestones(p, changeDates = []) {
+  const f = p.flow || {};
+  const plan = p.flowPlan || {};
+  const ds = changeDates.filter(Boolean).sort();
+  const out = [];
+  if (ds.length) out.push({ key: 'prep', label: 'Changes 준비', span: [ds[0], ds.at(-1)] });
+  for (const k of stepsOf(p).filter((x) => ACT_STEPS.includes(x))) out.push({ key: k, label: STEPS[k].name, plan: plan[k] || '', actual: f[k]?.date || '' });
+  out.push({ key: 'mto', label: 'MTO 완료', plan: p.meta?.target || '', actual: p.status === 'done' ? p.doneAt || f.ebeam?.date || '' : '' });
+  return out;
+}

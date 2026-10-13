@@ -10,6 +10,8 @@ import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
 import RevisionInfo from '../components/RevisionInfo.jsx';
 import RevisionFlow from '../components/RevisionFlow.jsx';
+import { flowMilestones } from '../lib/flow.js';
+import { prepMarks } from './RevisionTimeline.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
 import RevisionReference from '../components/RevisionReference.jsx';
 import { LayerListPanel } from './ItemLayerList.jsx';
@@ -116,7 +118,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {rev && (
         <>
-          <RevisionInfo key={`i${project.id}`} project={project} result={result} dispatch={dispatch} />
+          <RevisionInfo key={`i${project.id}`} project={project} result={result} dispatch={dispatch} products={state.projects.filter((x) => x.kind === 'product')} />
           <RevisionFlow project={project} dispatch={dispatch} notify={notify} />
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
@@ -143,7 +145,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {result && an && (
         <>
-          <section className="panel today mto-hero">
+          {!rev && <><section className="panel today mto-hero">
             <div className="today-main">
               <span className="label">최종 MTO</span>
               <div className="clock-big">
@@ -198,6 +200,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
             </section>
           </div>
 
+          </>}
           {!rev && <section className="panel">
             <h2>시나리오 비교 <span className="small muted">하루 MTO 수 × STEP2 동시 진행 수 · 행을 누르면 그 조건으로 바뀝니다</span></h2>
             <Scenarios grid={an.grid} result={result} onPick={pickScenario} />
@@ -208,7 +211,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
               일정 간트
               <GanttLegend />
             </h2>
-            <Gantt result={result} />
+            <Gantt result={result} milestones={rev ? flowMilestones(project, prepMarks(project).map((m) => m.date)) : []} />
           </section>
           {rev && <LayerSchedule project={project} result={result} notify={notify} />}
         </>

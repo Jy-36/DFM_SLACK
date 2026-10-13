@@ -16,14 +16,16 @@ export function TargetGap({ target, result }) {
   );
 }
 
-export default function RevisionInfo({ project, result, dispatch, live }) {
+export default function RevisionInfo({ project, result, dispatch, live, products }) {
   const meta = project.meta || {};
   const [draft, setDraft] = useState(null);
   const editing = live || !!draft;
   const m = live ? meta : draft || meta;
   const set = (patch) => (live ? dispatch({ type: 'updateProject', id: project.id, patch: { meta: { ...meta, ...patch } } }) : setDraft({ ...m, ...patch }));
   const save = () => {
-    dispatch({ type: 'updateProject', id: project.id, patch: { meta: draft } });
+    const { _name, _parent, ...metaOnly } = draft;
+    dispatch({ type: 'updateProject', id: project.id, patch: { meta: metaOnly, ...(_name && _name.trim() ? { name: _name.trim() } : {}) } });
+    if (_parent && _parent !== project.parentId) dispatch({ type: 'project', patch: { parentId: _parent } });
     setDraft(null);
   };
 
@@ -37,12 +39,22 @@ export default function RevisionInfo({ project, result, dispatch, live }) {
         <div className="rv-cell"><TargetGap target={meta.target} result={result} /></div>
         <div className="rv-cell"><span className="rv-k">요청자</span><span className="rv-v">{meta.requester || <span className="muted">-</span>}</span></div>
         <div className="rv-cell grow"><span className="rv-k">Comment</span><span className="rv-v">{meta.comment || <span className="muted">-</span>}</span></div>
-        <button type="button" className="btn small-btn rv-edit" onClick={() => setDraft({ ...meta })}><Icon name="settings" size={13} /> 수정</button>
+        <button type="button" className="btn small-btn rv-edit" onClick={() => setDraft({ ...meta, _name: project.name, _parent: project.parentId })}><Icon name="settings" size={13} /> 수정</button>
       </section>
     );
   }
   return (
     <section className={`panel rv-info ${live ? 'live' : 'editing'}`}>
+      {!live && products && (
+        <div className="rv-names">
+          <label className="field"><span>Product</span>
+            <select className="input" value={m._parent || ''} onChange={(e) => set({ _parent: e.target.value })}>
+              {products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          <label className="field"><span>ITEM 이름</span><input className="input" value={m._name || ''} onChange={(e) => set({ _name: e.target.value })} /></label>
+        </div>
+      )}
       <label className="field rv-target">
         <span>MTO Target</span>
         <DateField value={m.target} onChange={(target) => set({ target })} label="MTO Target" />

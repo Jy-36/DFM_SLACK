@@ -32,7 +32,11 @@ export function GanttLegend() {
   );
 }
 
-export default function Gantt({ result, highlight }) {
+const minD = (a, b) => (!a ? b : !b ? a : a < b ? a : b);
+const maxD = (a, b) => (!a ? b : !b ? a : a > b ? a : b);
+
+/** milestones: [{ key, label, plan, actual, span: [from, to] }] — 위쪽에 Step 예상(빈 마름모) · 실제(꽉 찬 마름모) 줄 */
+export default function Gantt({ result, highlight, milestones = [] }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(1000);
   const [tip, setTip] = useState(null);
@@ -47,16 +51,20 @@ export default function Gantt({ result, highlight }) {
   }, []);
 
   const geo = useMemo(() => {
-    const t0 = toDay(result.partAGds);
-    const nDays = diffDays(result.finalMto, result.partAGds) + 4;
+    let lo = result.partAGds;
+    let hi = result.finalMto;
+    for (const m of milestones) for (const d of [m.plan, m.actual, ...(m.span || [])]) { lo = minD(lo, d); hi = maxD(hi, d); }
+    const start = lo < result.partAGds ? addDays(lo, -1) : lo;
+    const t0 = toDay(start);
+    const nDays = diffDays(hi, start) + 4;
     const colW = Math.max(14, Math.min(30, Math.floor((width - LABEL_W - PAD_R) / nDays)));
     const parts = Object.keys(result.step1);
     const W = LABEL_W + colW * nDays + PAD_R;
-    const H = TOP + ROW * (result.layers.length + parts.length) + 14;
+    const H = TOP + ROW * (result.layers.length + parts.length + milestones.length) + (milestones.length ? 8 : 0) + 14;
     const cal = makeCalendar(result.config);
-    const off = new Map(cal.holidaysBetween(result.partAGds, addDays(result.partAGds, nDays - 1), false).map((h) => [h.date, h.name]));
+    const off = new Map(cal.holidaysBetween(start, addDays(start, nDays - 1), false).map((h) => [h.date, h.name]));
     return { t0, nDays, colW, parts, W, H, off };
-  }, [result, width]);
+  }, [result, width, milestones]);
 
   const { t0, nDays, colW, parts, W, H, off } = geo;
   const x = (iso) => LABEL_W + (toDay(iso) - t0) * colW;
@@ -101,6 +109,37 @@ export default function Gantt({ result, highlight }) {
   const rows = [];
   let y = TOP;
   const bh = ROW - 9;
+  // Step 예상 · 실제 (위쪽)
+  const dia = (cx, cy, r, cls) => `M${cx},${cy - r} l${r},${r} l${-r},${r} l${-r},${-r} z`;
+  for (const m of milestones) {
+    const cy = y + ROW / 2;
+    rows.push(<rect key={`ms-b${m.key}`} className="ms-band" x={0} y={y} width={W} height={ROW} />);
+    rows.push(<text key={`ms-l${m.key}`} className={`lbl ms-lbl ${m.key}`} x={10} y={cy + 4}>{m.label}</text>);
+    if (m.span && m.span[0]) {
+      rows.push(bar(`ms-s${m.key}`, `ms-span ${m.key}`, x(m.span[0]), y + 7, xEnd(m.span[1] || m.span[0]) - x(m.span[0]), bh - 6, {
+        cls: 'ms', title: m.label, rows: [['시작', fmtShort(m.span[0])], ['끝', fmtShort(m.span[1] || m.span[0])]],
+      }));
+    }
+    if (m.plan && m.actual && m.plan !== m.actual) {
+      rows.push(<line key={`ms-d${m.key}`} className={`ms-delay ${m.actual > m.plan ? 'late' : 'early'}`} x1={x(m.plan) + colW / 2} x2={x(m.actual) + colW / 2} y1={cy} y2={cy} />);
+    }
+    const tipRows = [...(m.plan ? [['예상', fmtShort(m.plan)]] : []), ...(m.actual ? [['실제', fmtShort(m.actual)]] : [])];
+    if (m.plan) {
+      rows.push(<g key={`ms-p${m.key}`} className="g-bar" onPointerMove={(e) => showTip(e, { cls: 'ms', title: `${m.label} · 예상`, rows: tipRows })} onPointerLeave={() => setTip(null)}>
+        <path className={`ms-plan ${m.key}`} d={dia(x(m.plan) + colW / 2, cy, 6)} />
+      </g>);
+    }
+    if (m.actual) {
+      rows.push(<g key={`ms-a${m.key}`} className="g-bar" onPointerMove={(e) => showTip(e, { cls: 'ms', title: `${m.label} · 완료`, rows: tipRows })} onPointerLeave={() => setTip(null)}>
+        <path className={`ms-act ${m.key} ${m.plan && m.actual > m.plan ? 'late' : ''}`} d={dia(x(m.actual) + colW / 2, cy, 6)} />
+      </g>);
+    }
+    y += ROW;
+  }
+  if (milestones.length) {
+    rows.push(<line key="ms-sep" className="month-line" x1={0} x2={W} y1={y + 4} y2={y + 4} />);
+    y += 8;
+  }
   for (const part of parts) {
     const s1 = result.step1[part];
     const gds = s1.gds;

@@ -50,7 +50,7 @@ function ItemDrawer({ state, dispatch, project, calc, calcs, go, notify, onClose
           <span><span className="small muted">Layer</span><b className="num">{project.layers.length}장</b></span>
         </div>
         <div className="drawer-body">
-          <RevisionInfo key={`i${project.id}`} project={project} result={r} dispatch={dispatch} />
+          <RevisionInfo key={`i${project.id}`} project={project} result={r} dispatch={dispatch} products={state.projects.filter((x) => x.kind === 'product')} />
           <RevisionFlow project={project} dispatch={dispatch} notify={notify} />
           <RevisionChanges key={`c${project.id}`} project={project} state={state} dispatch={dispatch} notify={notify} />
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />

@@ -76,9 +76,10 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
   const chip = (x) => {
     const st = projectStatus(calcs[x.id]);
     return (
-      <button key={x.id} type="button" role="tab" aria-selected={x.id === p.id} className={`pb-chip ${x.kind}`} onClick={() => dispatch({ type: 'select', id: x.id })}>
+      <button key={x.id} type="button" role="tab" aria-selected={x.id === p.id} className={`pb-chip ${x.kind}`} onClick={() => { dispatch({ type: 'select', id: x.id }); if (collapsible && open && x.id !== p.id) toggleOpen(); }}>
         <KindTag kind={x.kind} />
         <span className="pb-name">{x.name}</span>
+        {x.kind === 'revision' && x.meta?.target && <span className="pb-tg num">T {fmtShort(x.meta.target)}</span>}
         <span className={`pb-st ${st.tone} num`}>{st.text}</span>
       </button>
     );
@@ -93,14 +94,14 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
       {collapsible && (
         <button type="button" className="pb-fold" onClick={toggleOpen} aria-expanded={isOpen}>
           <Icon name="chevron" size={14} />
-          <span className="small muted">{section === 'product' ? 'Product 고르기' : 'Product · Revision ITEM 고르기'}</span>
-          {!isOpen && (
-            <span className="pb-fold-cur">
-              {p.kind === 'revision' && parentOf(p) && <span className="small muted">{parentOf(p).name} ›</span>}
-              <KindTag kind={p.kind} /> <b>{p.name}</b> <span className={`pb-st ${st.tone} num`}>{st.text}</span>
-            </span>
-          )}
-          <span className="small muted pb-fold-hint">{isOpen ? '접기' : '펼치기'}</span>
+          <span className="pb-fold-cur">
+            {p.kind === 'revision' && <span className="pb-cur-prod">{parentOf(p)?.name || 'Product 없음'}</span>}
+            {p.kind === 'revision' && <span className="muted">›</span>}
+            <b className="pb-cur-name">{p.name}</b>
+            {p.kind === 'revision' && <span className="pb-cur-tg small">Target <b className="num">{p.meta?.target ? fmtShort(p.meta.target) : '-'}</b></span>}
+            <span className={`pb-st ${st.tone} num`}>{st.text}</span>
+          </span>
+          <span className="small muted pb-fold-hint">{isOpen ? '닫기' : 'ITEM 바꾸기'}</span>
         </button>
       )}
       {isOpen && (section === 'product' ? (
@@ -126,7 +127,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
         </div>
       ))}
 
-      {showSettings && isOpen && (
+      {showSettings && isOpen && !collapsible && (
         <div className="pb-settings">
           <label className="field pb-title">
             <span>{p.kind === 'revision' ? 'ITEM 이름' : 'Product 이름'}</span>

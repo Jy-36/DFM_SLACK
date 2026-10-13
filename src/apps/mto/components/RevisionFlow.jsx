@@ -15,6 +15,7 @@ export default function RevisionFlow({ project, dispatch, notify, compact }) {
   const today = todayIso();
   const cur = currentStep(project, today);
   const f = project.flow || {};
+  const plan = project.flowPlan || {};
   const [date, setDate] = useState(today);
   const [comment, setComment] = useState('');
   useEffect(() => { setDate(today); setComment(''); }, [cur.key, project.id, today]);
@@ -53,6 +54,12 @@ export default function RevisionFlow({ project, dispatch, notify, compact }) {
               <span className="flow-dot">{st === 'done' ? <Icon name="check" size={11} /> : i + 1}</span>
               <span className="flow-name">{STEPS[k].name}</span>
               {d && st !== 'todo' && <span className="flow-date num">{fmtShort(d)}</span>}
+              {ACT_STEPS.includes(k) && st !== 'done' && (
+                <span className="flow-plan" title="예상 날짜">
+                  <DateField small value={plan[k]} onChange={(v) => upd({ flowPlan: { ...plan, [k]: v } })} label={`${STEPS[k].name} 예상 날짜`} placeholder="예상" />
+                </span>
+              )}
+              {k === 'mto' && st !== 'done' && project.meta?.target && <span className="flow-date num">Target {fmtShort(project.meta.target)}</span>}
             </li>
           );
         })}
