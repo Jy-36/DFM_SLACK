@@ -58,3 +58,32 @@ export function flowMilestones(p, changeDates = []) {
   out.push({ key: 'mto', label: 'MTO 완료', plan: p.meta?.target || '', actual: p.status === 'done' ? p.doneAt || f.ebeam?.date || '' : '' });
   return out;
 }
+
+/** 예상 날짜를 안 넣은 Step의 기본 기간 (달력 일) */
+export const STEP_DAYS = { stepx: 3, dwr: 2, dp: 5, ebeam: 2 };
+const addD = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+/** Revision Step 일정: [{ key, label, start, end, state: 'done'|'plan'|'auto'|'now', ... }] + mto
+ *  Changes 준비(준비 날짜 기간) → 각 Step은 앞 Step이 끝난 날부터 완료일 · 예상일 · (없으면) 기본 기간까지 */
+export function stepSchedule(p, changeDates = [], today) {
+  const f = p.flow || {};
+  const plan = p.flowPlan || {};
+  const ds = changeDates.filter(Boolean).sort();
+  const cur = currentStep(p, today).key;
+  const rows = [];
+  const prepEnd = ds.at(-1) || today;
+  rows.push({ key: 'prep', label: 'Changes 준비', start: ds[0] || today, end: prepEnd, state: cur === 'prep' ? 'now' : 'done' });
+  let prev = prepEnd;
+  for (const k of stepsOf(p).filter((x) => ACT_STEPS.includes(x))) {
+    const actual = f[k]?.date || '';
+    const pl = plan[k] || '';
+    let end = actual || pl || addD(prev > today || actual ? prev : today, STEP_DAYS[k]);
+    if (end < prev) end = prev;
+    const state = actual ? 'done' : k === cur ? 'now' : pl ? 'plan' : 'auto';
+    rows.push({ key: k, label: STEPS[k].name, start: prev, end, state, plan: pl, actual, auto: !actual && !pl });
+    prev = end;
+  }
+  const done = p.status === 'done';
+  rows.push({ key: 'mto', label: 'MTO 완료', start: prev, end: done ? p.doneAt || prev : prev, state: done ? 'done' : 'plan', target: p.meta?.target || '', milestone: true });
+  return rows;
+}

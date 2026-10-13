@@ -31,6 +31,8 @@ export function newProject(kind, projects = [], patch = {}) {
 export function effectiveConfig(config, project, proc = null) {
   const c = { ...config, ...(proc && project.kind !== 'revision' ? processConfig(proc) : {}), ...(project.override || {}) };
   if (project.kind === 'revision') c.step1Tat = { [REVISION_PART]: project.step1Tat ?? config.revisionStep1Tat };
+  // Revision은 STEP2 동시 진행 제한을 두지 않는다
+  if (project.kind === 'revision') c.step2Concurrency = null;
   return c;
 }
 

@@ -3,14 +3,15 @@ import { Stat, Pill, Icon } from '../../../shared/ui.jsx';
 import { QuickControls } from '../components/Controls.jsx';
 import Gantt, { GanttLegend } from '../components/Gantt.jsx';
 import { Bottlenecks, CriticalPath, Recommendations, Risks, Scenarios } from '../components/Insights.jsx';
-import { fmtLong, fmtShort } from '../lib/dates.js';
+import { fmtLong, fmtShort, todayIso } from '../lib/dates.js';
 import { EXAMPLE_GDS, EXAMPLE_LAYERS, EXAMPLE_REVISION } from '../lib/layers.js';
 import { partLabel } from '../lib/scheduler.js';
 import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
 import RevisionInfo from '../components/RevisionInfo.jsx';
 import RevisionFlow from '../components/RevisionFlow.jsx';
-import { flowMilestones } from '../lib/flow.js';
+import { stepSchedule } from '../lib/flow.js';
+import StepGantt, { StepGanttLegend } from '../components/StepGantt.jsx';
 import { prepMarks } from './RevisionTimeline.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
 import RevisionReference from '../components/RevisionReference.jsx';
@@ -124,6 +125,10 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
           <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
           <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />
           <RevisionIssues project={project} dispatch={dispatch} notify={notify} />
+          <section className="panel">
+            <h2>Step 일정 <StepGanttLegend /></h2>
+            <StepGantt rows={stepSchedule(project, prepMarks(project).filter((m) => m.kind !== 'stepx').map((m) => m.date), todayIso())} config={state.config} />
+          </section>
         </>
       )}
 
@@ -206,13 +211,15 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
             <Scenarios grid={an.grid} result={result} onPick={pickScenario} />
           </section>}
 
-          <section className="panel">
-            <h2>
-              일정 간트
-              <GanttLegend />
-            </h2>
-            <Gantt result={result} milestones={rev ? flowMilestones(project, prepMarks(project).map((m) => m.date)) : []} />
-          </section>
+          {!rev && (
+            <section className="panel">
+              <h2>
+                일정 간트
+                <GanttLegend />
+              </h2>
+              <Gantt result={result} />
+            </section>
+          )}
           {rev && <LayerSchedule project={project} result={result} notify={notify} />}
         </>
       )}

@@ -935,3 +935,27 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .gantt .ms-delay.early { stroke: var(--good); }
 .pb-chip .pb-tg { white-space: nowrap; }
 .pb-chip .pb-name { max-width: none; }
+/* v0.34: Revision Step 간트 */
+.sg .sg-bar.done { fill: var(--good); }
+.sg .sg-bar.now { fill: var(--accent); }
+.sg .sg-bar.plan { fill: color-mix(in srgb, var(--accent) 35%, var(--surface)); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 2; }
+.sg .sg-bar.prep.done { fill: color-mix(in srgb, var(--warn) 70%, var(--surface)); }
+.sg .sg-bar.prep.now { fill: var(--warn); }
+.sg .sg-hatch-bg { fill: color-mix(in srgb, var(--muted) 12%, var(--surface)); }
+.sg .sg-hatch { fill: color-mix(in srgb, var(--muted) 45%, var(--surface)); }
+.sg .sg-bar.auto { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 2; }
+.sg .sg-lbl.now { fill: var(--accent); }
+.sg .sg-lbl.auto, .sg .sg-lbl.plan { fill: var(--muted); }
+.sg .sg-ms { fill: var(--surface); stroke: var(--good); stroke-width: 2; stroke-dasharray: 3 2; }
+.sg .sg-ms.done { fill: var(--good); stroke: var(--surface); stroke-dasharray: none; }
+.sg .sg-ms.late { stroke: var(--bad); }
+.sg .sg-ms.done.late { fill: var(--bad); }
+.sg .lbl.final.late { fill: var(--bad); }
+.sg .sg-target line { stroke: var(--good); stroke-width: 2; stroke-dasharray: 5 3; }
+.sg .sg-target text { font-size: 11px; font-weight: 700; fill: var(--good); }
+.sw.sg.done { background: var(--good); }
+.sw.sg.now { background: var(--accent); }
+.sw.sg.plan { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); border: 1px dashed var(--accent); }
+.sw.sg.auto { background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--muted) 45%, var(--surface)) 0 2px, color-mix(in srgb, var(--muted) 12%, var(--surface)) 2px 5px); }
+.sw.sg.target { width: 3px !important; background: var(--good); }
+.sg-tline { display: inline-block; width: 0; height: 12px; border-left: 2px dashed var(--good); }
