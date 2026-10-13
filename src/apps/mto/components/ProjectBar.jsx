@@ -122,7 +122,7 @@ export default function ProjectBar({ state, dispatch, calcs, notify, showSetting
               </div>
             );
           })}
-          <div className="pb-row"><AddItem state={state} dispatch={dispatch} defaultParent={p.parentId} /></div>
+          {!collapsible && <div className="pb-row"><AddItem state={state} dispatch={dispatch} defaultParent={p.parentId} /></div>}
         </div>
       ))}
 

@@ -185,12 +185,12 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
 - FEOL Concept · Module · BEOL Option은 **+** 버튼(분류 묶음 옆, 각 편집 화면)에서 팝업으로 추가해요. BEOL Option은 Reference Copy(Layer · 순서 복사) 또는 새로 Setting.
 - Module은 ▲▼로 순서를 바꿀 수 있고, 시트와 Set List의 FEOL Layer 순서도 같이 바뀌어요.
 - 앱 이름 아래 도구줄의 **‹ ›**(뒤로 · 앞으로, Alt + ← / →, 마우스 뒤로·앞으로 버튼)와 메뉴 접기 버튼 — MTO와 WorkTime 공통. MTO는 메뉴 · Product · 공정 분류 이동, WorkTime은 메뉴와 근무기록 달을 되돌아가요.
-- Revision 메뉴: **Revision Dashboard · Revision 일정 현황 · Revision Concept**.
+- Revision 메뉴: **Dashboard · Concept**. 왼쪽 위는 앱 이름 · 버전 옆에 뒤로 · 앞으로 · 메뉴 접기.
 - Revision 일정 현황: 맨 위 Product · ITEM 고르기(접기/펼치기) → **변경점** DB · Runset · SPEC을 고르면 칸이 생겨요.
   DB는 바뀌는 것(A · B · C), Runset은 변경 STEP(없으면 + STEP으로 추가), 각각 준비 날짜 · 코멘트. SPEC은 준비 날짜 · 코멘트.
   GDS 입고일은 따로 넣지 않고 고른 변경점의 준비 날짜 중 가장 늦은 날로 계산해요 (하루 MTO · STEP2 동시는 규칙 기본값).
-- **Revision 일정 현황**: 날짜 기준으로 모든 ITEM을 Product별로 한 화면에 — ITEM마다 준비 날짜(DB · Runset · SPEC · Step X) → GDS → STEP1 → STEP2 → MTO를 한 줄로 잇고, MTO Target 깃발, Reference로 이어진 ITEM은 곡선으로. 날짜를 누르면 그날 ITEM별 단계.
-- **Revision Concept**: 제목 `Product · ITEM`, 아래 MTO Target(예상 MTO와 여유/늦음) · 요청자 · Comment → **Links**(관련 자료 링크, 누르면 브라우저 · 탐색기로) → **Changes**(보기 → [수정] → 저장. DB · Runset · SPEC은 접고 펴기, 오른쪽에 가장 늦은 날짜. 줄마다 날짜 · 코멘트 · 담당자, 끌어서 묶기 · 떼기, DB Step X는 대상 A · B · C) → **Reference** → **Layer List** → 결과 · 간트 · Layer별 일정표.
+- **Revision Dashboard**: ITEM 목록(필터: Product · ITEM/요청자 · MTO Target 기간) + 걸러진 ITEM만 일정 타임라인(준비 → GDS → STEP1 → STEP2 → MTO, Target 깃발, Reference 곡선, 기준일 단계). ITEM을 누르면 오른쪽에 Concept 정보 패널, **+ ITEM**은 Concept 정보(Product · 이름 · Target · 요청자 · Comment · Changes · Reference · Layer)를 한 번에 넣는 창.
+- **Revision Concept**: 위 ITEM 고르기는 스크롤해도 위에 고정. 제목 `Product · ITEM` → 기본 정보 · Changes · Reference(접기) · Layer List(고른 것만) 모두 보기 → [수정] → 저장 → **Issues**(상태 Open/진행/완료 · 내용 · 담당자 · 기한) → 결과 · 간트 · Layer별 일정표 → **관련 자료**(링크).
 - 위젯 모드에서 빈 곳을 두 번 누르면 창 모드로.
 - **BEOL Option**: 컨셉(예: 1X 6층 + 2X 4층 …)과 **Metal · Via 쌓는 순서**를 가져요. 순서가 없으면 [편집]에서 Layer를 아래부터 차례로 골라 정하고, Set List도 그 순서로 담겨요.
 - 예전 데이터의 Part A/B는 FEOL/BEOL로, 공정의 BEOL Module은 BEOL Option으로 자동으로 옮겨집니다.

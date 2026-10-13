@@ -13,7 +13,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.28.0';
+export const WORKTIME_VERSION = '0.29.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -107,10 +107,10 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
           <BrandMark />
           <div className="brand-text">
             <div className="brand-name">WorkTime</div>
-            <div className="brand-sub">선택근무제 근무시간 · v{WORKTIME_VERSION}</div>
+            <div className="brand-sub">v{WORKTIME_VERSION}</div>
           </div>
+          <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         </div>
-        <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         {NAV.map(([key, label]) => (
           <button key={key} className="nav-btn" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
             <Icon name={key} />

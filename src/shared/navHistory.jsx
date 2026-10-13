@@ -52,14 +52,14 @@ export function NavTools({ nav, navMini, toggleNav }) {
   return (
     <div className={`nav-tools ${navMini ? 'mini' : ''}`} role="toolbar" aria-label="메뉴 도구">
       <button type="button" className="nav-tool back" disabled={!nav.canBack} onClick={nav.back} title="뒤로 (Alt + ←)" aria-label="뒤로">
-        <Icon name="chevron" size={16} />
+        <Icon name="chevron" size={14} />
       </button>
       <button type="button" className="nav-tool" disabled={!nav.canForward} onClick={nav.forward} title="앞으로 (Alt + →)" aria-label="앞으로">
-        <Icon name="chevron" size={16} />
+        <Icon name="chevron" size={14} />
       </button>
       <span className="nav-tools-gap" />
       <button type="button" className="nav-tool" onClick={toggleNav} title={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-label={navMini ? '메뉴 펼치기' : '메뉴 접기'} aria-expanded={!navMini}>
-        <Icon name={navMini ? 'navOpen' : 'navClose'} size={16} />
+        <Icon name={navMini ? 'navOpen' : 'navClose'} size={14} />
       </button>
     </div>
   );

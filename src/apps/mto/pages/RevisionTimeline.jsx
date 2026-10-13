@@ -1,7 +1,6 @@
 // Revision 일정 현황: 날짜 기준으로 여러 ITEM을 한 화면에 — 준비(Changes) → GDS → STEP1 → STEP2 → MTO를 ITEM마다 한 줄로 잇고,
 // 날짜를 누르면 그날 ITEM마다 어느 단계인지 보여 준다.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Icon, Pill } from '../../../shared/ui.jsx';
 import { makeCalendar } from '../lib/scheduler.js';
 import { addDays, fmtShort, fromDay, toDay, todayIso, weekdayOf } from '../lib/dates.js';
 import { CHANGE_KINDS, groupsOf } from '../components/RevisionChanges.jsx';
@@ -14,7 +13,7 @@ const GROUP = 26;
 const PAD_R = 70;
 
 /** ITEM의 준비 날짜들: [{date, kind, label}] */
-function prepMarks(p) {
+export function prepMarks(p) {
   const c = p.changes || {};
   const out = [];
   if (c.db?.on) for (const g of groupsOf(c.db, 'parts')) if (g.date) out.push({ date: g.date, kind: 'db', label: `DB ${g.items.join('·')}` });
@@ -44,11 +43,12 @@ export function stageOn(item, d) {
   return { key: 'mto', text: `MTO ${mtoDone}/${L.length}` };
 }
 
-export default function RevisionTimeline({ state, calcs, go, dispatch }) {
+/** 여러 ITEM 타임라인 (Product별 묶음). projects: 보여 줄 Revision ITEM, onPick(id): ITEM을 눌렀을 때 */
+export default function RevisionTimeline({ state, calcs, projects, day, setDay, onPick, selected }) {
+  const go = (_, id) => onPick?.(id);
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(1000);
   const [tip, setTip] = useState(null);
-  const [day, setDay] = useState(todayIso());
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return undefined;
@@ -58,7 +58,7 @@ export default function RevisionTimeline({ state, calcs, go, dispatch }) {
   }, []);
 
   const products = state.projects.filter((p) => p.kind === 'product');
-  const revs = state.projects.filter((p) => p.kind === 'revision');
+  const revs = projects;
   // Product별로 묶어서 줄 만들기
   const lines = useMemo(() => {
     const out = [];
@@ -69,7 +69,7 @@ export default function RevisionTimeline({ state, calcs, go, dispatch }) {
       for (const p of its) out.push({ type: 'item', project: p, result: calcs[p.id]?.result || null, marks: prepMarks(p), target: p.meta?.target || '' });
     }
     return out;
-  }, [state.projects, calcs]);
+  }, [state.projects, projects, calcs]);
   const items = lines.filter((l) => l.type === 'item');
 
   const geo = useMemo(() => {
@@ -92,18 +92,6 @@ export default function RevisionTimeline({ state, calcs, go, dispatch }) {
     const ys = lines.map((l) => { const v = y; y += l.type === 'group' ? GROUP : ROW; return v; });
     return { t0, nDays, colW, off, ys, W: LABEL_W + colW * nDays + PAD_R, H: y + 12 };
   }, [lines, width, day, state.config]);
-
-  if (!revs.length) {
-    return (
-      <div className="page">
-        <div className="page-head"><div><h1>Revision 일정 현황</h1></div></div>
-        <section className="panel mto-empty"><h2>Revision ITEM이 없어요</h2><button type="button" className="btn primary" onClick={() => go('all')}><Icon name="plus" size={15} /> Revision Dashboard에서 추가</button></section>
-      </div>
-    );
-  }
-
-  const stages = items.map((it) => ({ it, st: stageOn(it, day) }));
-  const counts = stages.reduce((m, { st }) => ({ ...m, [st.key]: (m[st.key] || 0) + 1 }), {});
 
   let svg = null;
   if (geo) {
@@ -151,8 +139,8 @@ export default function RevisionTimeline({ state, calcs, go, dispatch }) {
       const late = r && target && r.finalMto > target;
       const name = p.name.length > 18 ? `${p.name.slice(0, 17)}…` : p.name;
       return (
-        <g key={p.id} className="rt-row" onDoubleClick={() => go('layers', p.id)}>
-          <rect className={k % 2 ? 'rowband' : 'rowband-0'} x={0} y={y} width={W} height={ROW} />
+        <g key={p.id} className={`rt-row ${selected === p.id ? 'sel' : ''}`}>
+          <rect className={selected === p.id ? 'row-hi' : k % 2 ? 'rowband' : 'rowband-0'} x={0} y={y} width={W} height={ROW} />
           <text className="lbl strong link" x={14} y={mid - 3} onClick={() => go('layers', p.id)}>{name}</text>
           <text className="lbl sub" x={14} y={mid + 12}>{r ? `${L.length}장 · MTO ${fmtShort(r.finalMto)}` : '계산 전'}</text>
           {pts.length > 1 && <line className="rt-link" x1={cx(pts[0])} x2={cx(pts.at(-1))} y1={mid} y2={mid} />}
@@ -208,64 +196,27 @@ export default function RevisionTimeline({ state, calcs, go, dispatch }) {
   }
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>Revision 일정 현황</h1></div>
-        <div className="head-actions">
-          <label className="field rt-day-pick">
-            <span>기준일</span>
-            <input type="date" className="input num" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
-          </label>
-          <button type="button" className="btn small-btn" onClick={() => setDay(todayIso())}>오늘</button>
+    <div className="gantt-wrap" ref={wrapRef}>
+      {svg || <p className="empty">날짜가 있는 ITEM이 없어요.</p>}
+      {tip && (
+        <div className="gantt-tip" style={{ left: tip.x + 14, top: tip.y + 14 }} role="status">
+          <div className="t">{tip.title}</div>
+          {tip.rows.map(([k, v]) => <div className="r" key={k}><span>{k}</span><b>{v}</b></div>)}
         </div>
-      </div>
-
-      <section className="panel rt-today">
-        <h2>
-          <span className="layer-sum">{fmtShort(day)} 현황</span>
-          <span className="rt-counts">
-            {[['prep', '준비'], ['step1', 'STEP1'], ['step2', 'STEP2'], ['mto', 'MTO'], ['done', '완료']].map(([k, label]) => (counts[k] ? <span key={k} className={`rt-st ${k}`}>{label} <b className="num">{counts[k]}</b></span> : null))}
-          </span>
-        </h2>
-        <div className="rt-list">
-          {stages.map(({ it, st }) => {
-            const pr = products.find((x) => x.id === it.project.parentId);
-            const late = it.result && it.target && it.result.finalMto > it.target;
-            return (
-              <button key={it.project.id} type="button" className="rt-card" onClick={() => go('layers', it.project.id)}>
-                <span className={`rt-st ${st.key}`}>{st.key === 'prep' ? '준비' : st.key === 'done' ? '완료' : st.key === 'none' ? '-' : st.key.toUpperCase()}</span>
-                <span className="rt-card-name"><span className="small muted">{pr?.name}</span><b>{it.project.name}</b></span>
-                <span className="small rt-card-st">{st.text}</span>
-                {it.target && <Pill tone={late ? 'bad' : 'good'}>Target {fmtShort(it.target)}</Pill>}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="panel">
-        <h2>
-          일정
-          <span className="rt-legend small">
-            {CHANGE_KINDS.map(([k, label]) => <span key={k}><i className={`rt-dot ${k}`} />{label}</span>)}
-            <span><i className="rt-dot stepx" />Step X</span>
-            <span><i className="sw step1" />STEP1</span>
-            <span><i className="sw step2" />STEP2</span>
-            <span><i className="sw mto" />MTO</span>
-            <span><i className="rt-flag-sw" />Target</span>
-          </span>
-        </h2>
-        <div className="gantt-wrap" ref={wrapRef}>
-          {svg || <p className="empty">날짜가 있는 ITEM이 없어요.</p>}
-          {tip && (
-            <div className="gantt-tip" style={{ left: tip.x + 14, top: tip.y + 14 }} role="status">
-              <div className="t">{tip.title}</div>
-              {tip.rows.map(([k, v]) => <div className="r" key={k}><span>{k}</span><b>{v}</b></div>)}
-            </div>
-          )}
-        </div>
-        <p className="small muted rt-help">날짜를 누르면 그날 기준 현황 · ITEM 이름을 누르면 Concept으로</p>
-      </section>
+      )}
     </div>
+  );
+}
+
+export function TimelineLegend() {
+  return (
+    <span className="rt-legend small">
+      {CHANGE_KINDS.map(([k, label]) => <span key={k}><i className={`rt-dot ${k}`} />{label}</span>)}
+      <span><i className="rt-dot stepx" />Step X</span>
+      <span><i className="sw step1" />STEP1</span>
+      <span><i className="sw step2" />STEP2</span>
+      <span><i className="sw mto" />MTO</span>
+      <span><i className="rt-flag-sw" />Target</span>
+    </span>
   );
 }

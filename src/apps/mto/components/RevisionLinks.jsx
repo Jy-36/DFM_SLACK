@@ -27,7 +27,7 @@ export default function RevisionLinks({ project, dispatch, notify }) {
   };
   return (
     <section className="panel links">
-      <div className="chg-title"><h2>Links</h2></div>
+      <div className="chg-title"><h2>관련 자료</h2></div>
       {links.length > 0 && (
         <div className="lk-list">
           {links.map((l) => (

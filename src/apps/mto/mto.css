@@ -784,3 +784,82 @@ button.bo-card.add:hover { background: var(--accent-soft); }
 .lk-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lk-add { display: grid; grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1.6fr) auto; gap: 8px; }
 .lk-add .input { height: 34px; }
+/* v0.29: Dashboard · Concept 보기/수정 · Issues · Drawer */
+.pb-sticky { position: sticky; top: 0; z-index: 30; margin-top: -8px; padding-top: 8px; background: var(--bg); }
+.pb-sticky .project-bar { box-shadow: 0 4px 14px rgba(16, 38, 84, 0.08); }
+.rv-info.view { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.rv-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rv-cell.grow { flex: 1; }
+.rv-k { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.rv-v { font-weight: 700; font-size: 14px; }
+.rv-cell.grow .rv-v { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-edit { margin-left: auto; }
+.rv-info.editing, .rv-info.live { grid-template-columns: 170px auto 170px minmax(0, 1fr) auto; }
+.rv-info.live { grid-template-columns: 170px 170px minmax(0, 1fr); }
+.rv-actions { display: inline-flex; gap: 6px; align-self: end; }
+.sec-fold { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; color: var(--fg); cursor: pointer; text-align: left; min-width: 0; }
+.sec-fold > svg { color: var(--muted); transform: rotate(90deg); transition: transform 0.15s; flex: none; }
+.ref.closed .sec-fold > svg { transform: rotate(0deg); }
+.ref.closed .chg-title { margin-bottom: 0; }
+.ref-brief { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+.ref-brief .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+.ref-grid.view { grid-template-columns: 1fr; }
+.ref-note-view { padding: 8px 12px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+.ll-view .chg-title h2 { gap: 8px; }
+.ll-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ll-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); }
+.ll-chip.missing { border-color: var(--bad); }
+.ll-no { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 6px; background: var(--surface-3); font-size: 11px; font-weight: 800; color: var(--muted); }
+.issues .chg-title h2 { gap: 8px; }
+.is-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: #fff; font-size: 11.5px; font-weight: 800; }
+.is-add { display: grid; grid-template-columns: minmax(0, 1fr) 120px auto auto; gap: 8px; align-items: center; padding: 8px; border-radius: 10px; background: var(--surface-2); }
+.is-add .input { height: 34px; }
+.is-list { display: flex; flex-direction: column; margin-top: 8px; }
+.is-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) 110px auto 92px 28px; gap: 8px; align-items: center; padding: 6px 4px; border-top: 1px solid var(--line); }
+.is-row:first-child { border-top: 0; }
+.is-st { height: 24px; border-radius: 6px; border: 0; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+.is-st.open { background: var(--bad-soft); color: var(--bad); }
+.is-st.doing { background: var(--warn-soft); color: var(--warn); }
+.is-st.done { background: var(--good-soft); color: var(--good); }
+.is-body { font-size: 13.5px; cursor: text; overflow-wrap: anywhere; }
+.is-row.done .is-body { color: var(--muted); text-decoration: line-through; }
+.is-row .is-text { height: 30px; }
+.ghost-in { height: 30px; border-color: transparent; background: transparent; }
+.ghost-in:hover, .ghost-in:focus { border-color: var(--line); background: var(--surface); }
+.is-over .date-field { border-color: var(--bad); }
+.is-over .date-field svg, .is-over .df-text { color: var(--bad); }
+.is-meta { text-align: right; }
+.date-field.sm { height: 30px; min-width: 104px; }
+.date-field.sm .df-text { font-size: 12.5px; }
+@media (max-width: 900px) { .is-row { grid-template-columns: 54px 1fr auto; } .is-add { grid-template-columns: 1fr 1fr; } }
+/* Dashboard */
+.rd-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin-bottom: 12px; }
+.rd-filters .field select, .rd-filters .field .input { height: 34px; }
+.rd-search .input { width: 200px; }
+.rd-range { display: inline-flex; align-items: center; gap: 6px; }
+.rd-count { margin-left: auto; align-self: center; }
+.rd-table tbody tr { cursor: pointer; }
+.rd-table tbody tr:hover td { background: var(--surface-2); }
+.rd-table tr.cur td { background: var(--accent-soft); }
+.rd-chg { display: inline-flex; gap: 3px; }
+.rd-day { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-weight: 500; }
+.gantt .row-hi { fill: var(--accent-soft); }
+/* Drawer */
+.drawer-back { position: fixed; inset: 0; z-index: 70; background: rgba(8, 16, 36, 0.28); animation: fadeIn 0.12s ease; }
+.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(780px, 94vw); background: var(--bg); box-shadow: -12px 0 40px rgba(8, 16, 36, 0.22); display: flex; flex-direction: column; animation: drawerIn 0.18s ease; }
+@keyframes drawerIn { from { transform: translateX(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.drawer-head h2 { margin: 2px 0 0; font-size: 20px; }
+.drawer-stats { display: flex; gap: 22px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.drawer-stats > span { display: flex; flex-direction: column; }
+.drawer-stats b { font-size: 15px; }
+.drawer-body { flex: 1; overflow: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.drawer-body .panel { margin: 0; }
+/* 새 ITEM 창 */
+.ai-body { display: flex; flex-direction: column; gap: 12px; }
+.ai-body .panel { margin: 0; box-shadow: none; border: 1px solid var(--line); }
+.ai-basic { display: grid; grid-template-columns: 180px 1fr 160px 150px; gap: 10px 12px; align-items: end; }
+.ai-basic .date-field { width: 100%; height: 38px; }
+.ai-comment { grid-column: 1 / -1; }
+.ai-sum { margin-right: auto; }
+.modal-body:has(.ai-body) { background: var(--bg); padding-top: 12px; }

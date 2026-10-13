@@ -1,5 +1,6 @@
 // Revision Reference: 이 Revision이 무엇을 기준으로 하는지 — 기존 Product의 Layer 또는 다른 Revision.
 // 고른 Reference가 아래 Layer 고르기의 출처가 된다.
+import { useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
 import { CHANGE_KINDS, changesGds } from './RevisionChanges.jsx';
@@ -13,21 +14,55 @@ export function referenceOf(state, project) {
   return find(ref.id, 'product') || find(project.parentId, 'product') || null;
 }
 
-export default function RevisionReference({ state, dispatch, project, calcs }) {
-  const ref = project.reference || {};
+export default function RevisionReference({ state, dispatch, project, calcs, live }) {
+  const [draft, setDraft] = useState(null);
+  const [open, setOpen] = useState(false);
+  const editing = live || !!draft;
+  const ref = (live ? project.reference : draft || project.reference) || {};
   const kind = ref.kind === 'revision' ? 'revision' : 'product';
-  const target = referenceOf(state, project);
+  const target = referenceOf(state, { ...project, reference: ref });
   const products = state.projects.filter((p) => p.kind === 'product');
   const revisions = state.projects.filter((p) => p.kind === 'revision' && p.id !== project.id);
-  const save = (patch) => dispatch({ type: 'updateProject', id: project.id, patch: { reference: { ...ref, kind, ...patch } } });
+  const save = (patch) => {
+    const next = { ...ref, kind, ...patch };
+    if (live) dispatch({ type: 'updateProject', id: project.id, patch: { reference: next } });
+    else setDraft(next);
+  };
+  const commit = () => {
+    dispatch({ type: 'updateProject', id: project.id, patch: { reference: draft } });
+    setDraft(null);
+  };
   const nameOf = (id) => products.find((p) => p.id === id)?.name || 'Product 없음';
   const st = target ? projectStatus(calcs[target.id]) : null;
 
   return (
-    <section className="panel ref">
-      <div className="chg-title"><h2>Reference</h2></div>
-      <div className="ref-grid">
-        <div className="ref-pick">
+    <section className={`panel ref ${editing ? 'editing' : ''} ${!editing && !open ? 'closed' : ''}`}>
+      {live ? <div className="chg-title"><h2>Reference</h2></div> : (
+        <div className="chg-title">
+          <button type="button" className="sec-fold" onClick={() => !editing && setOpen((v) => !v)} aria-expanded={editing || open}>
+            {!editing && <Icon name="chevron" size={13} />}
+            <h2>Reference</h2>
+            {!editing && !open && target && (
+              <span className="ref-brief">
+                <KindTag kind={target.kind} /> <b>{target.name}</b>
+                {ref.note && <span className="small muted">· {ref.note}</span>}
+              </span>
+            )}
+          </button>
+          <span className="chg-head-r">
+            {editing ? (
+              <>
+                <button type="button" className="btn small-btn ghost" onClick={() => setDraft(null)}>취소</button>
+                <button type="button" className="btn small-btn primary" disabled={JSON.stringify(draft) === JSON.stringify(project.reference || {})} onClick={commit}>저장</button>
+              </>
+            ) : (
+              <button type="button" className="btn small-btn" onClick={() => setDraft({ ...(project.reference || {}), kind })}><Icon name="settings" size={13} /> 수정</button>
+            )}
+          </span>
+        </div>
+      )}
+      {(editing || open) && <div className={`ref-grid ${editing ? '' : 'view'}`}>
+        {editing && <div className="ref-pick">
           <div className="seg" role="group" aria-label="Reference 종류">
             <button type="button" aria-pressed={kind === 'product'} onClick={() => save({ kind: 'product', id: ref.kind === 'product' ? ref.id : project.parentId })}>Product</button>
             <button type="button" aria-pressed={kind === 'revision'} onClick={() => save({ kind: 'revision', id: ref.kind === 'revision' ? ref.id : revisions.find((r) => r.parentId === project.parentId)?.id || revisions[0]?.id })} disabled={!revisions.length}>Revision</button>
@@ -58,7 +93,8 @@ export default function RevisionReference({ state, dispatch, project, calcs }) {
             </label>
           )}
           <textarea className="input" rows={2} value={ref.note || ''} placeholder="메모" onChange={(e) => save({ note: e.target.value })} aria-label="Reference 메모" />
-        </div>
+        </div>}
+        {!editing && ref.note && <div className="ref-note-view">{ref.note}</div>}
         <div className="ref-card">
           {target ? (
             <>
@@ -87,7 +123,7 @@ export default function RevisionReference({ state, dispatch, project, calcs }) {
             <div className="small muted"><Icon name="layers" size={14} /> -</div>
           )}
         </div>
-      </div>
+      </div>}
     </section>
   );
 }

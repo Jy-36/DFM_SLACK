@@ -169,11 +169,12 @@ function Brief({ kind, c }) {
   );
 }
 
-export default function RevisionChanges({ project, state, dispatch, notify }) {
+export default function RevisionChanges({ project, state, dispatch, notify, live }) {
   const saved = project.changes || {};
   const [draft, setDraft] = useState(null); // null = 보기, 객체 = 수정 중
-  const editing = !!draft;
-  const changes = draft || saved;
+  // live: 새 ITEM 만들기 창처럼 바로바로 반영 (수정/저장 없이)
+  const editing = live || !!draft;
+  const changes = live ? saved : draft || saved;
   const steps = state.runsetSteps || [];
   const [newStep, setNewStep] = useState('');
   const [adding, setAdding] = useState(false);
@@ -181,7 +182,11 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
   const isOpen = (k) => open[`${editing ? 'edit' : 'view'}:${k}`] ?? editing;
   const toggleOpen = (k) => setOpen((o) => ({ ...o, [`${editing ? 'edit' : 'view'}:${k}`]: !isOpen(k) }));
 
-  const save = (kind, patch) => setDraft({ ...changes, [kind]: { ...(changes[kind] || {}), ...patch } });
+  const save = (kind, patch) => {
+    const next = { ...changes, [kind]: { ...(changes[kind] || {}), ...patch } };
+    if (live) dispatch({ type: 'updateProject', id: project.id, patch: { changes: next } });
+    else setDraft(next);
+  };
   const commit = () => {
     const gds = changesGds(draft);
     dispatch({ type: 'updateProject', id: project.id, patch: { changes: draft, ...(gds ? { gds } : {}) } });
@@ -258,7 +263,7 @@ export default function RevisionChanges({ project, state, dispatch, notify }) {
             <b className="num">{gds ? fmtShort(gds) : '-'}</b>
             {editing && gds !== savedGds && <span className="small">저장 전</span>}
           </span>
-          {editing ? (
+          {live ? null : editing ? (
             <>
               <button type="button" className="btn small-btn ghost" onClick={() => setDraft(null)}>취소</button>
               <button type="button" className="btn small-btn primary" disabled={!dirty} onClick={commit}>저장</button>

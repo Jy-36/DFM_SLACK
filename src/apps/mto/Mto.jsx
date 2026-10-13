@@ -12,14 +12,14 @@ import ScheduleTable from './pages/ScheduleTable.jsx';
 import Rules from './pages/Rules.jsx';
 import ProcessSheet from './pages/ProcessSheet.jsx';
 import ProcessLayerList from './pages/ProcessLayerList.jsx';
-import RevisionTimeline from './pages/RevisionTimeline.jsx';
+import RevisionDashboard from './pages/RevisionDashboard.jsx';
 import ProductInfo from './pages/ProductInfo.jsx';
 import { NoneCard } from './pages/Overview.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './mto.css';
 
-export const MTO_VERSION = '0.14.0';
+export const MTO_VERSION = '0.15.0';
 
 // Product · Revision 탭마다 메뉴 이름이 다르고, 공정·규칙은 같이 쓴다
 const NAV = {
@@ -31,9 +31,8 @@ const NAV = {
   ],
   // Revision: Dashboard · 일정 현황(아래에 Layer별 일정표) · Concept(ITEM Layer 고르기)
   revision: [
-    ['all', 'Revision Dashboard', 'dashboard'],
-    ['overview', 'Revision 일정 현황', 'gantt'],
-    ['layers', 'Revision Concept', 'layers'],
+    ['all', 'Dashboard', 'dashboard'],
+    ['layers', 'Concept', 'layers'],
   ],
 };
 // Common: Product 정보 · 공정 · 규칙 (Product · Revision이 같이 쓰는 기준 정보)
@@ -148,6 +147,7 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
   const items = state.projects.filter((p) => p.kind === 'revision');
   const navItems = NAV[section];
   const perProject = ['overview', 'layers', 'table'].includes(tab) && !(section === 'revision' && tab === 'overview');
+  const revDash = section === 'revision' && (tab === 'all' || tab === 'overview');
   const area = COMMON_TABS.includes(tab) ? 'common' : section;
   return (
     <div className={`app mto fade-in ${navMini ? 'nav-mini' : ''}`}>
@@ -156,10 +156,10 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
           <BrandMark icon="mask" />
           <div className="brand-text">
             <div className="brand-name">MTO</div>
-            <div className="brand-sub">Product · Revision 일정 · v{MTO_VERSION}</div>
+            <div className="brand-sub">v{MTO_VERSION}</div>
           </div>
+          <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         </div>
-        <NavTools nav={nav} navMini={navMini} toggleNav={toggleNav} />
         <div className={`sec-switch two ${navMini ? 'mini' : ''}`} role="tablist" aria-label="Product · Revision">
           {[['product', 'Product'], ['revision', 'Revision']].map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={section === k} className={`${k} ${area === 'common' ? 'dim' : ''}`}
@@ -173,8 +173,8 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
         </div>
         {navItems.map(([key, label, icon], i) => (
           <div key={key} className="nav-item-wrap">
-            {i === (section === 'revision' ? 2 : 1) && !navMini && <div className="nav-sec sel-name" title={project ? project.name : undefined}>{project ? project.name : '선택 없음'}</div>}
-            <button className="nav-btn" aria-current={tab === key || (key === 'layers' && tab === 'table' && section === 'revision') ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
+            {i === 1 && section === 'product' && !navMini && <div className="nav-sec sel-name" title={project ? project.name : undefined}>{project ? project.name : '선택 없음'}</div>}
+            <button className="nav-btn" aria-current={tab === key || (section === 'revision' && ((key === 'layers' && tab === 'table') || (key === 'all' && tab === 'overview'))) ? 'page' : undefined} onClick={() => go(key)} title={navMini ? label : undefined}>
               <Icon name={icon} />
               <span className="nav-label">{label}</span>
               {key === 'layers' && issueCount > 0 && <span className="nav-dot" title={`입력 확인 ${issueCount}건`}>{issueCount}</span>}
@@ -202,9 +202,9 @@ export default function Mto({ mode, setMode, widget, setWidget }) {
       </nav>
 
       <main className="main">
-        {tab === 'all' && <Portfolio {...props} />}
+        {tab === 'all' && section !== 'revision' && <Portfolio {...props} />}
+        {revDash && <RevisionDashboard {...props} />}
         {perProject && !project && <NoneCard {...props} />}
-        {section === 'revision' && tab === 'overview' && <RevisionTimeline {...props} />}
         {project && section === 'revision' && (tab === 'layers' || tab === 'table') && <Overview key={project.id} {...props} />}
         {project && section !== 'revision' && tab === 'overview' && <Overview {...props} />}
         {project && tab === 'layers' && section !== 'revision' && (project.processId && state.processes.some((x) => x.id === project.processId) ? <ProcessLayerList key={project.id} {...props} /> : <LayerList key={project.id} {...props} />)}

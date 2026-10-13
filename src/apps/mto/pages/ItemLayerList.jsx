@@ -1,6 +1,6 @@
 // Revision ITEM Layer: 딸린 Product의 Set List에서 이번 ITEM에 들어오는 Layer(보통 1~5장)를 고른다.
 // Product가 공정 기준이면 공정 Layer를 가리키고(이름·Type은 공정 시트를 따라감), 직접 입력 Product면 Layer를 복사해 둔다.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { fmtShort } from '../lib/dates.js';
 import { projectLayers } from '../lib/projects.js';
@@ -11,7 +11,7 @@ const keyOf = (l) => (l.ref ? `r:${l.ref}` : `m:${l.layer}`);
 const ITEM_TYPICAL = 5;
 
 /** Revision Layer 고르기: source(Reference의 Layer)에서 이번 ITEM Layer를 고르고 순서를 정한다 */
-export function ItemLayerPicker({ state, dispatch, project, calc, go, notify, from, title }) {
+export function ItemLayerPicker({ state, dispatch, project, calc, go, notify, from, title, extraActions }) {
   const source = useMemo(() => (from ? projectLayers(from, state.processes).filter((l) => !l.missing).sort((a, b) => a.no - b.no) : []), [from, state.processes]);
   const mine = useMemo(() => projectLayers(project, state.processes), [project, state.processes]);
   const picked = new Set(mine.map(keyOf));
@@ -63,6 +63,7 @@ export function ItemLayerPicker({ state, dispatch, project, calc, go, notify, fr
               <Pill tone={n > ITEM_TYPICAL ? 'warn' : 'accent'}>{n}장</Pill>
             </span>
             <span className="head-actions">
+              {extraActions}
               {from.kind === 'revision' && source.length > 0 && <button type="button" className="btn small-btn" onClick={takeAll}><Icon name="copy" size={14} /> 전부 담기</button>}
               {n > 0 && <button type="button" className="btn small-btn ghost danger" onClick={() => set([], '선택을 모두 뺐어요')}><Icon name="trash" size={14} /> 비우기</button>}
             </span>
@@ -160,5 +161,41 @@ export default function ItemLayerList({ state, dispatch, project, calc, calcs, g
 
       <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)} />
     </div>
+  );
+}
+
+/** Concept의 Layer List: 평소엔 고른 Layer만, [수정]을 누르면 Reference에서 고르기 */
+export function LayerListPanel({ state, dispatch, project, calc, go, notify }) {
+  const [edit, setEdit] = useState(false);
+  const from = referenceOf(state, project);
+  const mine = useMemo(() => projectLayers(project, state.processes).slice().sort((a, b) => a.no - b.no), [project, state.processes]);
+  const mtoOf = new Map((calc.result?.layers || []).map((l) => [l.no, l]));
+  const title = <>Layer List <span className="small muted">{from?.name || ''}</span></>;
+  if (edit) {
+    return <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={from} title={title}
+      extraActions={<button type="button" className="btn small-btn primary" onClick={() => setEdit(false)}>완료</button>} />;
+  }
+  return (
+    <section className="panel ll-view">
+      <div className="chg-title">
+        <h2>Layer List <Pill tone={mine.length > ITEM_TYPICAL ? 'warn' : 'accent'}>{mine.length}장</Pill> <span className="small muted">{from?.name || ''}</span></h2>
+        <button type="button" className="btn small-btn" onClick={() => setEdit(true)}><Icon name="settings" size={13} /> 수정</button>
+      </div>
+      {mine.length ? (
+        <div className="ll-chips">
+          {mine.map((l) => {
+            const r = mtoOf.get(l.no);
+            return (
+              <span key={keyOf(l)} className={`ll-chip ${l.missing ? 'missing' : ''}`}>
+                <span className="num ll-no">{l.no}</span>
+                <b>{l.missing ? '(지워짐)' : l.layer}</b>
+                {l.type && <span className={`type-chip t-${l.type}`}>{l.type}</span>}
+                {r && <span className="small muted num">MTO {fmtShort(r.mtoDate)}</span>}
+              </span>
+            );
+          })}
+        </div>
+      ) : <div className="chg-empty small muted">없음</div>}
+    </section>
   );
 }

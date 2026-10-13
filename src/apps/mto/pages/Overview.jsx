@@ -10,8 +10,9 @@ import ProjectBar, { AddItem } from '../components/ProjectBar.jsx';
 import RevisionChanges from '../components/RevisionChanges.jsx';
 import RevisionInfo from '../components/RevisionInfo.jsx';
 import RevisionLinks from '../components/RevisionLinks.jsx';
-import RevisionReference, { referenceOf } from '../components/RevisionReference.jsx';
-import { ItemLayerPicker } from './ItemLayerList.jsx';
+import RevisionReference from '../components/RevisionReference.jsx';
+import { LayerListPanel } from './ItemLayerList.jsx';
+import RevisionIssues from '../components/RevisionIssues.jsx';
 import { LayerSchedule } from './ScheduleTable.jsx';
 
 export function loadExample(project, dispatch, notify) {
@@ -102,7 +103,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
   return (
     <div className="page">
-      {rev && <ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} collapsible />}
+      {rev && <div className="pb-sticky"><ProjectBar state={state} dispatch={dispatch} calcs={calcs} notify={notify} collapsible /></div>}
       <div className="page-head">
         <div>
           <h1>{rev ? <>{state.projects.find((x) => x.id === project.parentId)?.name || 'Product 없음'} <span className="h1-sep">·</span> {project.name}</> : `${project.name} 일정 현황`}</h1>
@@ -114,12 +115,11 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
 
       {rev && (
         <>
-          <RevisionInfo project={project} result={result} dispatch={dispatch} />
-          <RevisionLinks project={project} dispatch={dispatch} notify={notify} />
+          <RevisionInfo key={`i${project.id}`} project={project} result={result} dispatch={dispatch} />
           <RevisionChanges key={project.id} project={project} state={state} dispatch={dispatch} notify={notify} />
-          <RevisionReference state={state} dispatch={dispatch} project={project} calcs={calcs} />
-          <ItemLayerPicker state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} from={referenceOf(state, project)}
-            title={<>Layer List <span className="small muted">{referenceOf(state, project)?.name || ''}</span></>} />
+          <RevisionReference key={`r${project.id}`} state={state} dispatch={dispatch} project={project} calcs={calcs} />
+          <LayerListPanel key={`l${project.id}`} state={state} dispatch={dispatch} project={project} calc={calc} go={go} notify={notify} />
+          <RevisionIssues project={project} dispatch={dispatch} />
         </>
       )}
 
@@ -211,6 +211,7 @@ export default function Overview({ state, dispatch, project, calc, calcs, go, no
           {rev && <LayerSchedule project={project} result={result} notify={notify} />}
         </>
       )}
+      {rev && <RevisionLinks project={project} dispatch={dispatch} notify={notify} />}
     </div>
   );
 }
