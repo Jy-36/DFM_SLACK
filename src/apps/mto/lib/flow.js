@@ -1,6 +1,6 @@
 // Revision ITEM 진행 Step: Changes 준비 → (Step X) → DWR 작성 → DP → EBEAM Review → MTO 완료
 // 완료한 Step은 project.flow[key] = { date, comment } 로 남고, EBEAM Review를 끝내면 그 날짜에 MTO 완료.
-import { pendingKinds, prepText } from '../components/RevisionChanges.jsx';
+import { CHANGE_KINDS, effDate, kindLatest, pendingKinds, prepText, rowsOf } from '../components/RevisionChanges.jsx';
 
 export const STEPS = {
   prep: { name: 'Changes 준비', now: '준비중', done: 'Changes 준비 완료' },
@@ -17,7 +17,9 @@ export const hasStepX = (p) => !!(p.changes?.db?.on && p.changes.db.stepX?.on);
 
 /** 이 ITEM에 해당하는 Step 목록 */
 export function stepsOf(p) {
-  return ['prep', ...(hasStepX(p) ? ['stepx'] : []), 'dwr', 'dp', 'ebeam', 'mto'];
+  // Step X는 Changes(DB)의 최종 전달로 들어가서 따로 Step을 두지 않는다
+  void p;
+  return ['prep', 'dwr', 'dp', 'ebeam', 'mto'];
 }
 
 /** 지금 Step: { key, text, index, steps } */
@@ -63,27 +65,45 @@ export function flowMilestones(p, changeDates = []) {
 export const STEP_DAYS = { stepx: 3, dwr: 2, dp: 5, ebeam: 2 };
 const addD = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
-/** Revision Step 일정: [{ key, label, start, end, state: 'done'|'plan'|'auto'|'now', ... }] + mto
- *  Changes 준비(준비 날짜 기간) → 각 Step은 앞 Step이 끝난 날부터 완료일 · 예상일 · (없으면) 기본 기간까지 */
-export function stepSchedule(p, changeDates = [], today) {
+/** Revision 계획 · 실적 일정 줄
+ *  - Changes 항목(DB · Step X · Runset · SPEC): 계획일 ◇ · 실적일 ◆ (전달일만 있는 항목)
+ *  - DWR · DP · EBEAM Review: 앞 단계가 끝난 날부터 계획 막대 · 실적 막대 (계획이 없으면 기본 기간)
+ *  - MTO 완료: 계획(EBEAM 계획 끝) ◇ · 실적 ◆, Target 세로선 */
+export function stepSchedule(p, _changeDates, today) {
+  const c = p.changes || {};
   const f = p.flow || {};
   const plan = p.flowPlan || {};
-  const ds = changeDates.filter(Boolean).sort();
   const cur = currentStep(p, today).key;
   const rows = [];
-  const prepEnd = ds.at(-1) || today;
-  rows.push({ key: 'prep', label: 'Changes 준비', start: ds[0] || today, end: prepEnd, state: cur === 'prep' ? 'now' : 'done' });
-  let prev = prepEnd;
-  for (const k of stepsOf(p).filter((x) => ACT_STEPS.includes(x))) {
-    const actual = f[k]?.date || '';
+  for (const [k, label] of CHANGE_KINDS) {
+    if (!c[k]?.on) continue;
+    if (k === 'db') {
+      const rs = rowsOf(c, 'db');
+      const groups = rs.filter((r) => !r.stepx);
+      if (groups.length) rows.push({ key: 'db', label: 'DB', ms: true, plan: latest(groups.map((r) => r.date)), actual: groups.every((r) => r.actual) ? latest(groups.map((r) => r.actual)) : '', partial: groups.filter((r) => r.actual).length });
+      const sx = rs.find((r) => r.stepx);
+      if (sx) rows.push({ key: 'stepx', label: `Step X${sx.items.length ? ` (${sx.items.join('·')})` : ''}`, ms: true, plan: sx.date || '', actual: sx.actual || '' });
+    } else {
+      rows.push({ key: k, label, ms: true, plan: kindLatest(c, k, 'plan') || '', actual: kindLatest(c, k, 'actual') || '' });
+    }
+  }
+  // GDS: 계획 = 계획 중 가장 늦은 날, 실적 = 모든 항목이 끝난 날
+  const gdsPlan = latest(rows.map((r) => r.plan)) || today;
+  const allDone = rows.length && rows.every((r) => r.actual);
+  const gdsAct = allDone ? latest(rows.map((r) => r.actual)) : '';
+  let pPrev = gdsPlan;
+  let aPrev = gdsAct;
+  for (const k of ['dwr', 'dp', 'ebeam']) {
     const pl = plan[k] || '';
-    let end = actual || pl || addD(prev > today || actual ? prev : today, STEP_DAYS[k]);
-    if (end < prev) end = prev;
-    const state = actual ? 'done' : k === cur ? 'now' : pl ? 'plan' : 'auto';
-    rows.push({ key: k, label: STEPS[k].name, start: prev, end, state, plan: pl, actual, auto: !actual && !pl });
-    prev = end;
+    const pEnd = pl && pl >= pPrev ? pl : addD(pPrev, STEP_DAYS[k]);
+    const act = f[k]?.date || '';
+    rows.push({ key: k, label: STEPS[k].name, plan: { start: pPrev, end: pEnd, auto: !pl }, actual: act && aPrev ? { start: aPrev <= act ? aPrev : act, end: act } : act ? { start: act, end: act } : null, now: cur === k, nowFrom: !act && cur === k ? aPrev || today : null });
+    pPrev = pEnd;
+    aPrev = act || '';
   }
   const done = p.status === 'done';
-  rows.push({ key: 'mto', label: 'MTO 완료', start: prev, end: done ? p.doneAt || prev : prev, state: done ? 'done' : 'plan', target: p.meta?.target || '', milestone: true });
+  rows.push({ key: 'mto', label: 'MTO 완료', ms: true, plan: pPrev, actual: done ? p.doneAt || f.ebeam?.date || '' : '', target: p.meta?.target || '' });
   return rows;
 }
+const latest = (ds) => ds.filter(Boolean).sort().at(-1) || '';
+void effDate;

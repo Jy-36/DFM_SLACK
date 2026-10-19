@@ -22,40 +22,81 @@ export function groupsOf(c, listKey) {
   return items.length ? [{ id: 'g0', items, date: c.date || '' }] : [];
 }
 
-/** 항목별 가장 늦은 준비 날짜 */
-export function kindLatest(changes, kind) {
+/** 줄의 날짜: 실적(준비 완료한 날)이 있으면 실적, 없으면 계획 */
+export const effDate = (r) => r?.actual || r?.date || null;
+
+/** 항목의 줄들: DB는 묶음 줄 + Step X 줄, Runset은 묶음 줄, SPEC은 한 줄 */
+export function rowsOf(changes, kind) {
   const c = changes?.[kind];
-  if (!c?.on) return null;
-  if (kind === 'db') return latest([...groupsOf(c, 'parts').map((g) => g.date), c.stepX?.on ? c.stepX.date : null]);
-  if (kind === 'runset') return latest(groupsOf(c, 'steps').map((g) => g.date));
-  return c.date || null;
+  if (!c?.on) return [];
+  if (kind === 'db') return [...groupsOf(c, 'parts'), ...(c.stepX?.on ? [{ ...c.stepX, id: 'stepx', items: c.stepX.targets || [], stepx: true }] : [])];
+  if (kind === 'runset') return groupsOf(c, 'steps');
+  return [{ ...c, id: 'spec', items: ['SPEC'] }];
 }
 
-/** 그날 기준 준비 상태: 직접 '준비 완료'로 정했거나, 날짜가 다 있고 가장 늦은 날이 지났으면 완료 */
-export function kindReady(changes, kind, day) {
+/** 항목별 가장 늦은 날짜. which: 'plan'(계획) · 'actual'(실적, 다 끝났을 때만) · 'eff'(실적 우선)
+ *  DB에서 Step X 대상(A · B · C)은 Step X 날짜가 최종 전달일 */
+export function kindLatest(changes, kind, which = 'eff') {
+  const rows = rowsOf(changes, kind);
+  if (!rows.length) return null;
+  const pick = (r) => (which === 'plan' ? r.date : which === 'actual' ? r.actual : effDate(r));
+  if (which === 'actual' && !rows.every((r) => r.actual)) return null;
+  if (kind === 'db') {
+    const sx = rows.find((r) => r.stepx);
+    const finals = rows.filter((r) => !r.stepx).map((r) => (sx && r.items.every((x) => sx.items.includes(x)) ? null : pick(r)));
+    return latest([...finals, sx ? pick(sx) : null]);
+  }
+  return latest(rows.map(pick));
+}
+
+/** 준비 진행: { done, total } — 줄마다 실적(준비 완료)이 있으면 끝 */
+export function kindProgress(changes, kind) {
   const c = changes?.[kind];
-  if (!c?.on) return true;
-  if (c.ready) return true;
-  const d = kindLatest(changes, kind);
-  return !!d && d <= day;
+  const rows = rowsOf(changes, kind);
+  if (c?.ready && !rows.some((r) => r.actual)) return { done: rows.length, total: rows.length }; // 예전 '준비 완료' 표시
+  return { done: rows.filter((r) => r.actual).length, total: rows.length };
 }
-/** 아직 준비 중인 항목: [['db','DB'], …] */
-export function pendingKinds(changes, day) {
-  return CHANGE_KINDS.filter(([k]) => changes?.[k]?.on && !kindReady(changes, k, day));
+export function kindReady(changes, kind) {
+  if (!changes?.[kind]?.on) return true;
+  const { done, total } = kindProgress(changes, kind);
+  return total > 0 && done >= total;
 }
-/** 준비 상태 한 줄: 'DB 준비중' · '2/3 준비중' · '준비 완료' */
-export function prepText(changes, day) {
+/** 아직 준비 중인 항목: [['db','DB'], …] (DB는 Step X만 남았으면 'Step X') */
+export function pendingKinds(changes) {
+  return CHANGE_KINDS.filter(([k]) => changes?.[k]?.on && !kindReady(changes, k)).map(([k, l]) => {
+    if (k !== 'db') return [k, l];
+    const rows = rowsOf(changes, 'db');
+    const onlyStepX = rows.filter((r) => !r.actual).every((r) => r.stepx);
+    return [k, onlyStepX ? 'Step X' : l];
+  });
+}
+/** 준비 상태 한 줄: 'DB 준비중' · 'Step X 진행중' · '2/3 준비중' · '준비 완료' */
+export function prepText(changes) {
   const on = CHANGE_KINDS.filter(([k]) => changes?.[k]?.on);
-  const pend = pendingKinds(changes, day);
+  const pend = pendingKinds(changes);
   if (!on.length) return null;
   if (!pend.length) return '준비 완료';
-  if (pend.length === 1) return `${pend[0][1]} 준비중`;
+  if (pend.length === 1) return pend[0][1] === 'Step X' ? 'Step X 진행중' : `${pend[0][1]} 준비중`;
   return `${pend.length}/${on.length} 준비중`;
 }
 
-/** 고른 변경점의 준비 날짜 중 가장 늦은 날 = GDS 입고 (없으면 null) */
+/** GDS 입고 = 고른 변경점 중 가장 늦은 날 (실적이 있으면 실적, 없으면 계획) */
 export function changesGds(changes) {
   return latest(CHANGE_KINDS.map(([k]) => kindLatest(changes, k)));
+}
+
+/** 실적 칸: 준비 완료 전엔 [준비 완료] 버튼, 누르면 오늘 날짜로 실적 (고칠 수 있고 ×로 되돌림) */
+function ActualCell({ row, set }) {
+  if (!row.actual) {
+    return <button type="button" className="act-btn" onClick={() => set({ actual: todayIso() })} title="오늘 날짜로 준비 완료"><Icon name="check" size={12} /> 준비 완료</button>;
+  }
+  const late = row.date && row.actual > row.date;
+  return (
+    <span className={`act-cell ${late ? 'late' : ''}`} title={late ? '계획보다 늦음' : '실적'}>
+      <span className="act-k">실적</span>
+      <DateField small value={row.actual} onChange={(v) => set({ actual: v })} label="실적 날짜" />
+    </span>
+  );
 }
 
 /** 줄 오른쪽: 코멘트 · 담당자 (편집) */
@@ -69,7 +110,7 @@ function NoteInputs({ row, set }) {
 }
 
 /** 항목 고르기 + 줄마다 날짜 · 코멘트 · 담당자. 칩이나 ⋮⋮를 다른 줄에 끌어 놓으면 묶기, '따로' 칸에 놓으면 떼기 */
-function GroupDates({ options, groups, setGroups, tone, addSlot, extraRow }) {
+function GroupDates({ options, groups, setGroups, tone, addSlot, extraRow, setRowLive, stepXItems = [] }) {
   const [drag, setDrag] = useState(null);
   const picked = groups.flatMap((g) => g.items);
   const toggleItem = (x) => {
@@ -133,10 +174,11 @@ function GroupDates({ options, groups, setGroups, tone, addSlot, extraRow }) {
               <span className="gd-handle" onPointerDown={groups.length > 1 ? (e) => start(e, 'row', g) : undefined} style={groups.length > 1 ? undefined : { visibility: 'hidden' }} aria-label="끌어서 묶기">⋮⋮</span>
               <span className="gd-items">
                 {order(g).map((x) => (
-                  <span key={x} className={`gd-item ${canDrag(g) ? 'grab' : ''} ${drag?.moved && drag.kind === 'item' && drag.item === x ? 'src' : ''}`} onPointerDown={canDrag(g) ? (e) => start(e, 'item', g, x) : undefined}>{x}</span>
+                  <span key={x} title={stepXItems.includes(x) ? 'Step X 대상 · Step X 날짜가 최종 전달일' : undefined} className={`gd-item ${stepXItems.includes(x) ? 'sx-via' : ''} ${canDrag(g) ? 'grab' : ''} ${drag?.moved && drag.kind === 'item' && drag.item === x ? 'src' : ''}`} onPointerDown={canDrag(g) ? (e) => start(e, 'item', g, x) : undefined}>{x}</span>
                 ))}
               </span>
-              <DateField value={g.date} onChange={(date) => setRow(g, { date })} label={`${g.items.join(', ')} 준비 날짜`} warnEmpty />
+              <span className="plan-cell"><span className="act-k">계획</span><DateField small value={g.date} onChange={(date) => setRow(g, { date })} label={`${g.items.join(', ')} 계획 날짜`} warnEmpty /></span>
+              <ActualCell row={g} set={(p) => (setRowLive || setRow)(g, p)} />
               <NoteInputs row={g} set={(p) => setRow(g, p)} />
               <span className="gd-split">{g.items.length > 1 && <button type="button" className="btn small-btn ghost" onClick={() => split(g)}>풀기</button>}</span>
             </div>
@@ -156,15 +198,16 @@ function GroupDates({ options, groups, setGroups, tone, addSlot, extraRow }) {
   );
 }
 
-/** 보기용 한 줄 */
-function ViewRow({ items, tone, label, row }) {
+/** 보기용 한 줄: 항목 · 계획 · 실적(바로 준비 완료 가능) · 코멘트 · 담당자 */
+function ViewRow({ items, tone, label, row, setActual, stepXItems = [] }) {
   return (
     <div className="cv-line">
       <span className="cv-items">
         {label && <span className="cv-label">{label}</span>}
-        {items.map((x) => <span key={x} className={`gd-item ${tone}`}>{x}</span>)}
+        {items.map((x) => <span key={x} className={`gd-item ${tone} ${stepXItems.includes(x) ? 'sx-via' : ''}`} title={stepXItems.includes(x) ? 'Step X 대상' : undefined}>{x}</span>)}
       </span>
-      <span className={`cv-date num ${row.date ? '' : 'tone-warn'}`}>{row.date ? fmtShort(row.date) : '날짜 없음'}</span>
+      <span className={`cv-date num ${row.date ? '' : 'tone-warn'}`}><span className="act-k">계획</span> {row.date ? fmtShort(row.date) : '없음'}</span>
+      <ActualCell row={row} set={setActual} />
       <span className="cv-comment">{row.comment || <span className="muted">-</span>}</span>
       <span className="cv-owner">{row.owner || <span className="muted">-</span>}</span>
     </div>
@@ -173,18 +216,18 @@ function ViewRow({ items, tone, label, row }) {
 
 /** 접었을 때 한 줄 요약 */
 function Brief({ kind, c }) {
-  if (kind === 'spec') return <span className="cv-group"><span className={`num ${c.date ? '' : 'tone-warn'}`}>{c.date ? fmtShort(c.date) : '날짜 없음'}</span></span>;
+  if (kind === 'spec') return <span className="cv-group"><span className={`num ${c.actual ? 'tone-good' : c.date ? '' : 'tone-warn'}`}>{c.actual ? `✓ ${fmtShort(c.actual)}` : c.date ? fmtShort(c.date) : '날짜 없음'}</span></span>;
   const groups = groupsOf(c, kind === 'db' ? 'parts' : 'steps');
   return (
     <>
       {groups.map((g) => (
         <span key={g.id} className="cv-group">
           {g.items.map((x) => <span key={x} className={`gd-item ${kind}`}>{x}</span>)}
-          <span className={`num ${g.date ? '' : 'tone-warn'}`}>{g.date ? fmtShort(g.date) : '-'}</span>
+          <span className={`num ${g.actual ? 'tone-good' : g.date ? '' : 'tone-warn'}`}>{g.actual ? `✓ ${fmtShort(g.actual)}` : g.date ? fmtShort(g.date) : '-'}</span>
         </span>
       ))}
       {kind === 'db' && c.stepX?.on && (
-        <span className="cv-group"><span className="cv-label">Step X</span>{(c.stepX.targets || []).map((x) => <span key={x} className="gd-item stepx">{x}</span>)}<span className="num">{c.stepX.date ? fmtShort(c.stepX.date) : '-'}</span></span>
+        <span className="cv-group"><span className="cv-label">Step X</span>{(c.stepX.targets || []).map((x) => <span key={x} className="gd-item stepx">{x}</span>)}<span className={`num ${c.stepX.actual ? 'tone-good' : ''}`}>{c.stepX.actual ? `✓ ${fmtShort(c.stepX.actual)}` : c.stepX.date ? fmtShort(c.stepX.date) : '-'}</span></span>
       )}
       {!groups.length && !(kind === 'db' && c.stepX?.on) && <span className="muted small">고른 것 없음</span>}
     </>
@@ -204,14 +247,15 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
   const isOpen = (k) => open[`${editing ? 'edit' : 'view'}:${k}`] ?? editing;
   const toggleOpen = (k) => setOpen((o) => ({ ...o, [`${editing ? 'edit' : 'view'}:${k}`]: !isOpen(k) }));
 
-  // 준비 완료 표시는 보기 화면에서도 바로 저장
-  const toggleReady = (k) => {
-    const cur = changes[k] || {};
-    const patch = { ...cur, ready: !cur.ready };
-    if (live || draft) save(k, { ready: !cur.ready });
-    else dispatch({ type: 'updateProject', id: project.id, patch: { changes: { ...saved, [k]: { ...(saved[k] || {}), ready: !cur.ready } } } });
-    void patch;
+  // 실적(준비 완료)은 보기 화면에서도 바로 저장 (수정 중이면 수정본에)
+  const setLive = (kind, patch) => {
+    if (live || draft) return save(kind, patch);
+    const next = { ...saved, [kind]: { ...(saved[kind] || {}), ...patch } };
+    const g = changesGds(next);
+    dispatch({ type: 'updateProject', id: project.id, patch: { changes: next, ...(g ? { gds: g } : {}) } });
+    return undefined;
   };
+  const setGroupActual = (kind, listKey, g, patch) => setLive(kind, { groups: groupsOf(changes[kind], listKey).map((x) => (x.id === g.id ? { ...x, ...patch } : x)), ready: false });
   const save = (kind, patch) => {
     const next = { ...changes, [kind]: { ...(changes[kind] || {}), ...patch } };
     if (live) dispatch({ type: 'updateProject', id: project.id, patch: { changes: next } });
@@ -240,6 +284,7 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
   const dirty = editing && JSON.stringify(draft) !== JSON.stringify(saved);
   const onKinds = CHANGE_KINDS.filter(([k]) => changes[k]?.on);
 
+  const stepXItems = stepX.on ? stepX.targets || [] : [];
   const stepXRow = (
     <div className={`gd-row stepx ${stepX.on ? 'on' : ''}`}>
       <span className="gd-handle" style={{ visibility: 'hidden' }}>⋮⋮</span>
@@ -255,17 +300,20 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
       </span>
       {stepX.on ? (
         <>
-          <DateField value={stepX.date} onChange={(date) => setStepX({ date })} label="Step X 적용 날짜" warnEmpty />
+          <span className="plan-cell"><span className="act-k">계획</span><DateField small value={stepX.date} onChange={(date) => setStepX({ date })} label="Step X 계획 날짜" warnEmpty /></span>
+          <ActualCell row={stepX} set={setStepX} />
           <NoteInputs row={stepX} set={setStepX} />
         </>
-      ) : <span className="gd-off" />}
+      ) : <span className="gd-off small muted">켜면 대상 DB(A · B · C)는 Step X 날짜가 최종 전달일</span>}
       <span className="gd-split" />
     </div>
   );
 
   const block = (k, label, body, viewBody) => {
     const c = changes[k];
-    const d = kindLatest(changes, k);
+    const dp = kindLatest(changes, k, 'plan');
+    const da = kindLatest(changes, k, 'actual');
+    const pr = kindProgress(changes, k);
     const o = isOpen(k);
     return (
       <div key={k} className={`chg-area ${k} ${o ? 'open' : 'closed'}`}>
@@ -274,19 +322,21 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
           <Icon name="chevron" size={13} />
           <b>{label}</b>
           {!o && <span className="cv-brief"><Brief kind={k} c={c} /></span>}
-          <span className={`chg-latest num ${d ? '' : 'none'}`}>{d ? fmtShort(d) : '날짜 없음'}</span>
+          <span className="chg-dates">
+            <span className={`chg-latest num ${dp ? '' : 'none'}`} title="계획 중 가장 늦은 날"><small>계획</small> {dp ? fmtShort(dp) : '-'}</span>
+            <span className={`chg-latest act num ${da ? (dp && da > dp ? 'late' : 'ok') : 'none'}`} title="실적 (모두 준비 완료된 날)"><small>실적</small> {da ? fmtShort(da) : '-'}</span>
+          </span>
         </button>
-        <button type="button" className={`chg-ready ${kindReady(changes, k, todayIso()) ? 'on' : ''} ${c.ready ? 'manual' : ''}`} onClick={() => toggleReady(k)}
-          title={c.ready ? '눌러서 준비중으로' : kindReady(changes, k, todayIso()) ? '날짜가 지나 자동 완료 · 눌러서 완료로 고정' : '눌러서 준비 완료로'}>
-          {kindReady(changes, k, todayIso()) ? <><Icon name="check" size={12} /> 준비 완료</> : '준비중'}
-        </button>
+        <span className={`chg-ready ${pr.done >= pr.total && pr.total ? 'on' : ''}`} title="준비 완료한 줄 / 전체 줄">
+          {pr.done >= pr.total && pr.total ? <><Icon name="check" size={12} /> 준비 완료</> : `준비중 ${pr.done}/${pr.total}`}
+        </span>
         </div>
         {o && <div className="chg-area-b">{editing ? body : viewBody}</div>}
       </div>
     );
   };
 
-  const viewGroups = (groups, tone) => groups.map((g) => <ViewRow key={g.id} items={[...g.items]} tone={tone} row={g} />);
+  const viewGroups = (groups, tone, kind, listKey) => groups.map((g) => <ViewRow key={g.id} items={[...g.items]} tone={tone} row={g} stepXItems={kind === 'db' ? stepXItems : []} setActual={(p) => setGroupActual(kind, listKey, g, p)} />);
   const legacy = (c) => c?.comment && <div className="cv-legacy small muted">{c.comment}</div>;
 
   return (
@@ -294,7 +344,7 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
       <div className="chg-title">
         <h2>Changes</h2>
         <span className="chg-head-r">
-          {prepText(changes, todayIso()) && <span className={`prep-st ${pendingKinds(changes, todayIso()).length ? '' : 'ok'}`}>{prepText(changes, todayIso())}</span>}
+          {prepText(changes) && <span className={`prep-st ${pendingKinds(changes).length ? '' : 'ok'}`}>{prepText(changes)}</span>}
           <span className={`chg-gds ${gds ? 'on' : ''}`}>
             <span className="small">GDS</span>
             <b className="num">{gds ? fmtShort(gds) : '-'}</b>
@@ -325,10 +375,10 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
       {!onKinds.length ? (!editing && <div className="chg-empty small muted">없음</div>) : (
         <div className="chg-areas">
           {changes.db?.on && block('db', 'DB',
-            <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" extraRow={stepXRow} />,
+            <GroupDates options={DB_PARTS} groups={dbGroups} setGroups={(groups) => save('db', { groups })} tone="db" extraRow={stepXRow} stepXItems={stepXItems} />,
             <>
-              {viewGroups(dbGroups, 'db')}
-              {stepX.on && <ViewRow label="Step X" items={stepX.targets || []} tone="stepx" row={stepX} />}
+              {viewGroups(dbGroups, 'db', 'db', 'parts')}
+              {stepX.on && <ViewRow label="Step X" items={stepX.targets || []} tone="stepx" row={stepX} setActual={(p) => setLive('db', { stepX: { ...stepX, ...p } })} />}
               {legacy(changes.db)}
             </>)}
           {changes.runset?.on && block('runset', 'Runset',
@@ -343,7 +393,7 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
                 <button type="button" className="chg-chip add" onClick={() => setAdding(true)} aria-label="Runset STEP 추가"><Icon name="plus" size={12} /> STEP</button>
               )} />,
             <>
-              {viewGroups(rsGroups, 'runset')}
+              {viewGroups(rsGroups, 'runset', 'runset', 'steps')}
               {legacy(changes.runset)}
             </>)}
           {changes.spec?.on && block('spec', 'SPEC',
@@ -351,12 +401,13 @@ export default function RevisionChanges({ project, state, dispatch, notify, live
               <div className="gd-row">
                 <span className="gd-handle" style={{ visibility: 'hidden' }}>⋮⋮</span>
                 <span className="gd-items"><span className="gd-item spec">SPEC</span></span>
-                <DateField value={changes.spec.date} onChange={(date) => save('spec', { date })} label="SPEC 준비 날짜" warnEmpty />
+                <span className="plan-cell"><span className="act-k">계획</span><DateField small value={changes.spec.date} onChange={(date) => save('spec', { date })} label="SPEC 계획 날짜" warnEmpty /></span>
+                <ActualCell row={changes.spec} set={(p) => save('spec', p)} />
                 <NoteInputs row={changes.spec} set={(p) => save('spec', p)} />
                 <span className="gd-split" />
               </div>
             </div>,
-            <ViewRow items={['SPEC']} tone="spec" row={changes.spec} />)}
+            <ViewRow items={['SPEC']} tone="spec" row={changes.spec} setActual={(p) => setLive('spec', { ...p, ready: false })} />)}
         </div>
       )}
     </section>

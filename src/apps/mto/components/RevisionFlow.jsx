@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Icon } from '../../../shared/ui.jsx';
 import { fmtShort, todayIso } from '../lib/dates.js';
 import { ACT_STEPS, STEPS, completeStep, currentStep, stepBack, stepSchedule } from '../lib/flow.js';
-import { prepMarks } from '../pages/RevisionTimeline.jsx';
 import { pendingKinds } from './RevisionChanges.jsx';
 import DateField from './DateField.jsx';
 
@@ -17,8 +16,8 @@ export default function RevisionFlow({ project, dispatch, notify, compact }) {
   const cur = currentStep(project, today);
   const f = project.flow || {};
   const plan = project.flowPlan || {};
-  // 예상 날짜를 안 넣은 Step은 기본 기간으로 잡은 날짜를 흐리게 보여 준다
-  const sched = Object.fromEntries(stepSchedule(project, prepMarks(project).filter((m) => m.kind !== 'stepx').map((m) => m.date), today).map((r) => [r.key, r.end]));
+  // 계획 날짜를 안 넣은 Step은 기본 기간으로 잡은 날짜를 흐리게 보여 준다
+  const sched = Object.fromEntries(stepSchedule(project, [], today).filter((r) => !r.ms).map((r) => [r.key, r.plan.end]));
   const [date, setDate] = useState(today);
   const [comment, setComment] = useState('');
   useEffect(() => { setDate(today); setComment(''); }, [cur.key, project.id, today]);
@@ -56,10 +55,11 @@ export default function RevisionFlow({ project, dispatch, notify, compact }) {
             <li key={k} className={`flow-step ${st} ${k}`}>
               <span className="flow-dot">{st === 'done' ? <Icon name="check" size={11} /> : i + 1}</span>
               <span className="flow-name">{STEPS[k].name}</span>
-              {d && st !== 'todo' && <span className="flow-date num">{fmtShort(d)}</span>}
+              {d && st !== 'todo' && <span className={`flow-date num act ${plan[k] && d > plan[k] ? 'late' : ''}`}>실적 {fmtShort(d)}</span>}
+              {d && st !== 'todo' && plan[k] && <span className="flow-date num">계획 {fmtShort(plan[k])}</span>}
               {ACT_STEPS.includes(k) && st !== 'done' && (
-                <span className="flow-plan" title="예상 날짜">
-                  <DateField small value={plan[k]} onChange={(v) => upd({ flowPlan: { ...plan, [k]: v } })} label={`${STEPS[k].name} 예상 날짜`} placeholder={sched[k] ? `≈ ${fmtShort(sched[k])}` : '예상'} />
+                <span className="flow-plan" title="계획 날짜">
+                  <DateField small value={plan[k]} onChange={(v) => upd({ flowPlan: { ...plan, [k]: v } })} label={`${STEPS[k].name} 계획 날짜`} placeholder={sched[k] ? `계획 ≈ ${fmtShort(sched[k])}` : '계획'} />
                 </span>
               )}
               {k === 'mto' && st !== 'done' && project.meta?.target && <span className="flow-date num">Target {fmtShort(project.meta.target)}</span>}
@@ -70,7 +70,7 @@ export default function RevisionFlow({ project, dispatch, notify, compact }) {
 
       {cur.key === 'prep' && (
         <div className="flow-act prep">
-          <span className="small"><b>{pend.map(([, l]) => l).join(' · ')}</b> 준비중 · Changes에서 준비 완료로 바꾸면 다음 Step</span>
+          <span className="small"><b>{pend.map(([, l]) => l).join(' · ')}</b> 준비중 · Changes 줄마다 [준비 완료]를 누르면 다음 Step</span>
         </div>
       )}
       {ACT_STEPS.includes(cur.key) && (

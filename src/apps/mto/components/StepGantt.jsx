@@ -13,10 +13,11 @@ const PAD_R = 90;
 export function StepGanttLegend() {
   return (
     <span className="legend gantt-legend sg-legend">
-      <span><i className="sw sg done" />완료</span>
+      <span><i className="sw sg plan" />계획</span>
+      <span><i className="sw sg auto" />계획(기본 기간)</span>
+      <span><i className="sw sg done" />실적</span>
       <span><i className="sw sg now" />진행 중</span>
-      <span><i className="sw sg plan" />예상</span>
-      <span><i className="sw sg auto" />기본 기간</span>
+      <span><i className="sg-dia" />계획 ◇ · 실적 ◆</span>
       <span><i className="sg-tline" />MTO Target</span>
     </span>
   );
@@ -40,7 +41,8 @@ export default function StepGantt({ rows, config }) {
   const geo = useMemo(() => {
     let lo = today;
     let hi = today;
-    for (const r of rows) for (const d of [r.start, r.end, r.target]) if (d) { if (d < lo) lo = d; if (d > hi) hi = d; }
+    const ds = (r) => (r.ms ? [r.plan, r.actual, r.target] : [r.plan?.start, r.plan?.end, r.actual?.start, r.actual?.end, r.nowFrom]);
+    for (const r of rows) for (const d of ds(r)) if (d) { if (d < lo) lo = d; if (d > hi) hi = d; }
     const start = addDays(lo, -1);
     const t0 = toDay(start);
     const nDays = toDay(hi) - t0 + 3;
@@ -69,33 +71,38 @@ export default function StepGantt({ rows, config }) {
     }
   }
 
-  const stateText = { done: '완료', now: '진행 중', plan: '예상', auto: `기본 기간` };
+  const dia = (c, cy, r) => `M${c},${cy - r} l${r},${r} l${-r},${r} l${-r},${-r} z`;
   const body = rows.map((r, k) => {
     const y = TOP + k * ROW;
     const mid = y + ROW / 2;
-    const t = {
-      title: r.label,
-      rows: r.milestone
-        ? [['MTO', r.state === 'done' ? `완료 ${fmtShort(r.end)}` : `예상 ${fmtShort(r.end)}`], ...(r.target ? [['Target', fmtShort(r.target)]] : [])]
-        : [['기간', `${fmtShort(r.start)} ~ ${fmtShort(r.end)}`], ['상태', r.auto ? `${stateText.auto} ${STEP_DAYS[r.key] ?? ''}일` : stateText[r.state]], ...(r.plan && r.actual ? [['예상', fmtShort(r.plan)]] : [])],
-    };
-    const tipProps = { onPointerMove: (e) => setTip({ ...t, x: e.clientX, y: e.clientY }), onPointerLeave: () => setTip(null) };
-    const late = r.milestone && r.target && r.end > r.target;
+    const tipRows = r.ms
+      ? [['계획', r.plan ? fmtShort(r.plan) : '-'], ['실적', r.actual ? fmtShort(r.actual) : r.partial ? `${r.partial}줄 완료` : '-'], ...(r.target ? [['Target', fmtShort(r.target)]] : [])]
+      : [['계획', `${fmtShort(r.plan.start)} ~ ${fmtShort(r.plan.end)}${r.plan.auto ? ` (기본 ${STEP_DAYS[r.key]}일)` : ''}`], ['실적', r.actual ? `${fmtShort(r.actual.start)} ~ ${fmtShort(r.actual.end)}` : r.now ? '진행 중' : '-']];
+    const tipProps = { onPointerMove: (e) => setTip({ title: r.label, rows: tipRows, x: e.clientX, y: e.clientY }), onPointerLeave: () => setTip(null) };
+    const lateA = r.ms ? r.actual && r.plan && r.actual > r.plan : r.actual && r.actual.end > r.plan.end;
+    const done = r.ms ? !!r.actual : !!r.actual;
     return (
-      <g key={r.key}>
+      <g key={r.key} {...tipProps}>
         <rect className={k % 2 ? 'rowband' : 'rowband-0'} x={0} y={y} width={W} height={ROW} />
-        <text className={`lbl strong sg-lbl ${r.state}`} x={12} y={mid + 4}>{r.label}</text>
-        {r.milestone ? (
-          <g {...tipProps}>
-            <path className={`sg-ms ${r.state} ${late ? 'late' : ''}`} d={`M${cx(r.end)},${mid - 9} l9,9 l-9,9 l-9,-9 z`} />
-            <text className={`lbl final ${late ? 'late' : ''}`} x={xEnd(r.end) + 8} y={mid + 4}>{fmtShort(r.end)}{r.state === 'done' ? '' : ' 예상'}</text>
-          </g>
+        <text className={`lbl strong sg-lbl ${done ? 'done' : r.now ? 'now' : ''}`} x={12} y={mid + 4}>{r.label}</text>
+        {r.ms ? (
+          <>
+            {r.plan && r.actual && r.plan !== r.actual && <line className={`sg-delay ${lateA ? 'late' : 'early'}`} x1={cx(r.plan)} x2={cx(r.actual)} y1={mid} y2={mid} />}
+            {r.plan && <path className={`sg-ms plan ${r.key === 'mto' ? 'mto' : ''}`} d={dia(cx(r.plan), mid, 7)} />}
+            {r.actual && <path className={`sg-ms done ${lateA ? 'late' : ''}`} d={dia(cx(r.actual), mid, 7)} />}
+            <text className={`lbl sub ${lateA ? 'tone-bad' : ''}`} x={xEnd(r.actual && r.plan ? (r.actual > r.plan ? r.actual : r.plan) : r.actual || r.plan || today) + 8} y={mid + 4}>
+              {r.actual ? `실적 ${fmtShort(r.actual)}` : r.plan ? `계획 ${fmtShort(r.plan)}` : ''}
+            </text>
+          </>
         ) : (
-          <g {...tipProps}>
-            <rect className={`sg-bar ${r.state} ${r.auto ? 'auto' : ''} ${r.key}`} x={x(r.start)} y={mid - 8} width={Math.max(xEnd(r.end) - x(r.start), 4)} height={16} rx={5}
-              fill={r.auto && r.state !== 'now' ? `url(#sg-h-${uid})` : undefined} />
-            <text className="lbl sub" x={xEnd(r.end) + 6} y={mid + 4}>{fmtShort(r.end)}</text>
-          </g>
+          <>
+            <rect className={`sg-bar plan ${r.plan.auto ? 'auto' : ''}`} x={x(r.plan.start)} y={mid - 10} width={Math.max(xEnd(r.plan.end) - x(r.plan.start), 4)} height={8} rx={3} fill={r.plan.auto ? `url(#sg-h-${uid})` : undefined} />
+            {r.actual && <rect className={`sg-bar done ${lateA ? 'late' : ''}`} x={x(r.actual.start)} y={mid + 1} width={Math.max(xEnd(r.actual.end) - x(r.actual.start), 4)} height={9} rx={3} />}
+            {!r.actual && r.now && r.nowFrom && <rect className="sg-bar now" x={x(r.nowFrom)} y={mid + 1} width={Math.max(xEnd(today > r.nowFrom ? today : r.nowFrom) - x(r.nowFrom), 4)} height={9} rx={3} />}
+            <text className={`lbl sub ${lateA ? 'tone-bad' : ''}`} x={xEnd(r.actual && r.actual.end > r.plan.end ? r.actual.end : r.plan.end) + 6} y={mid + 4}>
+              {r.actual ? `실적 ${fmtShort(r.actual.end)}` : `계획 ${fmtShort(r.plan.end)}`}
+            </text>
+          </>
         )}
       </g>
     );

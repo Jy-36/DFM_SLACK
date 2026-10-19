@@ -190,6 +190,7 @@ MTO 앱 왼쪽 위에서 **Product · Revision · Common**을 전환합니다.
   DB는 바뀌는 것(A · B · C), Runset은 변경 STEP(없으면 + STEP으로 추가), 각각 준비 날짜 · 코멘트. SPEC은 준비 날짜 · 코멘트.
   GDS 입고일은 따로 넣지 않고 고른 변경점의 준비 날짜 중 가장 늦은 날로 계산해요 (하루 MTO · STEP2 동시는 규칙 기본값).
 - Concept 맨 위 고정 줄: `Product › ITEM · Target · MTO`, 누르면 ITEM 목록에서 바꾸기 (이름 · Product 변경은 기본 정보 [수정]). Concept에는 STEP1 · STEP2 간트 대신 **Step 일정** 간트(Changes 준비 → Step X → DWR → DP → EBEAM Review → MTO 완료: 완료 · 진행 중 · 예상 · 기본 기간(Step X 3 · DWR 2 · DP 5 · EBEAM 2일), 오늘 · MTO Target 선). Revision 계산은 STEP2 동시 진행 제한 없음.
+- **계획 · 실적**: Changes 줄마다 계획 날짜와 [준비 완료](누르면 오늘 날짜로 실적, 고치기 · × 되돌리기 가능). 보기 화면에서도 바로 누를 수 있어요. DB에서 Step X 대상(A · B · C)은 Step X 날짜가 최종 전달일. 항목 머리에 계획 · 실적 가장 늦은 날, 준비중 n/m. GDS = 실적이 있으면 실적, 없으면 계획 중 가장 늦은 날. Step X는 Changes(DB) 안에서 처리하고 따로 Step을 두지 않아요. Step 일정 간트는 줄마다 계획(점선) · 실적(진한 색), Changes 항목은 계획 ◇ · 실적 ◆.
 - **진행 Step** (Concept · 오른쪽 패널 · Dashboard Step 칸): Changes 준비 → (DB Step X가 있으면) Step X 진행중 → DWR 작성 필요 → DP 진행중 → EBEAM Review 요청 필요 → MTO 완료. 각 Step은 날짜(기본 오늘, 수정 가능) · 코멘트와 함께 완료 처리, EBEAM Review 완료 날짜가 MTO 완료 날짜. [이전 Step으로]로 한 단계씩 되돌리기, 끝낸 Step 기록에서 날짜 · 코멘트 수정, Step마다 예상 날짜.
 - **준비 상태**: Changes의 DB · Runset · SPEC마다 [준비중 / 준비 완료] (날짜가 다 지나면 자동 완료, 눌러서 직접 지정). Changes 제목 옆과 Dashboard 단계 칸에 'Runset 준비중' · '2/3 준비중'처럼 표시.
 - ITEM **완료 · 삭제**: Dashboard 목록 · 오른쪽 패널 · Concept 설정에서 완료 처리(목록 · 타임라인 · ITEM 고르기에서 숨김, 상태 필터 [진행 · 완료 · 전체]로 다시 보기), 삭제는 확인 팝업 + 되돌리기. 이슈 삭제도 되돌리기.
