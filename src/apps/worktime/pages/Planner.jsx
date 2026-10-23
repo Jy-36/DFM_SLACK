@@ -19,6 +19,22 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
   const [holidayPick, setHolidayPick] = useState('');
   const [sel, setSel] = useState(() => new Set());
   const lockedCount = rows.filter((d) => locks[d.key]).length;
+  // 보기: 간단(달력) | 상세(표) — 마지막에 고른 보기를 기억
+  const [view, setViewRaw] = useState(() => {
+    try {
+      return localStorage.getItem('worktime.planView') === 'detail' ? 'detail' : 'simple';
+    } catch {
+      return 'simple';
+    }
+  });
+  const setView = (v) => {
+    setViewRaw(v);
+    try {
+      localStorage.setItem('worktime.planView', v);
+    } catch {
+      /* 저장 불가 */
+    }
+  };
 
   // (제한을 켠 경우) 1일·주 한도를 지키며 이번 달 실제로 채울 수 있는 최대
   const reachable = useMemo(
@@ -29,11 +45,13 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
   const edited = rows.filter((d) => plans[d.key] != null || planIns[d.key]).length;
   // Shift를 누른 채 누르면 마지막으로 누른 날부터 여기까지 한 번에 선택(또는 해제)
   const anchor = useRef(null);
-  const toggle = (key, shift) =>
+  const toggle = (key, shift) => {
+    // 기준 날은 업데이트 함수 밖에서 읽고 바꾼다 (StrictMode에서 함수가 두 번 돌아도 구간이 유지되게)
+    const from = anchor.current ? rows.findIndex((d) => d.key === anchor.current) : -1;
+    anchor.current = key;
     setSel((prev) => {
       const next = new Set(prev);
       const turnOn = !prev.has(key);
-      const from = anchor.current ? rows.findIndex((d) => d.key === anchor.current) : -1;
       const to = rows.findIndex((d) => d.key === key);
       if (shift && from >= 0 && to >= 0) {
         const [a, b] = from < to ? [from, to] : [to, from];
@@ -43,9 +61,9 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
         }
       } else if (turnOn) next.add(key);
       else next.delete(key);
-      anchor.current = key;
       return next;
     });
+  };
   // 작은 달력에서 누른 날로 표를 옮기고 잠깐 강조
   const [flash, setFlash] = useState(null);
   const jump = (key) => {
@@ -79,12 +97,37 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
           <h1>
             근무 계획 <InfoTip text={`${monthLabel(s.year, s.month)} 남은 근무일에 일할 시간을 정하면 필수·최대 근무 시간 대비 결과가 바로 계산됩니다.`} />
           </h1>
+          <div className="seg plan-view-seg" role="group" aria-label="보기">
+            <button type="button" aria-pressed={view === 'simple'} onClick={() => setView('simple')}><Icon name="records" size={14} /> 간단</button>
+            <button type="button" aria-pressed={view === 'detail'} onClick={() => setView('detail')}><Icon name="table" size={14} /> 상세</button>
+          </div>
         </div>
         <PlanActions s={s} rules={rules} plans={plans} planIns={planIns} locks={locks} lockedCount={lockedCount} edited={edited} last={state.planLast} dispatch={dispatch} notify={notify} clearSel={() => setSel(new Set())} />
       </div>
 
       <TargetsPanel s={s} rules={rules} reachable={reachable} />
 
+      {view === 'simple' ? (
+        <SimplePlan
+          s={s}
+          rules={rules}
+          plans={plans}
+          planIns={planIns}
+          locks={locks}
+          rows={rows}
+          sel={sel}
+          toggle={toggle}
+          dispatch={dispatch}
+          notify={notify}
+          selectWhere={selectWhere}
+          clearSel={() => setSel(new Set())}
+          thisWeek={thisWeek}
+          nextWeek={nextWeek}
+          weekProjected={weekProjected}
+          lockedCount={lockedCount}
+          edited={edited}
+        />
+      ) : (
       <section className="panel">
         <h2>
           <span>
@@ -195,6 +238,7 @@ export default function Planner({ state, dispatch, summary, notify, now }) {
           </table>
         </div>
       </section>
+      )}
 
       {sel.size > 0 && (
         <BulkBar keys={[...sel]} s={s} rules={rules} plans={plans} planIns={planIns} locks={locks} dispatch={dispatch} notify={notify} clear={() => setSel(new Set())} />
@@ -479,6 +523,219 @@ function FamilyDayRow({ s, rules, plans, locks, dispatch, notify }) {
         align="right"
         text={`21일이 있는 주의 금요일. 쉬어도 필수 근무 시간(${fmtDur(s.required)})은 그대로라, 그날 몫 ${fmtDur(rules.dailyStdMin)}를 다른 근무일에 나눠 채워야 합니다.`}
       />
+    </div>
+  );
+}
+
+/** 간단 보기: 한 달 달력에서 칸마다 계획 시간을 바로 고치고, 칸을 눌러 고르면 아래에서 일괄 변경 */
+function SimplePlan({ s, rules, plans, planIns, locks, rows, sel, toggle, dispatch, notify, selectWhere, clearSel, thisWeek, nextWeek, weekProjected, lockedCount, edited }) {
+  const pickable = new Set(rows.map((d) => d.key));
+  const familyKey = rules.familyDayOn ? s.familyKey : null;
+  const lead = (s.days[0].dow + 6) % 7;
+  const cells = [...Array(lead).fill(null), ...s.days];
+  while (cells.length % 7) cells.push(null);
+  const weekRows = [];
+  for (let i = 0; i < cells.length; i += 7) weekRows.push(cells.slice(i, i + 7));
+
+  const addHoliday = (d) => {
+    dispatch({ type: 'plan/set', key: d.key, minutes: rules.dailyStdMin, lock: true });
+    notify(`${dayLabel(d.date)} 휴일 근무 ${fmtDur(rules.dailyStdMin)}를 넣었습니다. 최대 근무 시간에서만 빠지고 필수 근무 시간은 그대로입니다.`);
+  };
+
+  return (
+    <section className="panel">
+      <h2>
+        <span>
+          {s.month + 1}월 계획 달력
+          <InfoTip
+            text={
+              <>
+                칸의 − / + 로 그날 실근무 계획을 30분씩 바꾸거나 숫자를 직접 입력합니다. 바꾼 날은 자물쇠로 고정됩니다.
+                <br />칸을 누르면 선택되고(Shift: 구간), 아래 일괄 변경으로 여러 날을 한 번에 바꿉니다.
+                <br />주말·공휴일 칸의 [+ 근무]로 휴일 근무를 넣습니다.
+              </>
+            }
+          />
+        </span>
+        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {lockedCount > 0 && <Pill tone="accent"><Icon name="lock" size={12} /> {lockedCount}일 고정</Pill>}
+          {edited > 0 && <Pill tone="plan">{edited}일 직접 조정</Pill>}
+        </span>
+      </h2>
+
+      <div className="quick-select" role="group" aria-label="날짜 빠른 선택">
+        <span className="small muted">빠른 선택</span>
+        <button className="chip" onClick={() => selectWhere(() => true)}>전체</button>
+        <button className="chip" onClick={() => selectWhere((d) => capacityOf(d, rules) >= rules.dailyStdMin)}>휴가 없는 날</button>
+        <button className="chip" onClick={() => selectWhere((d) => weekKeyOf(d.date) === thisWeek)}>이번 주</button>
+        {nextWeek && <button className="chip" onClick={() => selectWhere((d) => weekKeyOf(d.date) === nextWeek)}>다음 주</button>}
+        {sel.size > 0 && <button className="chip ghost" onClick={clearSel}>선택 해제 ({sel.size})</button>}
+      </div>
+
+      <div className="cal-scroll">
+        <div className="plan-cal">
+          {['월', '화', '수', '목', '금', '토', '일'].map((w, i) => (
+            <div key={w} className={`cal-h ${i === 6 ? 'sun' : i === 5 ? 'sat' : ''}`}>{w}</div>
+          ))}
+          <div className="cal-h">주 합계</div>
+          {weekRows.map((wr, wi) => {
+            const any = wr.find(Boolean);
+            const wk = weekKeyOf(any.date);
+            const total = weekProjected(wk);
+            const over = rules.weeklyLimitOn && total > rules.maxWeeklyMin;
+            return [
+              ...wr.map((d, i) =>
+                d ? (
+                  <PlanCell
+                    key={d.key}
+                    d={d}
+                    rules={rules}
+                    plans={plans}
+                    planIns={planIns}
+                    locked={!!locks[d.key]}
+                    pickable={pickable.has(d.key)}
+                    selected={sel.has(d.key)}
+                    family={d.key === familyKey}
+                    toggle={toggle}
+                    dispatch={dispatch}
+                    addHoliday={addHoliday}
+                  />
+                ) : (
+                  <div key={`x${wi}-${i}`} className="cal-d out" aria-hidden="true" />
+                ),
+              ),
+              <div key={`w${wk}`} className={`pc-week ${over ? 'over' : ''}`} title="월~일, 이미 일한 시간 포함">
+                <span className="cd-label">합계</span>
+                <b className="num">{fmtDur(total)}</b>
+                {rules.weeklyLimitOn && <span className="small">{over ? '한도 초과' : `한도 ${Math.round(rules.maxWeeklyMin / 60)}h`}</span>}
+              </div>,
+            ];
+          })}
+        </div>
+      </div>
+
+      <div className="cal-legend" aria-label="달력 색 설명">
+        <span><i className="sw holiday" />공휴일</span>
+        <span><i className="sw weekend" />주말</span>
+        <span><i className="sw family" />패밀리데이</span>
+        <span><i className="sw holiday-work" />휴일 근무</span>
+        <span><i className="sw today" />오늘</span>
+        <span><Icon name="lock" size={12} /> 고정</span>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <FamilyDayRow s={s} rules={rules} plans={plans} locks={locks} dispatch={dispatch} notify={notify} />
+      </div>
+    </section>
+  );
+}
+
+function PlanCell({ d, rules, plans, planIns, locked, pickable, selected, family, toggle, dispatch, addHoliday }) {
+  const isHoliday = !d.isWorkday;
+  const isFamily = d.isRest || (family && !d.leave && d.isWorkday);
+  const holidayWork = isHoliday && (d.actual > 0 || (!d.isPast && plans[d.key] != null));
+  const planned = plans[d.key] ?? defaultPlanFor(d, rules);
+  const fullOff = !isHoliday && capacityOf(d, rules) === 0 && d.workCredit === 0;
+  const editable = pickable && !fullOff && d.workCredit === 0;
+  const inMin = d.isToday && d.inMin != null ? d.inMin : toMin(planIns[d.key] || rules.planDefaultIn);
+  const outMin = inMin + grossForNet(planned, rules) + (d.isToday ? 0 : d.plannedExclude);
+  const late = editable && planned > 0 && outMin > toMin(rules.recognizeTo);
+  const cls = [
+    'cal-d',
+    'pc-d',
+    selected && 'sel',
+    d.isToday && 'today',
+    !d.isPast && 'future',
+    d.isPast && 'past',
+    d.holiday && 'holiday',
+    !d.holiday && isHoliday && 'weekend',
+    isFamily && 'family',
+    holidayWork && 'holiday-work',
+    pickable && 'pick',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const tag = d.holiday
+    ? { text: d.holiday, tone: 'hol' }
+    : d.leaveLabel
+      ? { text: d.leaveLabel, tone: d.isRest ? 'fam' : 'leave' }
+      : isFamily
+        ? { text: '패밀리데이 후보', tone: 'fam' }
+        : null;
+  const stop = (e) => e.stopPropagation();
+  const onPick = (e) => pickable && toggle(d.key, e.shiftKey);
+
+  return (
+    <div
+      className={cls}
+      role={pickable ? 'button' : undefined}
+      tabIndex={pickable ? 0 : undefined}
+      aria-pressed={pickable ? selected : undefined}
+      aria-label={dayLabel(d.date)}
+      onClick={onPick}
+      onKeyDown={(e) => pickable && (e.key === ' ' || e.key === 'Enter') && e.target === e.currentTarget && (e.preventDefault(), toggle(d.key, e.shiftKey))}
+    >
+      <div className="cd-head">
+        <span className={`dnum ${d.dow === 0 || d.holiday ? 'sun' : d.dow === 6 ? 'sat' : ''}`}>{d.date.getDate()}</span>
+        {d.isToday && <span className="cd-today">오늘</span>}
+        {editable && (
+          <button
+            type="button"
+            className={`pc-lock ${locked ? 'on' : ''}`}
+            onClick={(e) => { stop(e); dispatch({ type: 'plan/lock', keys: [d.key], locked: !locked }); }}
+            title={locked ? '고정 풀기 (배분할 때 이 날도 바뀜)' : '이 시간으로 고정 (배분할 때 그대로 둠)'}
+            aria-label={locked ? `${dayLabel(d.date)} 고정 풀기` : `${dayLabel(d.date)} 시간 고정`}
+            aria-pressed={locked}
+          >
+            <Icon name={locked ? 'lock' : 'unlock'} size={13} />
+          </button>
+        )}
+      </div>
+      {tag && <span className={`cd-tag ${tag.tone}`} title={tag.text}>{tag.text}</span>}
+
+      {d.isPast ? (
+        d.recognized > 0 && (
+          <span className={`cd-foot ${holidayWork ? 'hw' : ''}`}>
+            <span className="cd-label">{holidayWork ? '휴일 근무' : '인정'}</span>
+            <b className="num">{fmtDur(d.recognized)}</b>
+          </span>
+        )
+      ) : editable ? (
+        <>
+          <span className="pc-edit" onClick={stop} onKeyDown={stop}>
+            <PlanStepper
+              id={`pc-${d.key}`}
+              value={planned}
+              edited={plans[d.key] != null}
+              locked={locked}
+              min={d.isToday ? d.actual : 0}
+              max={dailyCapOf(d, rules)}
+              onChange={(v) => dispatch({ type: 'plan/set', key: d.key, minutes: v, lock: true })}
+            />
+          </span>
+          {planned > 0 && (
+            <span className="pc-time num">
+              <span className={planIns[d.key] ? 'tone-plan' : ''}>{fmtClock(inMin)}</span>→<b className={late ? 'tone-bad' : ''}>{fmtClock(outMin)}</b>
+            </span>
+          )}
+          {isHoliday && d.actual === 0 && (
+            <button type="button" className="pc-add ghost" onClick={(e) => { stop(e); dispatch({ type: 'plan/set', key: d.key, minutes: null }); }}>
+              휴일 근무 빼기
+            </button>
+          )}
+        </>
+      ) : d.workCredit > 0 ? (
+        <span className="cd-foot plan">
+          <span className="cd-label">{d.leaveLabel} 고정</span>
+          <b className="num">{fmtDur(d.workCredit)}</b>
+        </span>
+      ) : isHoliday && !d.isPast ? (
+        <button type="button" className="pc-add" onClick={(e) => { stop(e); addHoliday(d); }}>
+          <Icon name="plus" size={12} /> 근무
+        </button>
+      ) : fullOff ? (
+        <span className="pc-off muted">쉬는 날</span>
+      ) : null}
     </div>
   );
 }
