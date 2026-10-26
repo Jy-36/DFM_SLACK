@@ -264,60 +264,39 @@ scripts/fixtures/mto-golden.json   Python 엔진 결과 (같은 공휴일 표로
 
 # Techmap
 
-Site Request를 양식 엑셀로 정리해 올리면 **techfile(.tf) · layermap · display.drf** 세 파일을 같이 검사하고,
-사람이 승인한 변경만 원본 양식 그대로 반영한 파일을 내주는 탭입니다. 서버 없이 이 PC 안에서만 계산·저장합니다.
+Process **Master Techmap**(Layer · Purpose 번호의 원본) → **DK All Layer** → **DK Option(Metal/Via Stack)** 을
+`DK_Ver_작업날짜` 단위로 관리하고, Site Request로 **techfile · layermap · display.drf · history.txt** 를 검토 · 수정해
+**VWP 폴더 구조 그대로** 내보내는 탭입니다. 서버 없이 이 PC 안에서만 계산 · 저장합니다.
+설계 · 규칙 · 다음 작업은 **[docs/techmap-kit](docs/techmap-kit/README.md)** (codemate 인계용), 저장소 루트 `AGENTS.md`.
 
-## 화면
+## 화면 (Window Mode 왼쪽 메뉴)
 
-| 화면 | 하는 일 |
+| 메뉴 | 하는 일 |
 |---|---|
-| Window Mode 왼쪽 메뉴 | Slack 채널처럼 **Request 묶음**(엑셀 하나 = 채널 하나, 검토 필요·ERROR 수 뱃지) · **Baseline 버전** · 처리 규칙 |
-| Request 묶음 | READY / 검토 필요 / ERROR / 반영 예정 요약, Request별 카드(검사 결과, 바뀔 줄 `techfile:83` · 변경 전/후, [반영] 체크), 파일 변경(diff), 검토 메모·활동 기록 |
-| 출력 | **수정 파일 묶음(.zip)** = 수정된 3개 파일 + review_report.csv + changes.diff · 리포트 CSV · **새 baseline으로 반영**(v0 → v1, 이전 버전은 남음) |
-| Baseline | LPP 목록(색 견본, GDS, 공유 packet), 파일 간 점검, 파일 저장, 새 baseline 등록(지금 쓰는 3개 파일 올리기) |
-| App Mode | 최근 묶음의 건수, 사람이 볼 항목, 엑셀 바로 올리기 |
-| Widget | 검토 필요 수 · ERROR · READY · 반영 예정 |
+| Process 전환 (SF3 · SF2 · +) | Process마다 Master · DK를 따로 |
+| 새 작업 | DK 작업(DK · Ver · 작업날짜 · Reference) 또는 Master 변경. Reference가 Master면 쓸 Layer를 고름 |
+| 번호 대장 | Layer# × Purpose(datatype) 격자 — GDS, 색, 숨김, Purpose 관례 datatype에서 벗어남(노랑), layermap 없음(빨강), 빈 Layer# |
+| Master 비교 | 다른 Process Master와 **기능키**(목적) 기준 GDS 비교 — 번호 다름 · 한쪽에만 · 번호 겹침 |
+| 분류 · 기능키 | FEOL · Metal n · Via n · Top · Marker 자동 추정 + 직접 고치기 (Option 자동 구성 · Master 비교 기준) |
+| DK → Ver · 작업 (채널) | 요청 검토 · Option 매트릭스 · 점검 · 파일 변경 · History · codemate 변환 · 승인 · 폴더 출력 |
+| 처리 규칙 · 작업공간 | Req_ID 주석, 공유 packet, 폐기 시 layermap, VWP 경로, 작업공간 내보내기/가져오기 |
 
-처음 실행하면 표준 Virtuoso 문법으로 만든 DEMO 파일이 `baseline v0`으로 들어 있고, Request 업로드 화면의 **예시 9건** 엑셀로 바로 시험해 볼 수 있습니다.
+## 요청 유형 (엑셀 `Request` 시트 · .csv · codemate request.json)
+`ADD` · `CHANGE_DISPLAY` · `RETIRE` · `HIDE`/`SHOW`(techDisplays Vis·Sel) · `OPTION_ADD`/`OPTION_REMOVE`(Option 예외).
+DK 작업의 ADD는 Layer · Purpose만 쓰면 번호 · GDS · 표시를 **Master에서 가져오고**, Master와 다르게 쓰면 ERROR. 양식 · 예시: `public/techmap/`.
 
-## Request 엑셀 (Request 시트, Req_ID 헤더 · .csv도 가능)
+## Option 자동화
+Layer 분류 + Stack 정의(Metal 수 · Top Layer) → 규칙으로 Layer 자동 포함, 규칙 밖은 Option × Layer 매트릭스에서 `+`/`−`.
+점검: Via 스택 끊김 · 빠진 Metal/Via · All에 없는 Layer. Option 파일 = All에서 빠지는 Layer 행만 지움.
 
-| Type | 필수 | 처리 |
-|---|---|---|
-| `ADD` (추가) | Layer, Purpose (+신규 Layer면 Layer_No), GDS_Layer/Datatype, Fill_Color 또는 Packet | techLayers · techPurposes(필요 시) · techLayerPurposePriorities · techDisplays · layermap · drDefinePacket/Color |
-| `CHANGE_DISPLAY` (변경) | Layer, Purpose + 바꿀 값 | packet 수정. 다른 LPP와 공유하면 전용 packet 생성(검토 필요). Packet 칸에 현재 이름을 쓰면 공유 packet 직접 수정 |
-| `RETIRE` (폐기) | Layer (+Purpose, 비우면 Layer 전체) | 지우지 않고 `;` 주석 + `RETIRED REQ-ID`. layermap은 기본 유지. 룰 등에서 참조되면 검토 필요 |
+## 출력 (zip → VWP에 풀기, 설치형 바로 쓰기는 Kit T2)
+`<Process>/<DK>/<DK>_<Ver>_<작업날짜>/All/{<DK>.tf, <DK>.layermap, display.drf, <DK>_history.txt}` ·
+`Options/<Stack>/{…}` · `_techmap/{revision.json, review_report.csv, changes.diff}`
 
-색은 drf 색 이름 · `#RRGGBB` · `R,G,B`. 같은 RGB가 있으면 그 색을 쓰고, 없으면 `cRRGGBB`로 추가합니다.
+## codemate 변환
+작업 화면 [codemate 변환] → 원문 붙여넣기 → inbox zip(site_request.txt · context.json · AGENTS.md · schema) →
+VSCode 터미널 `opencode run --dir <inbox> -f site_request.txt -f context.json "…"` → request.json을 [요청 올리기].
 
-## 원칙
-
-- **원본 양식 유지**: 줄 단위 패치. 새 행은 이웃 행의 컬럼 위치를 복제, CRLF 줄 끝 유지.
-- **추측하지 않음**: GDS 미지정 · 미정의 purpose · 참조가 남은 폐기는 자동으로 채우지 않고 검토 필요/ERROR.
-- **사람이 승인**: READY만 기본 반영, 검토 필요는 체크해야 반영. 승인·제외·저장·반영은 활동 기록에.
-- **같은 엑셀 안 충돌 검사**: Layer 번호 · GDS 번호가 앞 Request와 겹치면 ERROR.
-- 저장: techfile이 클 수 있어 IndexedDB(이 PC의 앱 데이터)에 둡니다. 처리 규칙만 localStorage.
-
-## Techmap 구조
-
-```
-src/apps/techmap/
-  Techmap.jsx      탭 진입점 (모드 전환, 채널형 메뉴)
-  lib/
-    sexpr.js       SKILL 괄호 파서 (줄 번호 유지)
-    model.js       tf · layermap · drf 색인, 파일 간 점검, LPP 표
-    planner.js     Request별 검사 → 상태 → 줄 패치 ← 처리 규칙 기본값 DEFAULT_OPTIONS
-    patcher.js     컬럼 정렬 유지 패치, diff
-    requests.js    Request 엑셀(.xlsx 직접 읽기) · CSV
-    zip.js         의존성 없는 zip 읽기/쓰기
-    report.js      리포트 CSV, 결과 zip, 파일 저장
-    store.js       상태 (IndexedDB)
-    samples.js     DEMO baseline 파일
-  components/      RequestCard, DiffView
-  pages/           BatchPage, BaselinePage, UploadPage, RulesPage, Mini, Widget
-public/techmap/    Request 빈 양식 · 예시 엑셀
-scripts/techmap-check.mjs          엔진 테스트 + Python 참조 엔진 결과와 글자 단위 비교 (npm run test:techmap, test:engine·CI에서도 함께)
-scripts/fixtures/techmap-golden.json   Python 참조 엔진 결과
-```
-
-사내 파일에 쓰기 전에 확인할 것 [VERIFY]: techfile이 include 파일로 나뉘어 있는지, drf packet 정의가 한 줄인지(여러 줄이면 CHANGE_DISPLAY가 ERROR로 멈춤), layermap 추가 컬럼, 폐기 Layer의 layermap 정책, 사내 reserved purpose 목록.
+## 확인
+`npm run test:techmap` — 엔진 · 작업공간 흐름 75건 + Python 참조 엔진과 글자 단위 비교 (`test:engine` · CI에서도 같이).
+DEMO: Master SF3(M1~M11) · SF2(이름이 다르고 VIA4 번호가 일부러 다름), SF3_DK v1.0.0.0(승인) → v1.0.0.0_exp_20261020(작업중).

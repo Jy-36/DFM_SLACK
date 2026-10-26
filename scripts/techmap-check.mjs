@@ -8,7 +8,7 @@ import { plan } from '../src/apps/techmap/lib/planner.js';
 import { formatLike } from '../src/apps/techmap/lib/patcher.js';
 import { readRequestFile, rowsToRequests, readCsv } from '../src/apps/techmap/lib/requests.js';
 import { unzip, zip } from '../src/apps/techmap/lib/zip.js';
-import { DEMO_FILES } from '../src/apps/techmap/lib/samples.js';
+import { DEMO_FILES } from './fixtures/techmap-demo-files.js';
 
 let pass = 0;
 let fail = 0;
@@ -27,7 +27,7 @@ const firstDiff = (a, b) => {
 };
 
 // ── 엑셀 읽기
-const xbuf = readFileSync(new URL('../public/techmap/techmap_request_sample.xlsx', import.meta.url));
+const xbuf = readFileSync(new URL('./fixtures/techmap_request_sample.xlsx', import.meta.url));
 const reqs = await readRequestFile('techmap_request_sample.xlsx', xbuf);
 ok('예시 엑셀 9건 읽기', reqs.length === 9, `got ${reqs.length}`);
 ok('엑셀 숫자 셀은 정수 문자열', reqs[0].f.layer_no === '16' && reqs[0].f.gds_datatype === '0', JSON.stringify(reqs[0].f));
@@ -119,6 +119,85 @@ ok('컬럼 정렬 유지', formatLike('  ( OD          1      OD   )\n', ['M9', 
 {
   const res = plan(ts(), reqs, null);
   ok('diff 머리 형식', res.diffs.tf.startsWith('--- a/demo.tf\n+++ b/demo.tf\n@@ -'));
+}
+
+// ── 작업공간 흐름: Master · DK · Ver · Option · history · 폴더 출력
+{
+  const { seedWorkspace, approveRevision, addRequests, newRevision } = await import('../src/apps/techmap/lib/workspace.js');
+  const { computeRevision, revisionFolder } = await import('../src/apps/techmap/lib/revision.js');
+  const { crossMaster, numberRegistry } = await import('../src/apps/techmap/lib/registry.js');
+  const { parseVer, compareVer, folderName } = await import('../src/apps/techmap/lib/version.js');
+  const { classOf } = await import('../src/apps/techmap/lib/classify.js');
+  const { DEFAULT_OPTIONS } = await import('../src/apps/techmap/lib/planner.js');
+  const S = DEFAULT_OPTIONS;
+
+  ok('Ver: 정식', parseVer('v1.0.0.0').kind === 'release');
+  ok('Ver: exp_날짜', parseVer('v1.0.0.0_exp_20261020').kind === 'exp' && parseVer('v1.0.0.0_exp_20261020').date === '20261020');
+  ok('Ver: exp날짜(붙여 씀)', parseVer('v1.0.0.0_exp20261020').date === '20261020');
+  ok('Ver: incr날짜', parseVer('v1.0.0.0_incr20261101').kind === 'incr');
+  ok('Ver: 잘못된 형식', !parseVer('1.0').valid);
+  ok('Ver 정렬', ['v1.0.0.0_incr20261101', 'v1.0.0.1', 'v1.0.0.0', 'v1.0.0.0_exp_20261020'].sort(compareVer).join() === 'v1.0.0.0,v1.0.0.0_exp_20261020,v1.0.0.0_incr20261101,v1.0.0.1');
+  ok('작업 폴더 이름 · 같은 날 _2', folderName('SF3_DK', 'v1.0.0.0', '20261026', ['SF3_DK_v1.0.0.0_20261026']) === 'SF3_DK_v1.0.0.0_20261026_2');
+  ok('분류 추정', classOf('M7').cls === 'METAL' && classOf('VI3').level === 3 && classOf('AP').cls === 'TOP' && classOf('prBoundary').cls === 'MARKER' && classOf('OD').cls === 'FEOL');
+
+  const { ws, current } = seedWorkspace(S);
+  const sf3 = ws.processes.find((p) => p.id === 'SF3');
+  const sf2 = ws.processes.find((p) => p.id === 'SF2');
+  const reg = numberRegistry(loadSet(sf3.master.files), sf3.classes);
+  ok('번호 대장: SF3 Layer 32 · 불일치 없음', reg.rows.length === 32 && !reg.issues.some((i) => i.level === 'error'));
+  const cm = crossMaster({ ts: loadSet(sf3.master.files), classes: sf3.classes }, { ts: loadSet(sf2.master.files), classes: sf2.classes });
+  ok('Master 비교: VIA4 번호 불일치 1건', cm.counts.mismatch === 1 && cm.rows[0].key === 'VIA4:drawing', JSON.stringify(cm.counts));
+  ok('Master 비교: RDL ↔ AP 기능키로 같음', cm.rows.some((r) => r.key === 'AP:drawing' && r.status === 'same' && r.b.layer === 'RDL'));
+  ok('Master 비교: 한쪽에만 (MIM · PAD · M10/M11)', cm.rows.some((r) => r.key === 'MIM:drawing' && r.status === 'onlyB') && cm.rows.some((r) => r.key === 'PAD:drawing' && r.status === 'onlyA'));
+
+  const first = ws.revisions.find((r) => r.status === 'approved');
+  ok('첫 DK 작업 승인 · 폴더 이름', first.folder === 'SF3_DK_v1.0.0.0_20261012' && first.output);
+  ok('첫 DK: HIDE 반영 (prBoundary Vis/Sel nil)', /prBoundary\s+drawing\s+prBoundary_drw\s+nil nil t t t/.test(first.output.files.tf.text));
+  const fc = computeRevision(ws, first, S);
+  ok('Option: 빠진 Layer를 룰 등에서 참조하면 알림', fc.checks.some((c) => c.scope === 'Option 1P9M_6X1Z' && c.msg.includes('M10')));
+  ok('첫 DK: Master 부분집합 · 번호 같음', !fc.checks.some((c) => c.scope === 'All ↔ Master'), JSON.stringify(fc.checks.slice(0, 3)));
+  const o9 = fc.options.find((o) => o.def.name === '1P9M_6X1Z');
+  ok('Option 9M: Metal 9 · Via 8 · AP 포함 · PAD 제외', o9.check.metals === 9 && o9.check.vias === 8 && o9.set.get('AP').in && !o9.set.get('PAD').in);
+  ok('Option 파일에서 M10 행 삭제', !/\(\s*M10\s+(\d+|drawing|pin)/.test(o9.files.tf.text) && !/^M10\s/m.test(o9.files.layermap.text) && /\(\s*M9\s/.test(o9.files.tf.text));
+
+  // exp 작업에 DK 예시 요청
+  const rev = ws.revisions.find((r) => r.id === current);
+  ok('exp 작업: Reference = 첫 작업, Option 이어받음', rev.ref.id === first.id && rev.options.length === 2 && rev.folder.startsWith('SF3_DK_v1.0.0.0_exp_20261020_'));
+  const dkReqs = await readRequestFile('dk.xlsx', readFileSync(new URL('../public/techmap/techmap_request_dk_sample.xlsx', import.meta.url)));
+  let ws2 = addRequests(ws, current, dkReqs, 'dk.xlsx');
+  const rev2 = ws2.revisions.find((r) => r.id === current);
+  const c2 = computeRevision(ws2, rev2, S);
+  const st = Object.fromEntries(c2.res.items.map((i) => [i.id, i.status]));
+  ok('DK 요청 상태', JSON.stringify(st) === JSON.stringify({ 'REQ-101': 'READY', 'REQ-102': 'ERROR', 'REQ-103': 'READY', 'REQ-104': 'READY', 'REQ-105': 'READY', 'REQ-106': 'READY', 'REQ-107': 'READY', 'REQ-108': 'READY', 'REQ-109': 'ERROR' }), JSON.stringify(st));
+  const i101 = c2.res.items.find((i) => i.id === 'REQ-101');
+  ok('DK ADD: 번호 · GDS · packet을 Master에서', i101.checks.some((c) => c.msg.startsWith('Master에서 가져옴: Layer# 236')) && c2.allFiles.layermap.text.includes('DMEXCL') && c2.allFiles.drf.text.includes('DMEXCL_drw'));
+  ok('DK ADD: Master와 다른 GDS → ERROR', c2.res.items.find((i) => i.id === 'REQ-102').checks.some((c) => c.msg.includes('≠ Master 10')));
+  ok('DK ADD: Master에 없는 LPP → ERROR', c2.res.items.find((i) => i.id === 'REQ-109').checks.some((c) => c.msg.includes('Master에 없는 LPP')));
+  ok('HIDE · SHOW 플래그', /text\s+drawing\s+text_drw\s+nil nil t t t/.test(c2.allFiles.tf.text) && /prBoundary\s+drawing\s+prBoundary_drw\s+t t t t t/.test(c2.allFiles.tf.text));
+  ok('수정 후에도 Master 부분집합', !c2.checks.some((c) => c.scope === 'All ↔ Master'), JSON.stringify(c2.checks.filter((c) => c.scope === 'All ↔ Master')));
+  const o9b = c2.options.find((o) => o.def.name === '1P9M_6X1Z');
+  ok('OPTION_ADD → 9M에 PAD (예외 +)', o9b.set.get('PAD').in && o9b.set.get('PAD').why === 'plus');
+  const o11 = c2.options.find((o) => o.def.name === '1P11M_8X2Z');
+  ok('OPTION_REMOVE VIA10 → Via 스택 점검 경고', !o11.set.get('VIA10').in && o11.check.issues.some((i) => i.msg.includes('M11') && i.msg.includes('Via 10')));
+  ok('history: 이전 블록 + 이번 블록', c2.history.includes('[SF3_DK v1.0.0.0]') && c2.history.includes('[SF3_DK v1.0.0.0_exp_20261020]') && c2.history.includes('ADD      REQ-101'));
+  const files = revisionFolder(ws2, rev2, c2).map((f) => f.path);
+  const root = `SF3/SF3_DK/${rev2.folder}`;
+  ok('출력 폴더 구조', files.includes(`${root}/All/SF3_DK.tf`) && files.includes(`${root}/All/SF3_DK_history.txt`) && files.includes(`${root}/Options/1P9M_6X1Z/SF3_DK.layermap`) && files.includes(`${root}/_techmap/revision.json`), files.join('\n'));
+
+  // 승인 → 다음 작업의 Reference
+  ws2 = approveRevision(ws2, current, S);
+  const nx = newRevision(ws2, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_incr20261101', workDate: '20261101', ref: current }, S);
+  ok('승인본이 다음 Reference', nx.rev.base.files.layermap.text.includes('DMEXCL') && nx.rev.base.history.includes('v1.0.0.0_exp_20261020'));
+
+  // Master 변경: 번호 지정 ADD + 다른 Master와 번호 비교
+  const mr = newRevision(ws2, { kind: 'master', process: 'SF3' }, S);
+  const mReqs = await readRequestFile('m.xlsx', readFileSync(new URL('../public/techmap/techmap_request_master_sample.xlsx', import.meta.url)));
+  const ws3 = addRequests(mr.ws, mr.rev.id, mReqs, 'm.xlsx');
+  const mc = computeRevision(ws3, ws3.revisions.find((r) => r.id === mr.rev.id), S);
+  ok('Master ADD 3건 READY', mc.res.items.every((i) => i.status === 'READY'), JSON.stringify(mc.res.items.map((i) => [i.id, i.status, i.checks])));
+  ok('Master ↔ SF2: MIM GDS 불일치 ERROR', mc.checks.some((c) => c.level === 'error' && c.msg.startsWith('MIM:drawing')), JSON.stringify(mc.checks));
+  const ws4 = approveRevision(ws3, mr.rev.id, S);
+  ok('Master 승인 → Process Master 갱신', ws4.processes.find((p) => p.id === 'SF3').master.files.tf.text.includes('M12'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

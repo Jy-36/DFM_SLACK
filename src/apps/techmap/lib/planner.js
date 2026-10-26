@@ -14,7 +14,11 @@ export const DEFAULT_OPTIONS = {
   retireLayermap: 'keep', // keep | comment
   splitSharedPacket: true, // 공유 packet을 바꾸면 전용 packet을 새로 만든다
 };
+// 실행할 때만 넘기는 값: master(TechSet) — DK 작업이면 번호 · 표시를 Master에서 가져오고 다르면 ERROR
+//                     optionNames — OPTION_ADD/REMOVE가 가리킬 수 있는 Option 이름
 
+// 한 줄의 괄호 안 토큰 (주석 제외)
+const lineTokens = (line) => (line.split(';')[0].match(/"[^"]*"|[^\s()]+/g) || []);
 const toInt = (v) => (/^-?\d+$/.test(String(v ?? '').trim()) ? Number(String(v).trim()) : null);
 const hex2 = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 
@@ -59,6 +63,18 @@ class State {
     this.stipples = drf.stippleNames();
     this.linestyles = drf.linestyleNames();
     this.retired = new Set();
+  }
+  static master(ts) {
+    // Master 색인 (DK 모드에서 번호 · 표시를 가져올 때)
+    return {
+      ts,
+      layers: ts.tf.layerByName(),
+      disp: ts.tf.displayRows(),
+      lm: ts.lm.byLpp(),
+      purposeNo: new Map((ts.tf.purposes?.rows || []).map((r) => [r.tokens[0], r.tokens[1]])),
+      packets: new Map([...ts.drf.packetRows()].map(([k, r]) => [k, [...r.tokens]])),
+      colors: new Map([...ts.drf.colorRows()].map(([k, r]) => [k, r.tokens.slice(2, 5).map(Number)])),
+    };
   }
   colorFor(rgb) {
     for (const [n, v] of this.colors) if (v.join() === rgb.join()) return n;
@@ -120,6 +136,7 @@ class Planner {
     this.st = new State(ts);
     this.pattern = packetPattern(this.st);
     this.displayName = ts.drf.colors?.rows[0]?.tokens[0] || 'display';
+    this.master = this.opts.master ? State.master(this.opts.master) : null;
     this.p = { tf: new Patch(ts.tf.lines, ';'), layermap: new Patch(ts.lm.lines, '#'), drf: new Patch(ts.drf.lines, ';') };
     const items = [];
     const seen = new Set();
@@ -128,8 +145,12 @@ class Planner {
       if (seen.has(req.id)) it.add('error', `Req_ID 중복: ${req.id}`);
       seen.add(req.id);
       if (!get(req, 'layer')) it.add('error', 'Layer 값이 비어 있음');
-      const fn = { ADD: this.add, CHANGE_DISPLAY: this.change, RETIRE: this.retire }[req.type];
-      if (!fn) it.add('error', `알 수 없는 Type '${req.type}' (ADD / CHANGE_DISPLAY / RETIRE)`);
+      const fn = {
+        ADD: this.add, CHANGE_DISPLAY: this.change, RETIRE: this.retire,
+        HIDE: (x, a) => this.flags(x, a, true), SHOW: (x, a) => this.flags(x, a, false),
+        OPTION_ADD: (x) => this.optionOp(x, 'add'), OPTION_REMOVE: (x) => this.optionOp(x, 'remove'),
+      }[req.type];
+      if (!fn) it.add('error', `알 수 없는 Type '${req.type}' (ADD / CHANGE_DISPLAY / RETIRE / HIDE / SHOW / OPTION_ADD / OPTION_REMOVE)`);
       if (it.status === ERROR) {
         items.push(it);
         continue;
@@ -155,7 +176,7 @@ class Planner {
       diffs[k] = this.p[k].diff(names[k]);
     }
     return {
-      items: items.map((it) => ({ id: it.req.id, type: it.req.type, row: it.req.row, fields: it.req.f, lpp: it.lpp, status: it.status, included: it.included, checks: it.checks, changes: it.changes })),
+      items: items.map((it) => ({ id: it.req.id, type: it.req.type, row: it.req.row, fields: it.req.f, lpp: it.lpp, status: it.status, included: it.included, checks: it.checks, changes: it.changes, optionOp: it.optionOp || null, filled: it.filled || null })),
       files,
       diffs,
       names,
@@ -207,9 +228,8 @@ class Planner {
     return name;
   }
 
-  packetTokens(it, name, base, apply) {
+  packetTokens(it, name, base, apply, r = it.req) {
     const st = this.st;
-    const r = it.req;
     const all = [...st.packets.values()];
     const stipple = get(r, 'stipple') || (base ? base[2] : mostCommon(all.map((p) => p[2])) || 'solid');
     const linestyle = get(r, 'linestyle') || (base ? base[3] : st.linestyles.has('solid') ? 'solid' : mostCommon(all.map((p) => p[3])) || 'solid');
@@ -273,11 +293,116 @@ class Planner {
     return name;
   }
 
+  /** DK 모드: Master에서 번호 · GDS · 표시를 채운 요청. 요청 값이 Master와 다르면 ERROR */
+  fillFromMaster(it) {
+    const M = this.master;
+    const r = it.req;
+    const layer = get(r, 'layer');
+    const purpose = get(r, 'purpose');
+    const key = lppKey(layer, purpose);
+    if (!M.disp.has(key)) {
+      it.add('error', `${key}는 Master에 없는 LPP — Master 변경으로 먼저 추가해 주세요`);
+      return null;
+    }
+    const f = { ...r.f };
+    const filled = [];
+    const take = (k, v, label) => {
+      if (v == null || v === '') return true;
+      if (get(r, k) && get(r, k) !== String(v)) {
+        it.add('error', `${label} ${get(r, k)} ≠ Master ${v} — DK는 Master 번호를 그대로 써야 해요`);
+        return false;
+      }
+      if (!get(r, k)) filled.push(`${label} ${v}`);
+      f[k] = String(v);
+      return true;
+    };
+    const ml = M.layers.get(layer);
+    if (!take('layer_no', ml?.tokens[1], 'Layer#')) return null;
+    if (!get(r, 'abbrev') && ml?.tokens[2]) f.abbrev = ml.tokens[2];
+    if (!take('purpose_no', M.purposeNo.get(purpose), 'Purpose#')) return null;
+    const mm = M.lm.get(key);
+    if (!take('gds_layer', mm?.stream, 'GDS layer') || !take('gds_datatype', mm?.datatype, 'GDS datatype')) return null;
+    const display = ['packet', 'fill_color', 'outline_color', 'stipple', 'linestyle', 'fill_style'].some((k) => get(r, k));
+    if (!display) {
+      f.packet = M.disp.get(key).tokens[2];
+      filled.push(`packet ${f.packet}`);
+      f._masterPacket = '1';
+    }
+    if (filled.length) it.add('info', `Master에서 가져옴: ${filled.join(' · ')}`);
+    it.filled = filled;
+    return { ...r, f };
+  }
+
+  /** Master packet(과 그 색)을 DK drf에 복사 */
+  copyMasterPacket(it, pk, apply) {
+    const st = this.st;
+    const drf = this.ts.drf;
+    const toks = this.master.packets.get(pk);
+    if (!toks) return it.add('error', `Master drf에 packet '${pk}'이 없음`), false;
+    if (!st.stipples.has(toks[2])) return it.add('error', `Stipple '${toks[2]}'이 DK drf에 없음 — drDefineStipple 복사 필요`), false;
+    if (!st.linestyles.has(toks[3])) return it.add('error', `LineStyle '${toks[3]}'이 DK drf에 없음`), false;
+    for (const c of new Set([toks[4], toks[5]])) {
+      if (st.colors.has(c)) continue;
+      const rgb = this.master.colors.get(c);
+      if (!rgb || !drf.colors?.rows.length) return it.add('error', `색 '${c}'을 DK drf에 만들 수 없음`), false;
+      const tmpl = drf.colors.rows[drf.colors.rows.length - 1];
+      this.emit(it, apply, 'drf', 'add', drf.colors.lastRowLine, formatLike(drf.lines[tmpl.start], [this.displayName, c, ...rgb.map(String)], ';', this.tag(it)), '', 'drDefineColor');
+      if (apply) st.colors.set(c, rgb);
+      it.add('info', `Master 색 '${c}' 복사`);
+    }
+    const nt = [this.displayName, ...toks.slice(1)];
+    const last = drf.packets.rows[drf.packets.rows.length - 1];
+    this.emit(it, apply, 'drf', 'add', drf.packets.lastRowLine, formatLike(drf.lines[last.start], nt, ';', this.tag(it)), '', 'drDefinePacket');
+    if (apply) st.packets.set(pk, nt);
+    it.add('info', `Master packet '${pk}' 복사`);
+    return true;
+  }
+
+  // ───────────────────────────────────────── HIDE / SHOW
+  // techDisplays의 Vis · Sel 플래그 (Layer는 파일에 남고, 사용자에게 안 보이고 · 고를 수 없게)
+  flags(it, apply, hide) {
+    const tf = this.ts.tf;
+    const r = it.req;
+    const key = lppKey(get(r, 'layer'), get(r, 'purpose'));
+    if (!get(r, 'purpose')) return it.add('error', `${hide ? 'HIDE' : 'SHOW'}에는 Purpose가 필요함`);
+    const row = tf.displayRows().get(key);
+    if (!row || this.st.retired.has(key)) return it.add('error', `${key}가 techDisplays에 없음 (Not Found)`);
+    const cur = this.p.tf.current(row.start);
+    const toks = lineTokens(cur);
+    if (toks.length < 5) return it.add('error', `${key}: techDisplays 행에 Vis/Sel 칸이 없음`);
+    const want = hide ? 'nil' : 't';
+    if (toks[3] === want && toks[4] === want) return it.add('error', `${key}는 이미 ${hide ? '숨김' : '표시'} 상태 — 변경 사항 없음`);
+    const nt = [...toks];
+    nt[3] = want;
+    nt[4] = want;
+    // 컬럼 배치는 표의 다른 행(숨기지 않은 보통 행)을 따른다 — nil/t 폭이 달라도 줄이 맞게
+    const tmplRow = tf.displays.rows.find((x) => x !== row && x.tokens[3] === 't' && x.tokens[4] === 't') || row;
+    this.emit(it, apply, 'tf', 'modify', row.start, formatLike(tf.lines[tmplRow.start], nt, ';', this.tag(it)), cur, 'techDisplays');
+    it.add('info', hide ? 'Vis · Sel → nil (화면에 안 보이고 고를 수 없음, Layer · layermap은 그대로)' : 'Vis · Sel → t');
+    return undefined;
+  }
+
+  // ─────────────────────────────── OPTION_ADD / OPTION_REMOVE
+  // 파일을 바로 고치지 않고 Option 정의의 예외(plus/minus)로 들어간다
+  optionOp(it, op) {
+    const r = it.req;
+    const option = get(r, 'option');
+    const layer = get(r, 'layer');
+    const names = this.opts.optionNames || [];
+    if (!option) return it.add('error', 'Option 이름이 필요함');
+    if (!names.includes(option)) return it.add('error', `Option '${option}'이 이 작업에 없음 (있는 Option: ${names.join(', ') || '없음'})`);
+    if (!this.st.layers.has(layer)) return it.add('error', `${layer}는 All Layer에 없음 — 먼저 ADD`);
+    it.optionOp = { op, option, layer };
+    it.add('info', `${option}에 ${layer} ${op === 'add' ? '넣기' : '빼기'} (Option 정의 예외로 반영)`);
+    return undefined;
+  }
+
   // ───────────────────────────────────────────── ADD
   add(it, apply) {
     const { tf, lm, drf } = this.ts;
     const st = this.st;
-    const r = it.req;
+    const r = this.master ? this.fillFromMaster(it) : it.req;
+    if (!r) return undefined;
     const layer = get(r, 'layer');
     const purpose = get(r, 'purpose');
     if (!purpose) return it.add('error', 'ADD에는 Purpose가 필요함');
@@ -330,11 +455,14 @@ class Planner {
     // 4) drf packet + techDisplays
     let packet = get(r, 'packet');
     if (packet && st.packets.has(packet) && !(get(r, 'fill_color') || get(r, 'stipple'))) {
-      it.add('info', `기존 packet '${packet}' 재사용 (현재 ${st.packetUsers(packet).length}개 LPP가 사용)`);
+      const n = st.packetUsers(packet).length;
+      it.add('info', n ? `기존 packet '${packet}' 재사용 (현재 ${n}개 LPP가 사용)` : `drf에 이미 있는 packet '${packet}' 사용 (지금 쓰는 LPP 없음)`);
+    } else if (this.master && get(r, '_masterPacket')) {
+      if (!this.copyMasterPacket(it, packet, apply)) return undefined;
     } else {
       packet = packet || this.newPacketName(layer, purpose);
       if (st.packets.has(packet)) return it.add('error', `Packet '${packet}'이 이미 있음 — 재사용하려면 색/패턴 칸을 비워 주세요`);
-      const toks = this.packetTokens(it, packet, null, apply);
+      const toks = this.packetTokens(it, packet, null, apply, r);
       if (!toks) return undefined;
       if (!drf.packets?.rows.length) return it.add('error', 'drf에 drDefinePacket 테이블이 없음');
       const last = drf.packets.rows[drf.packets.rows.length - 1];
@@ -343,9 +471,12 @@ class Planner {
     }
     if (!tf.displays?.rows.length) return it.add('error', 'techfile에 techDisplays 테이블이 없음');
     {
-      const [anchor] = this.neighbour(tf.displays.rows, layer);
-      const flags = anchor.tokens.length > 3 ? anchor.tokens.slice(3) : ['t', 't', 't', 't', 't'];
-      this.emit(it, apply, 'tf', 'add', anchor.end, formatLike(tf.lines[anchor.start], [layer, purpose, packet, ...flags], ';', this.tag(it)), '', 'techDisplays');
+      const [anchor0] = this.neighbour(tf.displays.rows, layer);
+      // 숨김(nil) 행은 칸 폭이 달라서, 컬럼 배치는 보통(t t) 행을 따른다
+      const anchor = anchor0.tokens[3] === 'nil' || anchor0.tokens[4] === 'nil' ? tf.displays.rows.find((x) => x.tokens[3] === 't' && x.tokens[4] === 't') || anchor0 : anchor0;
+      const mrow = this.master?.disp.get(lppKey(layer, purpose));
+      const flags = mrow && mrow.tokens.length > 3 ? mrow.tokens.slice(3) : anchor.tokens.length > 3 ? anchor.tokens.slice(3) : ['t', 't', 't', 't', 't'];
+      this.emit(it, apply, 'tf', 'add', anchor0.end, formatLike(tf.lines[anchor.start], [layer, purpose, packet, ...flags], ';', this.tag(it)), '', 'techDisplays');
       if (apply) {
         st.lpps.add(lppKey(layer, purpose));
         st.displayPacket.set(lppKey(layer, purpose), packet);

@@ -26,6 +26,14 @@ export function reviewCsv(batch, baseline, res) {
   return '﻿' + csv(rows);
 }
 
+/** 리비전 검토 리포트 CSV */
+export function revisionCsv(rev, c) {
+  return reviewCsv({ name: rev.folder }, { id: rev.ref?.label || '', label: '' }, c.res).replace('\r\n\r\n', `\r\n점검,${c.checks.length}건\r\n${c.checks.map((x) => [x.level, x.scope, x.msg].map(csvCell).join(',')).join('\r\n')}\r\n\r\n`);
+}
+
+/** 폴더 항목 [{path, data}] → zip (설치형에서는 같은 구조로 VWP 폴더에 바로 쓴다) */
+export const folderZip = (entries) => zip(entries.map((e) => ({ name: e.path, data: e.data })));
+
 export function bundleZip(batch, baseline, res) {
   const folder = `techmap_${batch.id}`;
   return zip([

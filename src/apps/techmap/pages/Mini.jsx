@@ -1,86 +1,79 @@
-// App Mode (휴대폰 폭 요약): 최근 Request 묶음 상태 · 검토할 것 · 바로 올리기
-import { useRef, useState } from 'react';
+// App Mode (휴대폰 폭 요약): 지금 작업 · 사람이 볼 것 · 요청 바로 올리기 · Process 번호 점검
+import { useRef } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
+import { readRequestFile } from '../lib/requests.js';
+import { addRequests } from '../lib/workspace.js';
 import { STATUS, TYPE_LABEL } from '../lib/view.js';
-import { uploadRequestFile } from './UploadPage.jsx';
 
-export default function Mini({ store, batch, baseline, res, expand, notify, select }) {
+export default function Mini({ ws, store, rev, c, expand, notify, select }) {
   const inputRef = useRef(null);
-  const [err, setErr] = useState('');
-  const latest = store.baselines[store.baselines.length - 1];
+  const open = ws.revisions.filter((r) => r.status !== 'approved');
   const take = async (file) => {
-    if (!file) return;
-    setErr('');
+    if (!file || !rev) return;
     try {
-      const b = await uploadRequestFile(file, latest.id, store);
-      select(b.id);
-      notify(`Request ${b.requests.length}건 검토 시작`);
+      const reqs = await readRequestFile(file.name, new Uint8Array(await file.arrayBuffer()));
+      store.update((w) => addRequests(w, rev.id, reqs, file.name));
+      notify(`${rev.folder}에 요청 ${reqs.length}건`);
     } catch (e) {
-      setErr(e.message);
+      notify(e.message);
     }
   };
-  const todo = res ? res.items.filter((i) => i.status !== 'READY') : [];
+  const todo = c && !c.error ? c.res.items.filter((i) => i.status !== 'READY') : [];
+  const errs = c && !c.error ? c.checks.filter((x) => x.level === 'error') : [];
   return (
     <div className="mini tm-mini fade-in">
-      {store.batches.length > 1 && (
-        <div className="tm-mini-pick" role="tablist" aria-label="Request 묶음">
-          {store.batches.slice(0, 6).map((b) => (
-            <button key={b.id} type="button" role="tab" aria-selected={b.id === batch?.id} className="tm-chip" onClick={() => select(b.id)}>
-              # {b.name}
-            </button>
+      {open.length > 1 && (
+        <div className="tm-mini-pick" role="tablist" aria-label="작업">
+          {open.slice(0, 6).map((r) => (
+            <button key={r.id} type="button" role="tab" aria-selected={r.id === rev?.id} className="tm-chip" onClick={() => select(r.id)}>{r.kind === 'dk' ? r.ver : `${r.process} Master`}</button>
           ))}
         </div>
       )}
-
-      {batch && res ? (
+      {rev && c && !c.error ? (
         <section className="mini-card">
           <div className="mini-card-head">
-            <h3># {batch.name}</h3>
-            {batch.promoted ? <Pill tone="good">{batch.promoted} 반영</Pill> : <Pill tone="accent">기준 {baseline.id}</Pill>}
+            <h3>{rev.kind === 'dk' ? rev.dk : `${rev.process} MASTER`}</h3>
+            <Pill tone={rev.status === 'approved' ? 'good' : 'warn'}>{rev.status === 'approved' ? '승인' : '작업중'}</Pill>
           </div>
+          <span className="mono small muted tm-mini-folder">{rev.folder}</span>
           <div className="tm-mini-nums">
-            <div><b className="num tone-good">{res.counts.READY}</b><span>READY</span></div>
-            <div><b className="num tone-warn">{res.counts.NEEDS_REVIEW}</b><span>검토 필요</span></div>
-            <div><b className="num tone-bad">{res.counts.ERROR}</b><span>ERROR</span></div>
-            <div><b className="num">{res.applied.length}</b><span>반영 예정</span></div>
+            <div><b className="num tone-good">{c.counts.READY}</b><span>READY</span></div>
+            <div><b className="num tone-warn">{c.counts.NEEDS_REVIEW}</b><span>검토 필요</span></div>
+            <div><b className="num tone-bad">{c.counts.ERROR}</b><span>ERROR</span></div>
+            <div><b className={`num ${errs.length ? 'tone-bad' : ''}`}>{errs.length}</b><span>점검 ERROR</span></div>
           </div>
-          {todo.length > 0 ? (
+          {todo.length > 0 && (
             <ul className="tm-mini-list">
-              {todo.slice(0, 6).map((i) => (
+              {todo.slice(0, 5).map((i) => (
                 <li key={i.id}>
                   <span className="tm-rid">{i.id}</span>
-                  <span className="tm-mini-lpp">{TYPE_LABEL[i.type] || i.type} · {i.lpp}</span>
+                  <span className="tm-mini-lpp">{TYPE_LABEL[i.type] || i.type} · {i.optionOp ? `${i.fields.option} ${i.fields.layer}` : i.lpp}</span>
                   <Pill tone={STATUS[i.status].tone}>{i.included ? '승인' : STATUS[i.status].label}</Pill>
-                  <span className="tm-mini-msg small muted">{(i.checks.find((c) => c.level !== 'info') || i.checks[0])?.msg}</span>
+                  <span className="tm-mini-msg small muted">{(i.checks.find((x) => x.level !== 'info') || i.checks[0])?.msg}</span>
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="small muted">사람이 볼 항목이 없어요. 모두 READY예요.</p>
           )}
+          {errs.slice(0, 2).map((x, k) => <p key={k} className="small tone-bad">{x.scope} · {x.msg}</p>)}
           <div className="mini-btns tm-mini-btns">
-            <button type="button" className="btn primary" onClick={() => expand({ page: 'batch', id: batch.id })}><Icon name="windowMode" size={15} /> 검토 · 파일 받기</button>
+            <button type="button" className="btn primary" onClick={() => expand({ page: 'rev', id: rev.id })}><Icon name="windowMode" size={15} /> 검토 · 출력</button>
+            {rev.status !== 'approved' && <button type="button" className="btn" onClick={() => inputRef.current?.click()}><Icon name="plus" size={15} /> 요청</button>}
           </div>
+          <input ref={inputRef} type="file" accept=".xlsx,.csv,.json" hidden onChange={(e) => { take(e.target.files[0]); e.target.value = ''; }} />
         </section>
       ) : (
         <section className="mini-card">
           <div className="mini-card-head"><h3>Techmap</h3></div>
-          <p className="small muted">Site Request 엑셀을 올리면 techfile · layermap · drf를 같이 검토하고, 바뀔 줄을 보여 줘요.</p>
+          <p className="small muted">진행 중인 작업이 없어요. Window Mode에서 새 작업을 만드세요.</p>
+          <button type="button" className="btn primary" onClick={() => expand({ page: 'new' })}><Icon name="plus" size={15} /> 새 작업</button>
         </section>
       )}
-
       <section className="mini-card">
-        <div className="mini-card-head">
-          <h3>Request 올리기</h3>
-          <span className="small muted">기준 {latest?.id}</span>
-        </div>
-        <button type="button" className="btn" onClick={() => inputRef.current?.click()}><Icon name="plus" size={15} /> 엑셀 고르기 (.xlsx · .csv)</button>
-        <input ref={inputRef} type="file" accept=".xlsx,.csv" hidden onChange={(e) => { take(e.target.files[0]); e.target.value = ''; }} />
-        {err && <p className="small tone-bad">{err}</p>}
+        <div className="mini-card-head"><h3>Process</h3></div>
         <div className="tm-mini-links">
-          <a href="/techmap/techmap_request_template.xlsx" download className="small">빈 양식</a>
-          <a href="/techmap/techmap_request_sample.xlsx" download className="small">예시 9건</a>
-          <button type="button" className="link-btn small" onClick={() => expand({ page: 'baseline', id: latest?.id })}>baseline {latest?.id} 보기</button>
+          {ws.processes.map((p) => (
+            <button key={p.id} type="button" className="tm-chip" onClick={() => expand({ page: 'registry', proc: p.id })}>{p.id} 번호 대장</button>
+          ))}
         </div>
       </section>
     </div>

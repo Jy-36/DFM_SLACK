@@ -1,4 +1,4 @@
-// 위젯: 최근 Request 묶음의 검토 필요 · ERROR · 반영 예정 (MTO · WorkTime 위젯과 같은 틀)
+// 위젯: 지금 작업의 검토 필요 · ERROR · 점검 (MTO · WorkTime 위젯과 같은 틀)
 import { Icon } from '../../../shared/ui.jsx';
 import { DfmLogo } from '../../../shared/Logo.jsx';
 import { isTauri } from '../../../shared/platform.js';
@@ -12,17 +12,19 @@ async function win(action) {
   }
 }
 
-export default function Widget({ batch, res, setMode, widget, setWidget }) {
+export default function Widget({ rev, c, setMode, widget, setWidget }) {
   const tauri = isTauri();
-  const total = res ? res.items.length : 0;
-  const pct = total ? res.applied.length / total : 0;
+  const ok = c && !c.error;
+  const total = ok ? c.res.items.length : 0;
+  const pct = total ? c.applied.length / total : 0;
+  const errs = ok ? c.checks.filter((x) => x.level === 'error').length : 0;
   return (
     <div className="widget" data-tauri-drag-region>
       <div className="wg-top" data-tauri-drag-region>
         <span className="wg-brand" data-tauri-drag-region>
           <DfmLogo size={18} />
           <span>Techmap</span>
-          <span className="wg-date tm-wg-date">{batch ? `# ${batch.name}` : 'Request 없음'}</span>
+          <span className="wg-date tm-wg-date">{rev ? (rev.kind === 'dk' ? rev.ver : `${rev.process} Master`) : '작업 없음'}</span>
         </span>
         <span className="wg-actions">
           <button type="button" className={`wg-btn ${widget.onTop ? 'on' : ''}`} onClick={() => setWidget({ onTop: !widget.onTop })} disabled={!tauri}
@@ -37,18 +39,18 @@ export default function Widget({ batch, res, setMode, widget, setWidget }) {
       <div className="wg-main" data-tauri-drag-region>
         <div className="wg-clock-wrap" data-tauri-drag-region>
           <span className="wg-label">검토 필요</span>
-          <b className="wg-clock num">{res ? res.counts.NEEDS_REVIEW : '-'}</b>
+          <b className="wg-clock num">{ok ? c.counts.NEEDS_REVIEW : '-'}</b>
         </div>
-        {res && (
+        {ok && (
           <div className="wg-side">
-            <span className="num"><small>ERROR</small> {res.counts.ERROR}</span>
-            <span className="num"><small>READY</small> {res.counts.READY}</span>
+            <span className="num"><small>ERROR</small> {c.counts.ERROR}</span>
+            <span className="num"><small>점검</small> {errs}</span>
           </div>
         )}
       </div>
       <div className="wg-bar" aria-label={`반영 예정 ${Math.round(pct * 100)}%`}><i style={{ width: `${pct * 100}%` }} /></div>
       <div className="wg-foot">
-        <span className="num">{res ? `반영 예정 ${res.applied.length}/${total}` : '엑셀을 올려 주세요'}</span>
+        <span className="num">{ok ? `반영 ${c.applied.length}/${total}` : '작업을 열어 주세요'}</span>
         <label className="wg-opacity" title="투명도">
           <Icon name="drop" size={12} />
           <input type="range" min="35" max="100" step="5" value={Math.round(widget.opacity * 100)} onChange={(e) => setWidget({ opacity: Number(e.target.value) / 100 })} aria-label="투명도" />

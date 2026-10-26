@@ -4,3 +4,4 @@ preview
 src-tauri/target
 src-tauri/gen
 *.log
+scripts/fixtures/real/

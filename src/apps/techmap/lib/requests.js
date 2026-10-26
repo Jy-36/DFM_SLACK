@@ -4,7 +4,7 @@ import { unzip } from './zip.js';
 export const COLUMNS = [
   // key, 헤더, 설명
   ['req_id', 'Req_ID', '고유 ID (예: REQ-2026-001)'],
-  ['type', 'Type', 'ADD / CHANGE_DISPLAY / RETIRE'],
+  ['type', 'Type', 'ADD / CHANGE_DISPLAY / RETIRE / HIDE / SHOW / OPTION_ADD / OPTION_REMOVE'],
   ['layer', 'Layer', 'Layer 이름'],
   ['purpose', 'Purpose', 'Purpose 이름 (RETIRE에서 비우면 Layer 전체)'],
   ['layer_no', 'Layer_No', 'ADD · 신규 Layer일 때 techLayers 번호'],
@@ -18,6 +18,7 @@ export const COLUMNS = [
   ['stipple', 'Stipple', 'drDefineStipple 이름'],
   ['linestyle', 'LineStyle', 'drDefineLineStyle 이름'],
   ['fill_style', 'Fill_Style', 'outline / solid / X / stipple / outlineStipple …'],
+  ['option', 'Option', 'OPTION_ADD/REMOVE · 대상 Option 이름 (예: 1P9M_6X1Z)'],
   ['requester', 'Requester', '요청자'],
   ['reason', 'Reason', '요청 사유 / Site Request 원문 요약'],
 ];
@@ -27,6 +28,9 @@ const TYPE_ALIASES = {
   ADD: 'ADD', '추가': 'ADD', NEW: 'ADD',
   CHANGE_DISPLAY: 'CHANGE_DISPLAY', CHANGE: 'CHANGE_DISPLAY', '변경': 'CHANGE_DISPLAY', DISPLAY: 'CHANGE_DISPLAY',
   RETIRE: 'RETIRE', DELETE: 'RETIRE', '삭제': 'RETIRE', '폐기': 'RETIRE',
+  HIDE: 'HIDE', '숨김': 'HIDE', SHOW: 'SHOW', '표시': 'SHOW', UNHIDE: 'SHOW',
+  OPTION_ADD: 'OPTION_ADD', 'OPTION추가': 'OPTION_ADD', 'OPTION_넣기': 'OPTION_ADD',
+  OPTION_REMOVE: 'OPTION_REMOVE', 'OPTION제외': 'OPTION_REMOVE', 'OPTION_빼기': 'OPTION_REMOVE',
 };
 export const normType = (t) => {
   const k = String(t || '').trim().toUpperCase().replace(/\s+/g, '_');
@@ -143,8 +147,22 @@ export function readCsv(text) {
   return rows;
 }
 
+/** codemate 결과 JSON: { requests: [ { req_id, type, layer, ... } ] } 또는 배열. 키는 key(req_id) · 헤더(Req_ID) 모두 받는다 */
+export function jsonToRequests(obj) {
+  const list = Array.isArray(obj) ? obj : obj?.requests;
+  if (!Array.isArray(list)) throw new Error('request.json에 requests 배열이 없어요');
+  const keys = COLUMNS.map(([k]) => k);
+  const table = [COLUMNS.map(([, h]) => h), ...list.map((o) => keys.map((k) => {
+    const h = COLUMNS.find(([kk]) => kk === k)[1];
+    const v = o[k] ?? o[h] ?? o[h.toLowerCase()] ?? '';
+    return v == null ? '' : String(v);
+  }))];
+  return rowsToRequests(table);
+}
+
 /** 파일 이름으로 형식을 고른다 */
 export async function readRequestFile(name, buf) {
+  if (/\.json$/i.test(name)) return jsonToRequests(JSON.parse(new TextDecoder().decode(buf)));
   if (/\.csv$/i.test(name)) return rowsToRequests(readCsv(new TextDecoder().decode(buf)));
   return rowsToRequests(await readXlsx(buf));
 }

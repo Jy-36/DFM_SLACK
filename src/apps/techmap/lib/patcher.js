@@ -51,7 +51,7 @@ export class Patch {
     this.eol = crlf > lines.length / 2 ? '\r\n' : '\n';
   }
   op(idx) {
-    if (!this.ops.has(idx)) this.ops.set(idx, { replace: null, after: [] });
+    if (!this.ops.has(idx)) this.ops.set(idx, { replace: null, remove: false, after: [] });
     return this.ops.get(idx);
   }
   insertAfter(idx, text) {
@@ -59,6 +59,10 @@ export class Patch {
   }
   replace(idx, text) {
     this.op(idx).replace = bare(text);
+  }
+  /** 줄 지우기 (Option 파일 만들 때 · 빠지는 Layer 행) */
+  remove(idx) {
+    this.op(idx).remove = true;
   }
   commentOut(start, end, tag) {
     for (let i = start; i <= end; i++) {
@@ -79,7 +83,7 @@ export class Patch {
       const op = this.ops.get(i);
       if (!op) return out.push(ln);
       const eol = eolOf(ln) || this.eol;
-      out.push((op.replace != null ? op.replace : bare(ln)) + eol);
+      if (!op.remove) out.push((op.replace != null ? op.replace : bare(ln)) + eol);
       for (const a of op.after) out.push(a + this.eol);
     });
     // 마지막 줄에 줄 끝이 없던 파일 뒤에 줄을 붙였으면 원래 모양을 지킨다
@@ -92,7 +96,8 @@ export class Patch {
     let b = 0;
     this.lines.forEach((ln, i) => {
       const op = this.ops.get(i);
-      if (!op || op.replace == null) seq.push({ t: ' ', s: bare(ln), a: i + 1, b: ++b });
+      if (!op || (op.replace == null && !op.remove)) seq.push({ t: ' ', s: bare(ln), a: i + 1, b: ++b });
+      else if (op.remove) seq.push({ t: '-', s: bare(ln), a: i + 1, b: null });
       else {
         seq.push({ t: '-', s: bare(ln), a: i + 1, b: null });
         seq.push({ t: '+', s: op.replace, a: null, b: ++b });
