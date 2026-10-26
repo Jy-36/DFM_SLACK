@@ -59,6 +59,15 @@
 
 점검 ERROR가 있어도 승인은 막지 않고 확인 창을 띄운다(사람이 판단). 바꾸려면 `RevisionPage.approve`.
 
+## 분기 · Merge
+- 분기 = 아무 작업(승인 · 작업중)을 Reference로 새 작업. 그래프 [분기]는 Ver를 `<기본 Ver>_exp_<오늘>`로 채워 준다(바꿀 수 있음).
+- Merge는 **작업중(draft) 작업에만**. 같은 Process · 같은 종류(DK ↔ DK, Master ↔ Master)끼리.
+- source가 이미 target의 조상이면 막는다("이미 들어 있어요").
+- 재생하는 요청 = source 쪽에만 있는 작업들에서 **실제로 반영된** 요청(승인본은 고정된 include). Merge로 들어온 요청은 원본만 재생(중복 방지).
+- **충돌 = 엔진 검사로 드러난다**: 같은 LPP를 양쪽에서 ADD, 이미 숨긴 것을 HIDE 등 → 합친 요청이 ERROR/변경 없음. 사람이 [반영] 체크를 풀어 정리.
+- Option 3-way: plus · minus · tops는 source가 공통 조상 대비 더하고 뺀 것만 반영. Metal 수는 target이 안 바꿨으면 source 값, 양쪽이 다르게 바꿨으면 target 유지 + 충돌 알림.
+- history 블록에 `Merge     : <폴더> (요청 n건)`, 합친 요청 줄 끝에 `← <원래 폴더>`.
+
 ## 분류 · 기능키 (`lib/classify.js`)
 - 추정: `M|ME|MET|METAL<n>` → METAL n, `VIA|VI|V<n>` → VIA n, `AP|RDL|PAD|UBM|CB|PI|PASS|BUMP|TV|LB` → TOP, `text|prBoundary|boundary|DMEXCL|*mark*|*excl*|*dummy*|*blk*|*_id` → MARKER, 나머지 FEOL.
 - 기능키: METAL n → `METALn`, VIA n → `VIAn`, 나머지 이름 대문자. LPP 기능키 = `기능키:purpose`.

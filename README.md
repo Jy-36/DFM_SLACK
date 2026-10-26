@@ -278,7 +278,8 @@ Process **Master Techmap**(Layer · Purpose 번호의 원본) → **DK All Layer
 | 번호 대장 | Layer# × Purpose(datatype) 격자 — GDS, 색, 숨김, Purpose 관례 datatype에서 벗어남(노랑), layermap 없음(빨강), 빈 Layer# |
 | Master 비교 | 다른 Process Master와 **기능키**(목적) 기준 GDS 비교 — 번호 다름 · 한쪽에만 · 번호 겹침 |
 | 분류 · 기능키 | FEOL · Metal n · Via n · Top · Marker 자동 추정 + 직접 고치기 (Option 자동 구성 · Master 비교 기준) |
-| DK → Ver · 작업 (채널) | 요청 검토 · Option 매트릭스 · 점검 · 파일 변경 · History · codemate 변환 · 승인 · 폴더 출력 |
+| DK 그래프 | git log --graph처럼: 정식 Ver = 왼쪽 줄기, exp · incr Ver마다 가지, 실선 = Reference(분기) · 점선 = Merge. 노드에서 열기 · [분기] · [→ 합치기] |
+| DK → Ver · 작업 (채널) | 요청 검토 · Option 매트릭스 · 점검 · 파일 변경 · History · codemate 변환 · 그래프 · 다른 작업 합치기 · 승인 · 폴더 출력 |
 | 처리 규칙 · 작업공간 | Req_ID 주석, 공유 packet, 폐기 시 layermap, VWP 경로, 작업공간 내보내기/가져오기 |
 
 ## 요청 유형 (엑셀 `Request` 시트 · .csv · codemate request.json)
@@ -289,6 +290,10 @@ DK 작업의 ADD는 Layer · Purpose만 쓰면 번호 · GDS · 표시를 **Mast
 Layer 분류 + Stack 정의(Metal 수 · Top Layer) → 규칙으로 Layer 자동 포함, 규칙 밖은 Option × Layer 매트릭스에서 `+`/`−`.
 점검: Via 스택 끊김 · 빠진 Metal/Via · All에 없는 Layer. Option 파일 = All에서 빠지는 Layer 행만 지움.
 
+## 분기 · Merge
+아무 작업에서 [분기] → 새 작업(Reference = 그 작업). [→ 합치기] / [다른 작업 합치기]는 source 쪽에만 있는 작업들의 **반영된 요청을 다시 적용**(git rebase처럼)하고,
+Option 정의는 공통 조상 대비 3-way. 같은 LPP를 양쪽에서 바꿨으면 합친 요청이 ERROR로 보여서 사람이 정리합니다. history에 Merge 줄이 남아요.
+
 ## 출력 (zip → VWP에 풀기, 설치형 바로 쓰기는 Kit T2)
 `<Process>/<DK>/<DK>_<Ver>_<작업날짜>/All/{<DK>.tf, <DK>.layermap, display.drf, <DK>_history.txt}` ·
 `Options/<Stack>/{…}` · `_techmap/{revision.json, review_report.csv, changes.diff}`
@@ -298,5 +303,5 @@ Layer 분류 + Stack 정의(Metal 수 · Top Layer) → 규칙으로 Layer 자�
 VSCode 터미널 `opencode run --dir <inbox> -f site_request.txt -f context.json "…"` → request.json을 [요청 올리기].
 
 ## 확인
-`npm run test:techmap` — 엔진 · 작업공간 흐름 75건 + Python 참조 엔진과 글자 단위 비교 (`test:engine` · CI에서도 같이).
-DEMO: Master SF3(M1~M11) · SF2(이름이 다르고 VIA4 번호가 일부러 다름), SF3_DK v1.0.0.0(승인) → v1.0.0.0_exp_20261020(작업중).
+`npm run test:techmap` — 엔진 · 작업공간 · 분기/Merge 88건 + Python 참조 엔진과 글자 단위 비교 (`test:engine` · CI에서도 같이).
+DEMO: Master SF3(M1~M11) · SF2(이름이 다르고 VIA4 번호가 일부러 다름), SF3_DK v1.0.0.0 → exp_20261015 → v1.0.0.1(exp Merge) · incr20261022 · exp_20261020(작업중).

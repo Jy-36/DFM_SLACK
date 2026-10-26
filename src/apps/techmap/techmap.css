@@ -190,3 +190,24 @@ select.tm-mini-input { min-width: 110px; }
 .tm-opt-cell button:not(:disabled):hover { border-color: var(--accent); }
 .tm-opt-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
 .tm-opt-add .input:first-child { max-width: 260px; }
+
+/* ── v0.3: 버전 그래프 (git log --graph) */
+.tm-dk-head { margin-top: 10px; }
+.tm-dk-head .nav-label { font-weight: 700; }
+.tm-graph { position: relative; overflow-x: auto; }
+.tm-graph-svg { position: absolute; left: 0; top: 0; }
+.tm-graph-rows { list-style: none; margin: 0; padding: 0; position: absolute; left: var(--tm-graph-w); right: 0; top: 0; }
+.tm-graph-row { position: absolute; left: 0; right: 0; height: var(--tm-row); display: flex; align-items: center; gap: 8px; padding-left: 8px; border-bottom: 1px solid var(--line); }
+.tm-graph-row.cur { background: var(--accent-soft); border-radius: var(--radius-sm); }
+.tm-graph-row:hover { background: var(--surface-2); }
+.tm-graph-row.cur:hover { background: var(--accent-soft); }
+.tm-graph-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--fg); padding: 0; overflow: hidden; white-space: nowrap; }
+.tm-graph-main.static { cursor: default; }
+.tm-graph-ver { font-family: 'Cascadia Mono', Consolas, monospace; font-weight: 700; font-size: 13.5px; }
+.tm-graph-acts { display: flex; gap: 6px; flex: none; padding-right: 6px; opacity: 0.55; transition: opacity 0.15s; }
+.tm-graph-row:hover .tm-graph-acts, .tm-graph-row.cur .tm-graph-acts { opacity: 1; }
+.tm-graph-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.tm-graph-legend { display: inline-flex; gap: 6px; }
+.tm-graph-target { display: inline-flex; gap: 8px; align-items: center; }
+.tm-type.merged { color: var(--sky); border-color: var(--sky); }
+.tm-merge-pick { width: auto; max-width: 280px; }

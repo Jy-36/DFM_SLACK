@@ -200,5 +200,55 @@ ok('컬럼 정렬 유지', formatLike('  ( OD          1      OD   )\n', ['M9', 
   ok('Master 승인 → Process Master 갱신', ws4.processes.find((p) => p.id === 'SF3').master.files.tf.text.includes('M12'));
 }
 
+// ── 분기 · Merge (git처럼)
+{
+  const { seedWorkspace, newRevision, addRequests, approveRevision, mergeInto, setOptions } = await import('../src/apps/techmap/lib/workspace.js');
+  const { computeRevision } = await import('../src/apps/techmap/lib/revision.js');
+  const { dkGraph, isAncestor, mergeBase } = await import('../src/apps/techmap/lib/graph.js');
+  const { DEFAULT_OPTIONS: S } = await import('../src/apps/techmap/lib/planner.js');
+  const { ws: w0, current: expId } = seedWorkspace(S);
+  const relId = w0.revisions.find((r) => r.status === 'approved').id;
+  const R = (id, type, f) => ({ id, type, row: 0, f: { req_id: id, type, ...f } });
+  // exp 브랜치: DMEXCL 추가 + 9M Option에 PAD
+  let ws = addRequests(w0, expId, [R('E-1', 'ADD', { layer: 'DMEXCL', purpose: 'drawing' }), R('E-2', 'OPTION_ADD', { layer: 'PAD', option: '1P9M_6X1Z' })], 'exp');
+  ws = setOptions(ws, expId, ws.revisions.find((r) => r.id === expId).options.map((o) => (o.name === '1P11M_8X2Z' ? { ...o, minus: ['DMEXCL'] } : o)));
+  ws = approveRevision(ws, expId, S);
+  // 정식 다음 버전: v1.0.0.1, v1.0.0.0에서 분기 (exp와 따로)
+  let n = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.1', workDate: '20261101', ref: relId }, S);
+  ws = addRequests(n.ws, n.rev.id, [R('R-1', 'HIDE', { layer: 'text', purpose: 'drawing' })], 'rel');
+  const relNext = n.rev.id;
+  ok('분기: exp와 v1.0.0.1은 서로 조상 아님', !isAncestor(ws, expId, relNext) && !isAncestor(ws, relNext, expId) && mergeBase(ws, expId, relNext) === relId);
+  const m = mergeInto(ws, relNext, expId, S);
+  ws = m.ws;
+  const t = ws.revisions.find((r) => r.id === relNext);
+  ok('Merge: exp의 반영 요청 2건이 들어옴', m.added.length === 2 && t.requests.some((q) => q.f.merged_from === ws.revisions.find((r) => r.id === expId).folder));
+  ok('Merge: 둘째 부모 기록', t.merges.length === 1 && t.merges[0].id === expId);
+  const c = computeRevision(ws, t, S);
+  ok('Merge 결과: 양쪽 변경이 모두 반영', c.allFiles.layermap.text.includes('DMEXCL') && /text\s+drawing\s+text_drw\s+nil nil/.test(c.allFiles.tf.text), JSON.stringify(c.res.items.map((i) => [i.id, i.status])));
+  ok('Merge: Option 3-way (exp가 바꾼 minus DMEXCL)', t.options.find((o) => o.name === '1P11M_8X2Z').minus.includes('DMEXCL'));
+  ok('Merge: history에 Merge 줄', c.history.includes('Merge     : SF3_DK_v1.0.0.0_exp_20261020_'));
+  let err = '';
+  try { mergeInto(ws, relNext, expId, S); } catch (e) { err = e.message; }
+  ok('같은 작업을 다시 합치면 막음 (이미 포함)', err.includes('이미 이 작업에 들어 있어요'));
+  // 충돌: 양쪽이 같은 LPP를 ADD
+  let n2 = newRevision(w0, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.1', workDate: '20261102', ref: relId }, S);
+  let w2 = addRequests(n2.ws, n2.rev.id, [R('X-1', 'ADD', { layer: 'DMEXCL', purpose: 'drawing' })], 'x');
+  w2 = addRequests(w2, expId, [R('E-1', 'ADD', { layer: 'DMEXCL', purpose: 'drawing' })], 'exp');
+  const m2 = mergeInto(w2, n2.rev.id, expId, S);
+  const c2 = computeRevision(m2.ws, m2.ws.revisions.find((r) => r.id === n2.rev.id), S);
+  ok('충돌: 같은 LPP ADD → 합친 쪽 요청이 ERROR', c2.res.items.find((i) => i.id === 'E-1').status === 'ERROR');
+  // 그래프
+  const g = dkGraph(ws, 'SF3_DK');
+  const lane = (id) => g.nodes.find((x) => x.rev.id === id).lane;
+  ok('그래프: 정식은 lane 0, exp는 다른 lane', lane(relId) === 0 && lane(relNext) === 0 && lane(expId) === 1 && g.lanes.length === 2);
+  ok('그래프: 분기 · Merge 선', g.edges.filter((e) => e.kind === 'parent').length === 2 && g.edges.some((e) => e.kind === 'merge' && e.from.rev.id === expId && e.to.rev.id === relNext) && g.edges.some((e) => e.kind === 'master'));
+  const rich = seedWorkspace(S, { rich: true });
+  const rg = dkGraph(rich.ws, 'SF3_DK');
+  ok('DEMO(rich): 정식 · exp 2 · incr = lane 4개, Merge 선 1개', rg.lanes.length === 4 && rg.edges.filter((e) => e.kind === 'merge').length === 1 && rg.nodes.length === 5, JSON.stringify(rg.lanes));
+  const v101 = rich.ws.revisions.find((r) => r.ver === 'v1.0.0.1');
+  ok('DEMO(rich): v1.0.0.1에 exp의 AP pin이 합쳐짐', v101.output.files.layermap.text.includes('AP                pin'), v101.log.map((l) => l.text).join(' / '));
+  ok('그래프: 위가 최신', g.nodes.find((x) => x.rev.id === relNext).row === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -20,7 +20,8 @@
     "ver": "v1.0.0.0_exp_20261020",    // 원문 그대로
     "workDate": "20261026",
     "folder": "SF3_DK_v1.0.0.0_exp_20261020_20261026",   // 출력 폴더 이름 (같은 날 또 하면 _2)
-    "ref": { "kind": "revision", "id": "...", "label": "SF3_DK_v1.0.0.0_20261012" },
+    "ref": { "kind": "revision", "id": "...", "label": "SF3_DK_v1.0.0.0_20261012" },   // 첫째 부모 (분기한 곳)
+    "merges": [{ "id": "...", "label": "SF3_DK_v1.0.0.0_exp_20261015_20261015", "count": 1, "at": "..." }],   // 둘째 부모들 (Merge)
     "base": { "files": {...}, "history": "..." },        // Reference에서 가져온 시작점 (All Layer)
     "options": [{ "name": "1P9M_6X1Z", "metals": 9, "tops": ["AP"], "plus": [], "minus": [] }],
     "requests": [{ "id": "REQ-101", "type": "ADD", "row": 3, "f": { "req_id": "REQ-101", "layer": "DMEXCL", ... } }],
@@ -44,6 +45,8 @@
 - **Reference = Master**: Master에서 고른 Layer만 남긴 파일(`filterSet`)을 DK 이름(`<DK>.tf` · `<DK>.layermap` · `display.drf`)으로 시작.
 - **Reference = 작업**: 그 작업의 `output`(미승인이면 지금 계산 결과) + Option 정의 + 누적 history.
 - **Master 변경 작업**(kind master): base = 현재 Process Master. 승인하면 `process.master`가 결과로 바뀌고 history가 이어진다.
+- **Merge**(`mergeInto(ws, target, source)`, `lib/graph.js`): source 쪽에만 있는 작업들(target 조상이 아닌 source 조상, 오래된 순)의 **반영된 요청을 target에 다시 적용**(git rebase처럼 재생). 요청에는 `f.merged_from = <원래 작업 폴더>`, Req_ID가 겹치면 `REQ-1@<ver>`. target `include`에 바로 추가. Option 정의는 공통 조상(`mergeBase`) 대비 source가 바꾼 것만 3-way로 반영.
+- 그래프(`dkGraph`): lane = 정식 Ver(`main`) 0번 + exp · incr Ver마다 하나, row = 만든 순서(위가 최신), edge = parent(분기) · merge · master(뿌리).
 - 계산은 항상 `computeRevision(ws, rev, settings)` 하나 — 저장된 결과가 아니라 base + requests + include + options로 매번 다시 계산(결정적). 승인할 때만 `output`으로 고정.
 
 ## computeRevision 결과

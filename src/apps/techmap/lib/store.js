@@ -54,7 +54,7 @@ export function useTechmapStore() {
       }
       let value = doc?.value;
       if (!value || value.version !== 2) {
-        const seeded = seedWorkspace(readSettings());
+        const seeded = seedWorkspace(readSettings(), { rich: true });
         value = seeded.ws;
         setFirstRev(seeded.current);
         if (dbRef.current) tx(dbRef.current, 'readwrite', (s) => s.put({ key: KEY, value })).catch(() => {});

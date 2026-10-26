@@ -12,13 +12,14 @@ import NewRevisionPage from './pages/NewRevisionPage.jsx';
 import RegistryPage from './pages/RegistryPage.jsx';
 import ComparePage from './pages/ComparePage.jsx';
 import ClassesPage from './pages/ClassesPage.jsx';
+import GraphPage from './pages/GraphPage.jsx';
 import RulesPage from './pages/RulesPage.jsx';
 import { MasterFilesPanel, NewProcessPage } from './pages/ProcessPage.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
 import './techmap.css';
 
-export const TECHMAP_VERSION = '0.2.0';
+export const TECHMAP_VERSION = '0.3.0';
 const LOC_KEY = 'techmap.loc2';
 const MINI_KEY = 'techmap.navMini';
 const PROC_KEY = 'techmap.proc';
@@ -146,7 +147,11 @@ export default function Techmap({ mode, setMode, widget, setWidget }) {
             const revs = ws.revisions.filter((r) => r.kind === 'dk' && r.dk === d.id).sort((a, b) => compareVer(b.ver, a.ver) || b.workDate.localeCompare(a.workDate));
             return (
               <div key={d.id} className="tm-dk">
-                {!navMini && <div className="tm-nav-sec">{d.id} <span className="tm-nav-count">{revs.length}</span></div>}
+                <button className="nav-btn tm-dk-head" aria-current={page === 'graph' && loc.dk === d.id ? 'page' : undefined} onClick={() => go({ page: 'graph', dk: d.id })} title={`${d.id} 버전 그래프`}>
+                  <Icon name="gantt" />
+                  <span className="nav-label">{d.id} 그래프</span>
+                  <span className="tm-nav-count">{revs.length}</span>
+                </button>
                 {revs.map(chan)}
               </div>
             );
@@ -168,9 +173,10 @@ export default function Techmap({ mode, setMode, widget, setWidget }) {
       <main className="main">
         {page === 'rev' && rev && c && <RevisionPage key={rev.id} ws={ws} rev={rev} c={c} store={store} notify={notify} go={go} />}
         {page === 'rev' && !rev && <div className="page"><div className="banner">작업을 찾지 못했어요. 왼쪽에서 고르거나 새 작업을 만드세요.</div></div>}
-        {page === 'new' && proc && <NewRevisionPage key={`${proc.id}-${loc.kind}-${loc.ref}`} ws={ws} proc={proc} store={store} notify={notify} go={go} initial={loc} />}
+        {page === 'new' && proc && <NewRevisionPage key={`${proc.id}-${loc.kind}-${loc.ref}-${loc.ver}`} ws={ws} proc={proc} store={store} notify={notify} go={go} initial={loc} />}
         {page === 'registry' && proc && <><RegistryPage proc={proc} go={go} /><div className="page tm-after"><MasterFilesPanel proc={proc} /></div></>}
         {page === 'compare' && proc && <ComparePage ws={ws} proc={proc} go={go} />}
+        {page === 'graph' && <GraphPage key={loc.dk} ws={ws} dk={loc.dk} store={store} notify={notify} go={go} />}
         {page === 'classes' && proc && <ClassesPage proc={proc} store={store} notify={notify} />}
         {page === 'process-new' && <NewProcessPage store={store} notify={notify} go={go} />}
         {page === 'rules' && <RulesPage store={store} notify={notify} />}

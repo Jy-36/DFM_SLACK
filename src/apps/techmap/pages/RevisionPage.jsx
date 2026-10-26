@@ -9,6 +9,10 @@ import { folderZip, revisionCsv, saveFile } from '../lib/report.js';
 import { revisionFolder } from '../lib/revision.js';
 import { addRequests, approveRevision, deleteRevision, freezeInclude, logRevision, setInclude, setOptions, updateRevision } from '../lib/workspace.js';
 import { buildInbox } from '../lib/codemate.js';
+import RevGraph from '../components/RevGraph.jsx';
+import { isAncestor } from '../lib/graph.js';
+import { mergeInto } from '../lib/workspace.js';
+import { today8 } from '../lib/version.js';
 import { KIND_LABEL, parseVer } from '../lib/version.js';
 import { colorsOf, LEVEL_TONE } from '../lib/view.js';
 
@@ -81,7 +85,21 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
     ['diff', '파일 변경'],
     ['history', 'History'],
     ['codemate', 'codemate 변환'],
+    ...(isDk ? [['graph', '그래프']] : []),
   ];
+  const mergeable = ws.revisions.filter((r) => r.process === rev.process && r.kind === rev.kind && r.id !== rev.id && !isAncestor(ws, r.id, rev.id));
+  const doMerge = (srcId) => {
+    const src = ws.revisions.find((r) => r.id === srcId);
+    if (!src || !window.confirm(`${src.folder}의 변경(반영된 요청 · Option 예외)을 이 작업에 합칠까요?\n같은 LPP를 양쪽에서 바꿨으면 합친 요청이 ERROR로 보여요.`)) return;
+    try {
+      const out = store.update((w) => mergeInto(w, rev.id, srcId, store.settings));
+      notify(`요청 ${out.added.length}건 합침${out.conflicts.length ? ` · Option 충돌 ${out.conflicts.length}건` : ''}`);
+      if (out.conflicts.length) window.alert(out.conflicts.join('\n'));
+      setTab('requests');
+    } catch (e) {
+      notify(e.message);
+    }
+  };
   return (
     <div className="page">
       <div className="page-head">
@@ -92,11 +110,17 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
             <Pill tone={locked ? 'good' : 'warn'}>{locked ? `승인 ${rev.approvedAt}` : '작업중'}</Pill>
           </h1>
           <p className="mono small">{rev.folder}</p>
-          <p>작업 {rev.workDate} · Reference {rev.ref?.label}</p>
+          <p>작업 {rev.workDate} · Reference {rev.ref?.label}{(rev.merges || []).length > 0 && <> · Merge ⟵ {rev.merges.map((m) => m.label).join(', ')}</>}</p>
         </div>
         <div className="head-actions">
           {!locked && <button type="button" className="btn" onClick={() => fileRef.current?.click()}><Icon name="plus" size={15} /> 요청 올리기</button>}
           <input ref={fileRef} type="file" hidden accept=".xlsx,.csv,.json" onChange={(e) => { upload(e.target.files[0]); e.target.value = ''; }} />
+          {!locked && mergeable.length > 0 && (
+            <select className="input tm-merge-pick" value="" onChange={(e) => e.target.value && doMerge(e.target.value)} title="다른 작업의 변경을 이 작업에 합치기">
+              <option value="">⟵ 다른 작업 합치기…</option>
+              {mergeable.map((r) => <option key={r.id} value={r.id}>{r.folder}{r.status === 'approved' ? ' ✓' : ' (작업중)'}</option>)}
+            </select>
+          )}
           <button type="button" className="btn" onClick={exportFolder}><Icon name="download" size={15} /> 폴더 출력 (.zip)</button>
           {!locked && <button type="button" className="btn primary" onClick={approve}><Icon name="check" size={15} /> 승인</button>}
           {locked && <button type="button" className="btn primary" onClick={() => go({ page: 'new', kind: rev.kind, ref: rev.id })}><Icon name="plus" size={15} /> 이걸 Reference로 새 작업</button>}
@@ -160,6 +184,16 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
         <section className="panel">
           <h2>{isDk ? `${rev.dk}_history.txt` : `${rev.process}_master_history.txt`} <span className="small muted">이전 history 뒤에 이번 블록이 붙어요{locked ? '' : ' · 승인하면 승인 시각이 들어가요'}</span></h2>
           <pre className="tm-pre">{c.history}</pre>
+        </section>
+      )}
+
+      {tab === 'graph' && isDk && (
+        <section className="panel">
+          <h2>{rev.dk} 버전 그래프 <span className="small muted">이 작업이 어디서 갈라졌고 무엇을 합쳤는지 · [→ 합치기]는 이 작업으로</span></h2>
+          <RevGraph ws={ws} dk={rev.dk} process={rev.process} current={rev.id} target={locked ? null : rev.id}
+            onOpen={(id) => go({ page: 'rev', id })}
+            onBranch={(r) => go({ page: 'new', kind: 'dk', ref: r.id, ver: `${r.ver.replace(/_(exp|incr)_?\d{8}.*$/i, '')}_exp_${today8()}` })}
+            onMerge={(r) => doMerge(r.id)} />
         </section>
       )}
 

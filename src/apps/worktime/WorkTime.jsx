@@ -13,7 +13,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.37.0';
+export const WORKTIME_VERSION = '0.38.0';
 
 const NAV = [
   ['dashboard', '현황'],

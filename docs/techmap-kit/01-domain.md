@@ -27,6 +27,16 @@ Process (뼈대 공정, 예: SF3)
 - **DK All Layer**: Master에서 쓰는 Layer로 꾸린다. 번호 · GDS는 Master와 같아야 한다(다르면 ERROR).
 - **DK Option**: DK가 제공하는 Metal/Via Stack별 파일. DK 작업 폴더 안 `Options/<이름>/` 폴더. All에 없는 Layer는 못 넣는다.
 - **정식 DK 작업**: Reference(이전 작업 결과 또는 Master)를 가져와 추가 · 삭제 · 변경으로 작업 → 승인 → 다음 작업의 Reference.
+- **git처럼 갈라지고 합쳐진다**: 작업 = 커밋, Reference = 부모. 정식 Ver에서 exp · incr가 **분기**하고, exp에서 확인한 변경을 다음 정식 Ver에 **Merge**한다.
+  ```
+  ○ v1.0.0.0_exp_20261020 (작업중) ⟵ Merge incr
+  │ ● v1.0.0.0_incr20261022
+  ●─┤ v1.0.0.1  ⟵ Merge v1.0.0.0_exp_20261015
+  │ ● v1.0.0.0_exp_20261015
+  ● v1.0.0.0
+  ■ SF3 MASTER
+  ```
+  화면: DK 그래프(정식 = 왼쪽 줄기, exp · incr Ver마다 가지, 실선 = 분기, 점선 = Merge).
 
 ## 번호 (Layer, Property)
 - Property = **Purpose(datatype)**. 같은 Process 안에서는 같은 Purpose가 같은 datatype을 쓰도록 관리 (예: drawing 0, pin 10, fillDummy 1).

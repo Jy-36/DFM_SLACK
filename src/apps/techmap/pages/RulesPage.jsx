@@ -62,7 +62,7 @@ export default function RulesPage({ store, notify }) {
           <button type="button" className="btn" onClick={() => saveFile(JSON.stringify(ws), `techmap_workspace_${new Date().toISOString().slice(0, 10)}.json`, 'application/json')}><Icon name="download" size={14} /> 내보내기 (.json · 백업)</button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>가져오기</button>
           <input ref={fileRef} type="file" hidden accept=".json" onChange={(e) => { importWs(e.target.files[0]); e.target.value = ''; }} />
-          <button type="button" className="btn ghost" onClick={() => { if (window.confirm('작업공간을 지우고 DEMO 데이터로 다시 시작할까요? (먼저 내보내기로 백업하세요)')) { store.replace(seedWorkspace(settings).ws); notify('DEMO로 초기화했어요'); } }}>DEMO로 초기화</button>
+          <button type="button" className="btn ghost" onClick={() => { if (window.confirm('작업공간을 지우고 DEMO 데이터로 다시 시작할까요? (먼저 내보내기로 백업하세요)')) { store.replace(seedWorkspace(settings, { rich: true }).ws); notify('DEMO로 초기화했어요'); } }}>DEMO로 초기화</button>
         </div>
       </section>
       <section className="panel">

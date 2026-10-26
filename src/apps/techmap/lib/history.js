@@ -20,6 +20,7 @@ export function historyBlock(rev, res, options, applied) {
     LINE,
     `${head}  작업 ${rev.workDate}  (폴더 ${rev.folder})`,
     `Reference : ${rev.ref?.label || '-'}`,
+    ...(rev.merges || []).map((m) => `Merge     : ${m.label} (요청 ${m.count}건)`),
     `승인      : ${rev.approvedAt || '(미승인 · 작업중)'}`,
     '-'.repeat(72),
   ];
@@ -32,7 +33,7 @@ export function historyBlock(rev, res, options, applied) {
       continue;
     }
     const gds = it.type === 'ADD' ? (it.changes.find((c) => c.file === 'layermap')?.text.trim().split(/\s+/).slice(2, 4).join('/') || '') : '';
-    lines.push(`${pad(it.type === 'CHANGE_DISPLAY' ? 'DISPLAY' : it.type, 8)} ${pad(it.id, 8)} ${pad(it.lpp, 22)} ${pad(gds ? `GDS ${gds}` : '', 16)} ${pad(f.requester, 8)} ${f.reason || ''}`.trimEnd());
+    lines.push(`${pad(it.type === 'CHANGE_DISPLAY' ? 'DISPLAY' : it.type, 8)} ${pad(it.id, 8)} ${pad(it.lpp, 22)} ${pad(gds ? `GDS ${gds}` : '', 16)} ${pad(f.requester, 8)} ${f.reason || ''}${f.merged_from ? `  ← ${f.merged_from}` : ''}`.trimEnd());
   }
   for (const o of options || []) lines.push(`Option   ${pad(o.def.name, 12)} Metal ${o.def.metals} · Via ${o.check.vias} · ${o.check.count} Layer${o.def.plus.length ? ` · +${o.def.plus.join(',')}` : ''}${o.def.minus.length ? ` · -${o.def.minus.join(',')}` : ''}`);
   lines.push(LINE, '');

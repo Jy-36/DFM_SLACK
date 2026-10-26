@@ -34,15 +34,16 @@ src/apps/techmap/
     version.js           Ver 해석 · 정렬 · 작업 폴더 이름
     history.js           history.txt 블록 양식
     revision.js          작업 계산(computeRevision) · 출력 폴더 항목(revisionFolder)
+    graph.js             분기 · Merge 관계: 조상 · 공통 조상 · 재생 경로 · DK 그래프 배치(lane/row/edge)
     workspace.js         작업공간 만들기 · 바꾸기 (불변 갱신) · DEMO 데이터
     requests.js          엑셀(.xlsx 직접 읽기) · CSV · request.json → 요청
     codemate.js          inbox 폴더 · AGENTS.md(변환 규칙) · opencode 명령
     zip.js · report.js   의존성 없는 zip, 리포트 CSV, 저장
     store.js             저장 (지금: IndexedDB 한 건 → 다음: 작업 폴더)
     demoMasters.js       DEMO Master(SF3 · SF2) — scripts/gen/make_techmap_demo.py로 생성
-  pages/ · components/   화면 (RevisionPage, OptionMatrix, RegistryPage, ComparePage, ClassesPage …)
+  pages/ · components/   화면 (RevisionPage, GraphPage · RevGraph, OptionMatrix, RegistryPage, ComparePage, ClassesPage …)
 public/techmap/          요청 엑셀 양식 · DK/Master 예시 (scripts/gen/make_techmap_requests.py)
-scripts/techmap-check.mjs  엔진 · 작업공간 흐름 테스트 (75건) + Python 참조 엔진과 글자 단위 비교
+scripts/techmap-check.mjs  엔진 · 작업공간 · 분기/Merge 테스트 (88건) + Python 참조 엔진과 글자 단위 비교
 ```
 
 ## 실행 · 확인

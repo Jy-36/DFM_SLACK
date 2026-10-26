@@ -28,6 +28,7 @@ export default function RequestCard({ item, colors, locked, onToggle }) {
         <span className="tm-type">{TYPE_LABEL[item.type] || item.type}</span>
         <span className="tm-lpp">{item.optionOp || item.type?.startsWith('OPTION') ? item.fields.layer : item.lpp}</span>
         {item.fields.option && <span className="tm-type">Option {item.fields.option}</span>}
+        {item.fields.merged_from && <span className="tm-type merged" title="Merge로 들어온 요청">⟵ {item.fields.merged_from}</span>}
         {(f.fill_color || f.stipple || f.linestyle) && (
           <span className="tm-disp">
             {f.fill_color && <Swatch name={f.fill_color} colors={colors} />}

@@ -11,7 +11,7 @@ export default function NewRevisionPage({ ws, proc, store, notify, go, initial =
   const refRev = ws.revisions.find((r) => r.id === initial.ref);
   const dks = ws.dks.filter((d) => d.process === proc.id);
   const [dk, setDk] = useState(refRev?.dk || dks[0]?.id || `${proc.id}_DK`);
-  const [ver, setVer] = useState(refRev?.ver || 'v1.0.0.0');
+  const [ver, setVer] = useState(initial.ver || refRev?.ver || 'v1.0.0.0');
   const [workDate, setWorkDate] = useState(today8());
   const sameDk = ws.revisions.filter((r) => r.kind === 'dk' && r.dk === dk).sort((a, b) => compareVer(b.ver, a.ver) || b.workDate.localeCompare(a.workDate));
   const [ref, setRef] = useState(initial.ref || sameDk[0]?.id || 'master');

@@ -3,6 +3,7 @@ import { DEMO_MASTERS } from './demoMasters.js';
 import { filterSet, newOption } from './options.js';
 import { loadSet } from './model.js';
 import { computeRevision, dkFileNames, processOf } from './revision.js';
+import { isAncestor, mergeBase, replayPath } from './graph.js';
 import { folderName, parseVer, today8 } from './version.js';
 
 export const now = () => {
@@ -117,6 +118,74 @@ export const logRevision = (ws, id, kind, text) => updateRevision(ws, id, (r) =>
 export const setOptions = (ws, id, options, note) => updateRevision(ws, id, (r) => (note ? withLog({ ...r, options }, 'decision', note) : { ...r, options }));
 export const addOption = (ws, id, name, metals, tops) => setOptions(ws, id, [...(ws.revisions.find((r) => r.id === id).options || []), newOption(name, metals, tops)], `Option ${name} 추가`);
 
+/** Merge: source 쪽에만 있는 작업들의 반영 요청을 target에 다시 적용한다 (git rebase처럼 요청을 재생).
+ *  - 같은 번호 · LPP를 이미 바꿨으면 엔진이 ERROR로 보여 준다 (= 충돌, 사람이 정리)
+ *  - Option 정의는 3-way: 공통 조상 대비 source가 바꾼 것만 target에 반영, 양쪽이 다르게 바꾼 값은 target 유지 + 충돌 기록
+ *  반환 { ws, added, conflicts } */
+export function mergeInto(ws, targetId, sourceId, settings) {
+  const target = ws.revisions.find((r) => r.id === targetId);
+  const source = ws.revisions.find((r) => r.id === sourceId);
+  if (!target || !source) throw new Error('작업을 찾지 못했어요');
+  if (target.status === 'approved') throw new Error('승인된 작업에는 합칠 수 없어요 — 새 작업을 만들어 합치세요');
+  if (target.id === source.id) throw new Error('같은 작업이에요');
+  if (target.process !== source.process) throw new Error('다른 Process의 작업은 합칠 수 없어요');
+  if (isAncestor(ws, source.id, target.id)) throw new Error(`${source.folder}의 변경은 이미 이 작업에 들어 있어요`);
+  const path = replayPath(ws, source.id, target.id);
+  // 반영할 요청: 각 작업에서 실제로 반영된 것 (승인본은 고정된 include, 작업중은 지금 계산)
+  const taken = new Set(target.requests.map((r) => r.id));
+  const added = [];
+  for (const r of path) {
+    const applied = r.status === 'approved' && r.include ? new Set(r.include) : new Set(computeRevision(ws, r, settings).applied || []);
+    for (const q of r.requests) {
+      // Merge로 들어온 요청은 원래 작업도 path(또는 target 조상)에 있으니 원본만 재생한다
+      if (!applied.has(q.id) || q.f.merged_from) continue;
+      let id = q.id;
+      if (taken.has(id)) id = `${q.id}@${r.ver}`;
+      if (taken.has(id)) continue;
+      taken.add(id);
+      added.push({ ...q, id, f: { ...q.f, req_id: id, merged_from: r.folder } });
+    }
+  }
+  // Option 3-way
+  const baseId = mergeBase(ws, source.id, target.id);
+  const baseRev = baseId ? ws.revisions.find((r) => r.id === baseId) : null;
+  const baseOpts = new Map((baseRev?.options || []).map((o) => [o.name, o]));
+  const srcOpts = source.options || [];
+  const conflicts = [];
+  const minus = (a, b) => (a || []).filter((x) => !(b || []).includes(x));
+  let options = (target.options || []).map((o) => ({ ...o, plus: [...o.plus], minus: [...o.minus], tops: [...o.tops] }));
+  for (const so of srcOpts) {
+    const bo = baseOpts.get(so.name);
+    const to = options.find((o) => o.name === so.name);
+    if (!to) {
+      if (!bo) options.push({ ...so, plus: [...so.plus], minus: [...so.minus], tops: [...so.tops] });
+      continue; // 공통 조상엔 있었는데 target이 지운 Option은 그대로 둔다
+    }
+    const b = bo || { metals: to.metals, tops: to.tops, plus: [], minus: [] };
+    const set = (k, arr) => {
+      to[k] = [...new Set([...minus(to[k], minus(b[k], arr)), ...minus(arr, b[k])])];
+    };
+    set('plus', so.plus);
+    set('minus', so.minus);
+    set('tops', so.tops);
+    if (so.metals !== b.metals) {
+      if (to.metals === b.metals) to.metals = so.metals;
+      else if (to.metals !== so.metals) conflicts.push(`${so.name} Metal 수: 이 작업 ${to.metals} · ${source.ver} ${so.metals} — 이 작업 값 유지`);
+    }
+  }
+  const next = updateRevision(ws, targetId, (t) => {
+    const defaults = t.include || computeRevision(ws, t, settings).applied || [];
+    return withLog({
+      ...t,
+      requests: [...t.requests, ...added],
+      include: [...new Set([...defaults, ...added.map((q) => q.id)])],
+      options,
+      merges: [...(t.merges || []), { id: source.id, label: source.folder, count: added.length, at: now() }],
+    }, 'system', `Merge ← ${source.folder}: 요청 ${added.length}건${conflicts.length ? ` · Option 충돌 ${conflicts.length}` : ''}`);
+  });
+  return { ws: next, added, conflicts };
+}
+
 /** 승인: 결과를 고정 (다음 작업의 Reference가 됨). Master 변경이면 Process Master를 바꾼다 */
 export function approveRevision(ws, id, settings) {
   const rev = ws.revisions.find((r) => r.id === id);
@@ -132,8 +201,8 @@ export function approveRevision(ws, id, settings) {
   return next;
 }
 
-/** 데모 작업공간: SF3 · SF2 Master, SF3_DK v1.0.0.0 (승인) + exp 작업 1건 */
-export function seedWorkspace(settings) {
+/** 데모 작업공간: SF3 · SF2 Master, SF3_DK v1.0.0.0 (승인) + exp 작업 1건. rich면 exp → v1.0.0.1 Merge · incr 가지도 */
+export function seedWorkspace(settings, { rich = false } = {}) {
   let ws = emptyWorkspace();
   ws = addProcess(ws, 'SF3', DEMO_MASTERS.SF3, 'DEMO');
   ws = addProcess(ws, 'SF2', DEMO_MASTERS.SF2, 'DEMO');
@@ -151,6 +220,20 @@ export function seedWorkspace(settings) {
   ws = setOptions(ws, first, [newOption('1P9M_6X1Z', 9, ['AP']), newOption('1P11M_8X2Z', 11, ['AP', 'PAD'])]);
   ws = addRequests(ws, first, [{ id: 'REQ-001', type: 'HIDE', row: 3, f: { req_id: 'REQ-001', type: 'HIDE', layer: 'prBoundary', purpose: 'drawing', requester: 'DK팀', reason: '사용자 선택 막기' } }], '초기 구성');
   ws = approveRevision(ws, first, settings);
+  if (rich) {
+    // 그래프가 보이게: exp 가지 → 정식 v1.0.0.1에 Merge, incr 가지
+    const Q = (id, type, f) => ({ id, type, row: 0, f: { req_id: id, type, requester: 'DEMO', ...f } });
+    let b = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_exp_20261015', workDate: '20261015', ref: first }, settings);
+    ws = addRequests(b.ws, b.rev.id, [Q('EXP-01', 'ADD', { layer: 'AP', purpose: 'pin', reason: 'AP pin 시험 제공' })], 'DEMO');
+    ws = approveRevision(ws, b.rev.id, settings);
+    const c = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.1', workDate: '20261020', ref: first }, settings);
+    ws = addRequests(c.ws, c.rev.id, [Q('REL-01', 'CHANGE_DISPLAY', { layer: 'M7', purpose: 'drawing', stipple: 'dots', reason: 'M7 패턴 구분' })], 'DEMO');
+    ws = mergeInto(ws, c.rev.id, b.rev.id, settings).ws;
+    ws = approveRevision(ws, c.rev.id, settings);
+    const d = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_incr20261022', workDate: '20261022', ref: first }, settings);
+    ws = addRequests(d.ws, d.rev.id, [Q('INC-01', 'HIDE', { layer: 'M11', purpose: 'pin', reason: '고객사 요청으로 M11 pin 숨김' })], 'DEMO');
+    ws = approveRevision(ws, d.rev.id, settings);
+  }
   r = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_exp_20261020', ref: first }, settings);
   return { ws: r.ws, current: r.rev.id };
 }
