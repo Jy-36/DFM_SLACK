@@ -24,7 +24,7 @@ export default function Widget({ rev, c, setMode, widget, setWidget }) {
         <span className="wg-brand" data-tauri-drag-region>
           <DfmLogo size={18} />
           <span>Techmap</span>
-          <span className="wg-date tm-wg-date">{rev ? (rev.kind === 'dk' ? rev.ver : `${rev.process} Master`) : '작업 없음'}</span>
+          <span className="wg-date tm-wg-date">{rev ? (rev.kind === 'dk' ? `${rev.dk} ${rev.ver}` : 'Master 변경') : '작업 없음'}</span>
         </span>
         <span className="wg-actions">
           <button type="button" className={`wg-btn ${widget.onTop ? 'on' : ''}`} onClick={() => setWidget({ onTop: !widget.onTop })} disabled={!tauri}

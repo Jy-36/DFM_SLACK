@@ -2,7 +2,7 @@
 // (Kit의 docs/folder-db.md, Tauri 커맨드 명세 참고). 처리 규칙 · 출력 경로는 localStorage.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_OPTIONS } from './planner.js';
-import { seedWorkspace } from './workspace.js';
+import { normalizeWorkspace, seedWorkspace } from './workspace.js';
 
 const DB = 'dfmslack-techmap';
 const STORE = 'docs';
@@ -59,6 +59,7 @@ export function useTechmapStore() {
         setFirstRev(seeded.current);
         if (dbRef.current) tx(dbRef.current, 'readwrite', (s) => s.put({ key: KEY, value })).catch(() => {});
       }
+      value = normalizeWorkspace(value);
       wsRef.current = value;
       if (alive) setWs(value);
     })();

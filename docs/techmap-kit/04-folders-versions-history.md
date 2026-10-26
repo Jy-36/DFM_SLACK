@@ -3,9 +3,9 @@
 ## VWP 출력 구조 (`revisionFolder`)
 ```
 <VWP 루트>/
-  <Process>/
-    <DK>/
-      <DK>_<Ver>_<작업날짜>[_n]/          예: SF3_DK_v1.0.0.0_exp_20261020_20261026
+  <노드 id>/                           예: 2_3nm (화면 2/3nm) · 8_10nm
+    <DK>/                              예: SF3 · SF2 (한 노드 아래 여러 DK)
+      <DK>_<Ver>_<작업날짜>[_n]/          예: SF3_v1.0.0.0_exp_20261020_20261026
         All/
           <DK>.tf
           <DK>.layermap
@@ -21,8 +21,8 @@
           review_report.csv                요청별 상태 · 검사 · 반영된 변경 줄 · 점검
           changes.diff                     All Layer 세 파일 unified diff
     _MASTER/
-      <Process>_MASTER_<작업날짜>[_n]/     Master 변경 작업
-        <Process>_master.tf …, <Process>_master_history.txt, _techmap/
+      <노드 id>_MASTER_<작업날짜>[_n]/     Master 변경 작업
+        <노드 id>_master.tf …, <노드 id>_master_history.txt, _techmap/
 ```
 - 파일 이름: Reference가 Master이면 DK 이름 규칙(`<DK>.tf` · `<DK>.layermap` · `display.drf`)으로 바꾸고, 그다음부터는 이어받은 이름을 그대로 쓴다. **사내 실제 이름 규칙은 08 [VERIFY]**.
 - 지금은 같은 구조를 zip으로 저장(VWP에 풀면 됨). 설치형에서 바로 쓰기 = 06 문서 · 07 T2.
@@ -39,8 +39,8 @@
 
 ```
 ========================================================================
-[SF3_DK v1.0.0.0_exp_20261020]  작업 20261026  (폴더 SF3_DK_v1.0.0.0_exp_20261020_20261026)
-Reference : SF3_DK_v1.0.0.0_20261012
+[SF3 v1.0.0.0_exp_20261020]  작업 20261026  (폴더 SF3_v1.0.0.0_exp_20261020_20261026)
+Reference : SF3_v1.0.0.0_20261012
 승인      : 2026-10-26 11:58
 ------------------------------------------------------------------------
 ADD      REQ-101  DMEXCL/drawing         GDS 236/0        Site-A   Dummy 제외 영역 사용 — 번호·표시는 Master 그대로

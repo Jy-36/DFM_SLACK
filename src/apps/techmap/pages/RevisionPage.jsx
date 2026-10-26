@@ -14,7 +14,7 @@ import { isAncestor } from '../lib/graph.js';
 import { mergeInto } from '../lib/workspace.js';
 import { today8 } from '../lib/version.js';
 import { KIND_LABEL, parseVer } from '../lib/version.js';
-import { colorsOf, LEVEL_TONE } from '../lib/view.js';
+import { colorsOf, LEVEL_TONE, pname } from '../lib/view.js';
 
 const FILTERS = [['ALL', '전체'], ['READY', 'READY'], ['NEEDS_REVIEW', '검토 필요'], ['ERROR', 'ERROR']];
 
@@ -63,7 +63,7 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
     notify('폴더 구조 그대로 zip으로 저장했어요 — VWP에 풀면 돼요');
   };
   const approve = () => {
-    const msg = errors.length ? `점검 ERROR ${errors.length}건이 있어요. 그래도 승인할까요?` : `반영 ${c.applied.length}건으로 승인할까요? 승인하면 고정되고, 다음 작업의 Reference가 돼요.${rev.kind === 'master' ? '\n(Process Master가 이 결과로 바뀌어요)' : ''}`;
+    const msg = errors.length ? `점검 ERROR ${errors.length}건이 있어요. 그래도 승인할까요?` : `반영 ${c.applied.length}건으로 승인할까요? 승인하면 고정되고, 다음 작업의 Reference가 돼요.${rev.kind === 'master' ? '\n(노드 Master가 이 결과로 바뀌어요)' : ''}`;
     if (!window.confirm(msg)) return;
     try {
       store.update((w) => approveRevision(w, rev.id, store.settings));
@@ -105,7 +105,7 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
       <div className="page-head">
         <div>
           <h1 className="tm-rev-title">
-            {isDk ? rev.dk : `${rev.process} MASTER`} {isDk && <span className="tm-ver">{rev.ver}</span>}
+            {isDk ? <><span className="tm-node">{pname(ws, rev.process)}</span> {rev.dk}</> : `${pname(ws, rev.process)} MASTER`} {isDk && <span className="tm-ver">{rev.ver}</span>}
             {isDk && <Pill tone={pv.kind === 'release' ? 'accent' : 'plan'}>{KIND_LABEL[pv.kind] || pv.kind}</Pill>}
             <Pill tone={locked ? 'good' : 'warn'}>{locked ? `승인 ${rev.approvedAt}` : '작업중'}</Pill>
           </h1>
@@ -169,7 +169,7 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
 
       {tab === 'checks' && (
         <section className="panel">
-          <h2>점검 <span className="small muted">{isDk ? 'All ↔ Master 번호 · Option 스택 · 빠진 Layer 참조' : '다른 Process Master와 기능키별 번호'}</span></h2>
+          <h2>점검 <span className="small muted">{isDk ? 'All ↔ Master 번호 · Option 스택 · 빠진 Layer 참조' : '다른 노드 Master와 기능키별 번호'}</span></h2>
           {c.checks.length ? (
             <ul className="tm-checks flat">
               {[...errors, ...warns].map((x, k) => <li key={k}><Pill tone={LEVEL_TONE[x.level]}>{x.level}</Pill><b className="small">{x.scope}</b><span>{x.msg}</span></li>)}
@@ -190,7 +190,7 @@ export default function RevisionPage({ ws, rev, c, store, notify, go }) {
       {tab === 'graph' && isDk && (
         <section className="panel">
           <h2>{rev.dk} 버전 그래프 <span className="small muted">이 작업이 어디서 갈라졌고 무엇을 합쳤는지 · [→ 합치기]는 이 작업으로</span></h2>
-          <RevGraph ws={ws} dk={rev.dk} process={rev.process} current={rev.id} target={locked ? null : rev.id}
+          <RevGraph ws={ws} dk={rev.dk} process={pname(ws, rev.process)} current={rev.id} target={locked ? null : rev.id}
             onOpen={(id) => go({ page: 'rev', id })}
             onBranch={(r) => go({ page: 'new', kind: 'dk', ref: r.id, ver: `${r.ver.replace(/_(exp|incr)_?\d{8}.*$/i, '')}_exp_${today8()}` })}
             onMerge={(r) => doMerge(r.id)} />

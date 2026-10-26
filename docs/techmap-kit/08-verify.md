@@ -11,7 +11,7 @@ DEMO 파일은 표준 Virtuoso 문법으로 만든 합성 데이터다. 사내 �
 | V5 | drf FillStyle 허용 값 | outline · solid · X · stipple · outlineStipple … | |
 | V6 | layermap 컬럼 수 · 주석 문자 | 4컬럼, `#` 주석 | |
 | V7 | DK 파일 이름 규칙 (All · Option 폴더 안) | `<DK>.tf` · `<DK>.layermap` · `display.drf` · `<DK>_history.txt` | |
-| V8 | VWP 폴더 구조 | `Process/DK/DK_Ver_작업날짜/All · Options/<Stack>` | |
+| V8 | VWP 폴더 구조 | `노드/DK/DK_Ver_작업날짜/All · Options/<Stack>` (노드 폴더 이름: 2_3nm · 8_10nm) | |
 | V9 | Option 파일에서 빠진 Layer 처리 | 표 3개 · layermap 행 삭제, drf는 그대로, 다른 절(룰 등) 참조는 알림만 | |
 | V10 | 폐기 Layer의 layermap 행 | 유지 (설정으로 주석) | |
 | V11 | 사내 reserved purpose 목록 · purpose 번호 체계 | Virtuoso 기본 목록 + techPurposes | |

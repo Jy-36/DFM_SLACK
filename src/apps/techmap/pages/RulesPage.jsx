@@ -51,13 +51,13 @@ export default function RulesPage({ store, notify }) {
           <span className="tm-rule-pad" />
           <span>
             <b>VWP 출력 위치</b>
-            <span className="small muted">설치형 폴더 쓰기(다음 단계)에서 이 경로 아래에 <code>Process/DK/DK_Ver_작업날짜/</code>로 써요. 지금은 같은 구조의 zip으로 저장돼요.</span>
+            <span className="small muted">설치형 폴더 쓰기(다음 단계)에서 이 경로 아래에 <code>노드/DK/DK_Ver_작업날짜/</code>로 써요. 지금은 같은 구조의 zip으로 저장돼요.</span>
             <input className="input mono" style={{ maxWidth: 520 }} value={settings.vwpRoot} onChange={(e) => setSettings({ vwpRoot: e.target.value })} placeholder="예: \\\\vwp\\techmap 또는 D:\\VWP\\Techmap" />
           </span>
         </div>
       </section>
       <section className="panel">
-        <h2>작업공간 <span className="small muted">Process {ws.processes.length} · DK {ws.dks.length} · 작업 {ws.revisions.length} — 이 PC에만 저장{store.persistent ? '' : ' (저장소를 쓸 수 없어 창을 닫으면 사라져요)'}</span></h2>
+        <h2>작업공간 <span className="small muted">노드 {ws.processes.length} · DK {ws.dks.length} · 작업 {ws.revisions.length} — 이 PC에만 저장{store.persistent ? '' : ' (저장소를 쓸 수 없어 창을 닫으면 사라져요)'}</span></h2>
         <div className="head-actions">
           <button type="button" className="btn" onClick={() => saveFile(JSON.stringify(ws), `techmap_workspace_${new Date().toISOString().slice(0, 10)}.json`, 'application/json')}><Icon name="download" size={14} /> 내보내기 (.json · 백업)</button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>가져오기</button>

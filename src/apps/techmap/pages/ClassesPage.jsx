@@ -17,9 +17,9 @@ export default function ClassesPage({ proc, store, notify }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{proc.id} 분류 · 기능키</h1>
+          <h1>{proc.name} 분류 · 기능키</h1>
           <p>
-            분류는 Option(Metal/Via Stack) 자동 구성에, 기능키는 다른 Process Master와 번호를 맞출 때 쓰여요. 이름으로 자동 추정하고, 다르면 여기서 고쳐요.
+            분류는 Option(Metal/Via Stack) 자동 구성에, 기능키는 다른 노드 Master와 번호를 맞출 때 쓰여요. 이름으로 자동 추정하고, 다르면 여기서 고쳐요.
             {manual > 0 && <> · 직접 고친 Layer <b>{manual}</b>개</>}
           </p>
         </div>

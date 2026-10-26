@@ -7,7 +7,7 @@ Techmap 탭(DFM Slack Prototype)의 **설계 · 규칙 · 프로토타입 · 다
 
 | 문서 | 내용 |
 |---|---|
-| [01-domain.md](01-domain.md) | 업무 도메인: Process Master · DK · Option · Ver · 작업날짜 · 숨김 · Other_master |
+| [01-domain.md](01-domain.md) | 업무 도메인: 노드(Process) Master · DK · Option · Ver · 작업날짜 · 숨김 · Other_master |
 | [02-data-model.md](02-data-model.md) | 작업공간(workspace) 구조, 작업(리비전) 생애주기, 저장 방식 |
 | [03-rules.md](03-rules.md) | 요청 유형별 처리 · 점검 규칙 전체 (엔진이 지키는 것) |
 | [04-folders-versions-history.md](04-folders-versions-history.md) | VWP 출력 폴더 구조, 파일 이름, Ver 해석, history.txt 양식 |
@@ -22,7 +22,7 @@ Techmap 탭(DFM Slack Prototype)의 **설계 · 규칙 · 프로토타입 · 다
 
 ```
 src/apps/techmap/
-  Techmap.jsx            탭 진입점 · 왼쪽 메뉴(Process → Master · DK → Ver · 작업)
+  Techmap.jsx            탭 진입점 · 왼쪽 메뉴(노드 → Master · DK → Ver · 작업)
   lib/                   ← 순수 함수. 화면 · 테스트 · 앞으로의 CLI가 같이 쓴다
     sexpr.js             SKILL 괄호 파서 (줄 번호 유지)
     model.js             tf · layermap · drf 색인, 파일 간 점검, LPP 표
@@ -40,7 +40,7 @@ src/apps/techmap/
     codemate.js          inbox 폴더 · AGENTS.md(변환 규칙) · opencode 명령
     zip.js · report.js   의존성 없는 zip, 리포트 CSV, 저장
     store.js             저장 (지금: IndexedDB 한 건 → 다음: 작업 폴더)
-    demoMasters.js       DEMO Master(SF3 · SF2) — scripts/gen/make_techmap_demo.py로 생성
+    demoMasters.js       DEMO Master(2/3nm · 4nm) — scripts/gen/make_techmap_demo.py로 생성
   pages/ · components/   화면 (RevisionPage, GraphPage · RevGraph, OptionMatrix, RegistryPage, ComparePage, ClassesPage …)
 public/techmap/          요청 엑셀 양식 · DK/Master 예시 (scripts/gen/make_techmap_requests.py)
 scripts/techmap-check.mjs  엔진 · 작업공간 · 분기/Merge 테스트 (88건) + Python 참조 엔진과 글자 단위 비교
@@ -55,13 +55,13 @@ npm run dev               # 브라우저에서 화면 (http://localhost:1420)
 npm run tauri dev         # 데스크톱 창
 ```
 
-화면에서 DEMO 흐름: Techmap 탭 → Window Mode → 열린 작업 `SF3_DK v1.0.0.0_exp_20261020` → [요청 올리기]에 `public/techmap/techmap_request_dk_sample.xlsx`
+화면에서 DEMO 흐름: Techmap 탭 → Window Mode → 열린 작업 `SF3 v1.0.0.0_exp_20261020` → [요청 올리기]에 `public/techmap/techmap_request_dk_sample.xlsx`
 → 요청 검토 · Option · 점검 · History 탭 → [승인] → [폴더 출력].
 
 ## 바꾸면 안 되는 원칙
 
 1. **번호는 Master에서만 만든다.** DK · Option은 Master에 있는 LPP만, Master와 같은 번호로.
-2. **같은 목적이면 Process가 달라도 같은 번호.** 이름이 달라도 기능키로 묶어 비교한다.
+2. **같은 목적이면 노드가 달라도 같은 번호.** 이름이 달라도 기능키로 묶어 비교한다.
 3. **원본 양식 유지.** 파일을 다시 만들지 않고 줄 단위로 고친다.
 4. **추측하지 않는다.** 모르는 값은 NEEDS_REVIEW/ERROR로 남기고 사람이 결정한다.
 5. **LLM은 변환만.** 요청 원문 → request.json까지. 파일 수정 · 번호 확인은 엔진.

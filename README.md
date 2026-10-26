@@ -264,7 +264,7 @@ scripts/fixtures/mto-golden.json   Python 엔진 결과 (같은 공휴일 표로
 
 # Techmap
 
-Process **Master Techmap**(Layer · Purpose 번호의 원본) → **DK All Layer** → **DK Option(Metal/Via Stack)** 을
+노드(2/3nm · 4nm · 5nm · 7nm · 8/10nm · 14nm) **Master Techmap**(Layer · Purpose 번호의 원본) → 그 아래 여러 DK(SF2 · SF3 …) → **DK All Layer** → **DK Option(Metal/Via Stack)** 을
 `DK_Ver_작업날짜` 단위로 관리하고, Site Request로 **techfile · layermap · display.drf · history.txt** 를 검토 · 수정해
 **VWP 폴더 구조 그대로** 내보내는 탭입니다. 서버 없이 이 PC 안에서만 계산 · 저장합니다.
 설계 · 규칙 · 다음 작업은 **[docs/techmap-kit](docs/techmap-kit/README.md)** (codemate 인계용), 저장소 루트 `AGENTS.md`.
@@ -273,10 +273,10 @@ Process **Master Techmap**(Layer · Purpose 번호의 원본) → **DK All Layer
 
 | 메뉴 | 하는 일 |
 |---|---|
-| Process 전환 (SF3 · SF2 · +) | Process마다 Master · DK를 따로 |
+| 노드 전환 (2/3nm · 4nm · 5nm · 7nm · 8/10nm · 14nm · +) | 노드마다 Master · DK를 따로. Master가 없는 노드(점선)는 Master 등록부터. 폴더 id는 2_3nm · 8_10nm |
 | 새 작업 | DK 작업(DK · Ver · 작업날짜 · Reference) 또는 Master 변경. Reference가 Master면 쓸 Layer를 고름 |
 | 번호 대장 | Layer# × Purpose(datatype) 격자 — GDS, 색, 숨김, Purpose 관례 datatype에서 벗어남(노랑), layermap 없음(빨강), 빈 Layer# |
-| Master 비교 | 다른 Process Master와 **기능키**(목적) 기준 GDS 비교 — 번호 다름 · 한쪽에만 · 번호 겹침 |
+| Master 비교 | 다른 노드 Master와 **기능키**(목적) 기준 GDS 비교 — 번호 다름 · 한쪽에만 · 번호 겹침 |
 | 분류 · 기능키 | FEOL · Metal n · Via n · Top · Marker 자동 추정 + 직접 고치기 (Option 자동 구성 · Master 비교 기준) |
 | DK 그래프 | git log --graph처럼: 정식 Ver = 왼쪽 줄기, exp · incr Ver마다 가지, 실선 = Reference(분기) · 점선 = Merge. 노드에서 열기 · [분기] · [→ 합치기] |
 | DK → Ver · 작업 (채널) | 요청 검토 · Option 매트릭스 · 점검 · 파일 변경 · History · codemate 변환 · 그래프 · 다른 작업 합치기 · 승인 · 폴더 출력 |
@@ -295,7 +295,7 @@ Layer 분류 + Stack 정의(Metal 수 · Top Layer) → 규칙으로 Layer 자�
 Option 정의는 공통 조상 대비 3-way. 같은 LPP를 양쪽에서 바꿨으면 합친 요청이 ERROR로 보여서 사람이 정리합니다. history에 Merge 줄이 남아요.
 
 ## 출력 (zip → VWP에 풀기, 설치형 바로 쓰기는 Kit T2)
-`<Process>/<DK>/<DK>_<Ver>_<작업날짜>/All/{<DK>.tf, <DK>.layermap, display.drf, <DK>_history.txt}` ·
+`<노드 id>/<DK>/<DK>_<Ver>_<작업날짜>/All/{<DK>.tf, <DK>.layermap, display.drf, <DK>_history.txt}` ·
 `Options/<Stack>/{…}` · `_techmap/{revision.json, review_report.csv, changes.diff}`
 
 ## codemate 변환
@@ -304,4 +304,4 @@ VSCode 터미널 `opencode run --dir <inbox> -f site_request.txt -f context.json
 
 ## 확인
 `npm run test:techmap` — 엔진 · 작업공간 · 분기/Merge 88건 + Python 참조 엔진과 글자 단위 비교 (`test:engine` · CI에서도 같이).
-DEMO: Master SF3(M1~M11) · SF2(이름이 다르고 VIA4 번호가 일부러 다름), SF3_DK v1.0.0.0 → exp_20261015 → v1.0.0.1(exp Merge) · incr20261022 · exp_20261020(작업중).
+DEMO: 2/3nm Master(M1~M11) 아래 DK SF3 · SF2, 4nm Master(이름이 다르고 VI4 번호가 일부러 다름) 아래 SF4, 나머지 노드는 미등록. SF3 v1.0.0.0 → exp_20261015 → v1.0.0.1(exp Merge) · incr20261022 · exp_20261020(작업중).

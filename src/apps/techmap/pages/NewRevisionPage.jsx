@@ -10,7 +10,7 @@ export default function NewRevisionPage({ ws, proc, store, notify, go, initial =
   const [kind, setKind] = useState(initial.kind || 'dk');
   const refRev = ws.revisions.find((r) => r.id === initial.ref);
   const dks = ws.dks.filter((d) => d.process === proc.id);
-  const [dk, setDk] = useState(refRev?.dk || dks[0]?.id || `${proc.id}_DK`);
+  const [dk, setDk] = useState(initial.dk || refRev?.dk || dks[0]?.id || '');
   const [ver, setVer] = useState(initial.ver || refRev?.ver || 'v1.0.0.0');
   const [workDate, setWorkDate] = useState(today8());
   const sameDk = ws.revisions.filter((r) => r.kind === 'dk' && r.dk === dk).sort((a, b) => compareVer(b.ver, a.ver) || b.workDate.localeCompare(a.workDate));
@@ -53,7 +53,7 @@ export default function NewRevisionPage({ ws, proc, store, notify, go, initial =
       <section className="panel tm-form">
         <div className="seg" role="group" aria-label="작업 종류">
           <button type="button" aria-pressed={kind === 'dk'} onClick={() => setKind('dk')}>DK 작업</button>
-          <button type="button" aria-pressed={kind === 'master'} onClick={() => setKind('master')}>{proc.id} Master 변경</button>
+          <button type="button" aria-pressed={kind === 'master'} onClick={() => setKind('master')}>{proc.name} Master 변경</button>
         </div>
         {kind === 'dk' ? (
           <div className="tm-pick-grid">
@@ -78,13 +78,13 @@ export default function NewRevisionPage({ ws, proc, store, notify, go, initial =
               <select className="input" value={ref} onChange={(e) => setRef(e.target.value)}>
                 {sameDk.map((r) => <option key={r.id} value={r.id}>{r.folder}{r.status === 'approved' ? ' ✓' : ' (작업중)'}</option>)}
                 {ws.revisions.filter((r) => r.kind === 'dk' && r.process === proc.id && r.dk !== dk).map((r) => <option key={r.id} value={r.id}>{r.folder} (다른 DK)</option>)}
-                <option value="master">{proc.id} MASTER에서 새로 꾸리기</option>
+                <option value="master">{proc.name} MASTER에서 새로 꾸리기</option>
               </select>
               <span className="small muted">{ref === 'master' ? 'Master에서 쓸 Layer를 아래에서 골라요' : 'All Layer · Option · history를 이어받아요'}</span>
             </label>
           </div>
         ) : (
-          <p className="small muted">현재 {proc.id} Master({proc.master.updated})를 시작점으로 Layer · Purpose 번호를 추가 · 변경해요. 승인하면 Process Master가 바뀌고, 다른 Process Master와 번호 비교 결과가 점검에 나와요.</p>
+          <p className="small muted">현재 {proc.name} Master({proc.master.updated})를 시작점으로 Layer · Purpose 번호를 추가 · 변경해요. 승인하면 노드 Master가 바뀌고, 다른 노드 Master와 번호 비교 결과가 점검에 나와요.</p>
         )}
         <div className="banner">작업 폴더 <b className="mono">{preview}</b></div>
         {kind === 'dk' && ref === 'master' && (

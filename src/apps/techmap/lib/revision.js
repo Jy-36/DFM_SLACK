@@ -42,7 +42,8 @@ export function dkFileNames(dk) {
 /** 리비전 계산: 요청 반영 → All Layer → Option들 → 점검 → history */
 export function computeRevision(ws, rev, settings) {
   const proc = processOf(ws, rev.process);
-  const master = techSetOf(proc?.master.files);
+  if (!proc?.master) return { error: `${proc?.name || rev.process} 노드에 Master가 없어요` };
+  const master = techSetOf(proc.master.files);
   const base = techSetOf(rev.base.files);
   if (!base || base.error) return { error: `시작 파일을 읽지 못했어요: ${base?.error || '없음'}` };
   if (!master || master.error) return { error: `Master 파일을 읽지 못했어요: ${master?.error || '없음'}` };
@@ -95,16 +96,16 @@ export function computeRevision(ws, rev, settings) {
     for (const o of options) for (const [l, n] of o.refs) checks.push({ level: 'info', scope: `Option ${o.def.name}`, msg: `빠진 Layer ${l}을 techfile 다른 곳(룰 등)에서 ${n}번 참조 — 사내 규칙대로 정리 필요` });
   } else {
     // Master 변경: 다른 Process Master와 기능키 번호 비교 (새로 생긴 불일치만)
-    for (const other of ws.processes.filter((p) => p.id !== proc.id)) {
+    for (const other of ws.processes.filter((p) => p.id !== proc.id && p.master)) {
       const o = techSetOf(other.master.files);
       if (!o || o.error) continue;
       const before = crossMaster({ ts: master.ts, classes: proc.classes }, { ts: o.ts, classes: other.classes });
       const after = crossMaster({ ts: all, classes: proc.classes }, { ts: o.ts, classes: other.classes });
       const was = new Set(before.rows.filter((r) => r.status === 'mismatch').map((r) => r.key));
-      for (const r of after.rows) if (r.status === 'mismatch' && !was.has(r.key)) checks.push({ level: 'error', scope: `Master ↔ ${other.id}`, msg: `${r.key}: ${proc.id} ${r.a.layer} ${r.a.gds} ≠ ${other.id} ${r.b.layer} ${r.b.gds}` });
+      for (const r of after.rows) if (r.status === 'mismatch' && !was.has(r.key)) checks.push({ level: 'error', scope: `Master ↔ ${other.name || other.id}`, msg: `${r.key}: ${proc.name || proc.id} ${r.a.layer} ${r.a.gds} ≠ ${other.name || other.id} ${r.b.layer} ${r.b.gds}` });
     }
   }
-  const history = (rev.base.history || '') + historyBlock(rev, res, options, applied);
+  const history = (rev.base.history || '') + historyBlock(rev, res, options, applied, proc.name || proc.id);
   return { res, counts, applied, allFiles, all, options, checks, history, master: master.ts };
 }
 

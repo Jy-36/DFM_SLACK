@@ -7,8 +7,8 @@
 ```
 <작업 폴더>/                        설정에서 경로 입력 (예: D:\Techmap)
   workspace.json                    processes(메타 · classes) · dks · revisions 메타(파일 본문 제외)
-  processes/<Process>/master/       tf · layermap · drf · history.txt (현재 Master)
-  processes/<Process>/master/_versions/<YYYYMMDD_HHmm>/   승인 전 Master 보관
+  processes/<노드 id>/master/       tf · layermap · drf · history.txt (현재 Master)
+  processes/<노드 id>/master/_versions/<YYYYMMDD_HHmm>/   승인 전 Master 보관
   revisions/<folder>/
     revision.json                   kind · ver · workDate · ref · options · requests · include · log · status
     base/                           tf · layermap · drf · history.txt (Reference에서 가져온 시작점)

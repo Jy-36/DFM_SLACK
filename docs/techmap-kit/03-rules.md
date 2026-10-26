@@ -51,7 +51,7 @@
 | Option | Metal n(n>1)이 있으면 Metal n−1 · Via n−1도 | warn |
 | Option | 예외 Layer가 All에 있어야 | error |
 | Option 파일 | 빠진 Layer를 techfile 다른 절에서 참조 | info (사내 규칙대로 정리 필요 — 08 [VERIFY]) |
-| Master 변경 | 다른 Process Master와 기능키가 같은데 GDS가 다름(이번 작업에서 새로 생긴 것) | error |
+| Master 변경 | 다른 노드 Master와 기능키가 같은데 GDS가 다름(이번 작업에서 새로 생긴 것) | error |
 | 번호 대장 | Layer# 중복 · GDS 중복 | error |
 | 번호 대장 | layermap 없는 LPP | warn |
 | 번호 대장 | Purpose 관례 datatype과 다름, GDS layer ≠ Layer# | info |
@@ -61,7 +61,7 @@
 
 ## 분기 · Merge
 - 분기 = 아무 작업(승인 · 작업중)을 Reference로 새 작업. 그래프 [분기]는 Ver를 `<기본 Ver>_exp_<오늘>`로 채워 준다(바꿀 수 있음).
-- Merge는 **작업중(draft) 작업에만**. 같은 Process · 같은 종류(DK ↔ DK, Master ↔ Master)끼리.
+- Merge는 **작업중(draft) 작업에만**. 같은 노드 · 같은 종류(DK ↔ DK, Master ↔ Master)끼리.
 - source가 이미 target의 조상이면 막는다("이미 들어 있어요").
 - 재생하는 요청 = source 쪽에만 있는 작업들에서 **실제로 반영된** 요청(승인본은 고정된 include). Merge로 들어온 요청은 원본만 재생(중복 방지).
 - **충돌 = 엔진 검사로 드러난다**: 같은 LPP를 양쪽에서 ADD, 이미 숨긴 것을 HIDE 등 → 합친 요청이 ERROR/변경 없음. 사람이 [반영] 체크를 풀어 정리.
@@ -71,7 +71,7 @@
 ## 분류 · 기능키 (`lib/classify.js`)
 - 추정: `M|ME|MET|METAL<n>` → METAL n, `VIA|VI|V<n>` → VIA n, `AP|RDL|PAD|UBM|CB|PI|PASS|BUMP|TV|LB` → TOP, `text|prBoundary|boundary|DMEXCL|*mark*|*excl*|*dummy*|*blk*|*_id` → MARKER, 나머지 FEOL.
 - 기능키: METAL n → `METALn`, VIA n → `VIAn`, 나머지 이름 대문자. LPP 기능키 = `기능키:purpose`.
-- Process별 예외: `process.classes[layer] = { cls?, level?, key? }`.
+- 노드별 예외: `process.classes[layer] = { cls?, level?, key? }`.
 - 사내 이름 규칙에 맞춰 추정식을 늘리는 건 07 작업 T5.
 
 ## Option 규칙 (`lib/options.js`)

@@ -14,8 +14,8 @@
 const LINE = '='.repeat(72);
 const pad = (s, n) => String(s ?? '').padEnd(n);
 
-export function historyBlock(rev, res, options, applied) {
-  const head = rev.kind === 'dk' ? `[${rev.dk} ${rev.ver}]` : `[${rev.process} MASTER]`;
+export function historyBlock(rev, res, options, applied, nodeName = rev.process) {
+  const head = rev.kind === 'dk' ? `[${rev.dk} ${rev.ver}]` : `[${nodeName} MASTER]`;
   const lines = [
     LINE,
     `${head}  작업 ${rev.workDate}  (폴더 ${rev.folder})`,

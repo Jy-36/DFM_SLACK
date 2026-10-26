@@ -19,4 +19,7 @@ export const STATUS = {
 };
 export const TYPE_LABEL = { ADD: '추가', CHANGE_DISPLAY: '표시 변경', RETIRE: '폐기', HIDE: '숨김', SHOW: '보이기', OPTION_ADD: 'Option +', OPTION_REMOVE: 'Option −' };
 export const FILE_LABEL = { tf: 'techfile', layermap: 'layermap', drf: 'drf' };
+/** 노드(Process) 표시 이름: 2/3nm · 8/10nm (폴더 id는 2_3nm · 8_10nm) */
+export const pname = (ws, id) => ws?.processes.find((p) => p.id === id)?.name || id;
+
 export const LEVEL_TONE = { error: 'bad', warn: 'warn', info: 'neutral' };

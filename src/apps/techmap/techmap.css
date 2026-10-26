@@ -211,3 +211,10 @@ select.tm-mini-input { min-width: 110px; }
 .tm-graph-target { display: inline-flex; gap: 8px; align-items: center; }
 .tm-type.merged { color: var(--sky); border-color: var(--sky); }
 .tm-merge-pick { width: auto; max-width: 280px; }
+
+/* ── v0.4: 노드(2/3nm · 4nm …) → DK */
+.tm-proc-switch button.empty { border-style: dashed; color: var(--faint); }
+.tm-proc-switch button.empty[aria-selected='true'] { background: var(--surface-3); color: var(--fg); border-color: var(--line-strong); }
+.tm-node { display: inline-block; font-size: 0.62em; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 7px; vertical-align: 0.25em; margin-right: 4px; }
+
+.techmap a.btn, .tm-mini a.btn { text-decoration: none; color: inherit; }

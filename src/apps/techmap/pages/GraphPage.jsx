@@ -5,6 +5,7 @@ import RevGraph from '../components/RevGraph.jsx';
 import { computeRevision } from '../lib/revision.js';
 import { mergeInto } from '../lib/workspace.js';
 import { today8 } from '../lib/version.js';
+import { pname } from '../lib/view.js';
 
 export default function GraphPage({ ws, dk, store, notify, go }) {
   const d = ws.dks.find((x) => x.id === dk);
@@ -36,7 +37,7 @@ export default function GraphPage({ ws, dk, store, notify, go }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{dk} 버전 그래프</h1>
+          <h1><span className="tm-node">{pname(ws, d.process)}</span> {dk} 버전 그래프</h1>
           <p>위가 최신. 실선은 Reference(분기), 점선은 Merge. 채운 점 = 승인, 빈 점 = 작업중. 정식 Ver는 왼쪽 줄기, exp · incr Ver는 각자 가지로 그려져요.</p>
         </div>
         <div className="head-actions">
@@ -62,7 +63,7 @@ export default function GraphPage({ ws, dk, store, notify, go }) {
           ) : <span className="small muted">작업중인 작업이 없어서 합치기는 꺼져 있어요 — [분기]로 새 작업을 만드세요</span>}
         </div>
         {revs.length ? (
-          <RevGraph ws={ws} dk={dk} process={d.process} target={target} counts={counts} onOpen={(id) => go({ page: 'rev', id })} onBranch={branch} onMerge={merge} />
+          <RevGraph ws={ws} dk={dk} process={pname(ws, d.process)} target={target} counts={counts} onOpen={(id) => go({ page: 'rev', id })} onBranch={branch} onMerge={merge} />
         ) : <p className="empty">아직 작업이 없어요.</p>}
       </section>
     </div>

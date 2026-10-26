@@ -13,10 +13,10 @@
 ## 계층
 
 ```
-Process (뼈대 공정, 예: SF3)
+노드 = Process (뼈대 공정: 2/3nm · 4nm · 5nm · 7nm · 8/10nm · 14nm, 폴더 id는 '/' → '_' 예 2_3nm)
  ├─ Master Techmap      Layer# · Purpose(datatype) · GDS 번호의 원본. Option별 파일 없음
- │    · 다른 Process의 Master(Other_master)와 "같은 목적 = 같은 번호"를 맞춘다
- └─ DK (Design Kit, 예: SF3_DK)
+ │    · 다른 노드의 Master(Other_master)와 "같은 목적 = 같은 번호"를 맞춘다
+ └─ DK (Design Kit) — 한 노드 아래 여러 갈래 (예: 2/3nm 아래 SF2 · SF3)
       └─ Ver  (v1.0.0.0 · v1.0.0.0_exp_20261020 · v1.0.0.0_exp20261020 · v1.0.0.0_incr20261101 …)
            └─ 작업(리비전) — 작업날짜 단위. 같은 Ver에 요청이 여러 번 오면 작업이 여러 개
                 ├─ All Layer     Master의 부분집합 (DK에서 쓰는 Layer만)
@@ -34,17 +34,17 @@ Process (뼈대 공정, 예: SF3)
   ●─┤ v1.0.0.1  ⟵ Merge v1.0.0.0_exp_20261015
   │ ● v1.0.0.0_exp_20261015
   ● v1.0.0.0
-  ■ SF3 MASTER
+  ■ 2/3nm MASTER
   ```
   화면: DK 그래프(정식 = 왼쪽 줄기, exp · incr Ver마다 가지, 실선 = 분기, 점선 = Merge).
 
 ## 번호 (Layer, Property)
-- Property = **Purpose(datatype)**. 같은 Process 안에서는 같은 Purpose가 같은 datatype을 쓰도록 관리 (예: drawing 0, pin 10, fillDummy 1).
+- Property = **Purpose(datatype)**. 같은 노드 안에서는 같은 Purpose가 같은 datatype을 쓰도록 관리 (예: drawing 0, pin 10, fillDummy 1).
 - 번호 대장 화면: Layer# × Purpose 격자, Purpose별 관례 datatype에서 벗어나면 노란색, layermap 없음은 빨간색, 빈 Layer# 목록.
 
-## Other_master (다른 Process Master)
-- 이름은 조금 달라도(예: SF3 `M1` / SF2 `ME1`, SF3 `AP` / SF2 `RDL`) **목적이 같은 Layer는 GDS layer · datatype이 같아야** 한다.
-- 목적 = **기능키**. 이름으로 자동 추정(METAL n → `METAL1`, VIA n → `VIA1`, 나머지는 이름 대문자)하고, 다르면 Process별로 직접 지정(예: SF2 `RDL` → 기능키 `AP`).
+## Other_master (다른 노드 Master)
+- 이름은 조금 달라도(예: 2/3nm `M1` / 4nm `ME1`, 2/3nm `AP` / 4nm `RDL`) **목적이 같은 Layer는 GDS layer · datatype이 같아야** 한다.
+- 목적 = **기능키**. 이름으로 자동 추정(METAL n → `METAL1`, VIA n → `VIA1`, 나머지는 이름 대문자)하고, 다르면 노드별로 직접 지정(예: 4nm `RDL` → 기능키 `AP`).
 - 비교 결과: 번호 다름(ERROR) · 한쪽에만 있음 · 같은 번호를 다른 기능이 씀(겹침).
 
 ## 숨김

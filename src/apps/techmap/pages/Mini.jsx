@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { Icon, Pill } from '../../../shared/ui.jsx';
 import { readRequestFile } from '../lib/requests.js';
 import { addRequests } from '../lib/workspace.js';
-import { STATUS, TYPE_LABEL } from '../lib/view.js';
+import { STATUS, TYPE_LABEL, pname } from '../lib/view.js';
 
 export default function Mini({ ws, store, rev, c, expand, notify, select }) {
   const inputRef = useRef(null);
@@ -32,7 +32,7 @@ export default function Mini({ ws, store, rev, c, expand, notify, select }) {
       {rev && c && !c.error ? (
         <section className="mini-card">
           <div className="mini-card-head">
-            <h3>{rev.kind === 'dk' ? rev.dk : `${rev.process} MASTER`}</h3>
+            <h3>{pname(ws, rev.process)} · {rev.kind === 'dk' ? rev.dk : 'MASTER'}</h3>
             <Pill tone={rev.status === 'approved' ? 'good' : 'warn'}>{rev.status === 'approved' ? '승인' : '작업중'}</Pill>
           </div>
           <span className="mono small muted tm-mini-folder">{rev.folder}</span>
@@ -69,10 +69,10 @@ export default function Mini({ ws, store, rev, c, expand, notify, select }) {
         </section>
       )}
       <section className="mini-card">
-        <div className="mini-card-head"><h3>Process</h3></div>
+        <div className="mini-card-head"><h3>노드</h3></div>
         <div className="tm-mini-links">
           {ws.processes.map((p) => (
-            <button key={p.id} type="button" className="tm-chip" onClick={() => expand({ page: 'registry', proc: p.id })}>{p.id} 번호 대장</button>
+            <button key={p.id} type="button" className="tm-chip" onClick={() => expand({ page: 'registry', proc: p.id })}>{p.name}{p.master ? '' : ' (미등록)'}</button>
           ))}
         </div>
       </section>

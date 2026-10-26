@@ -18,14 +18,31 @@ function renameFiles(files, names) {
   return { tf: { ...files.tf, name: names.tf }, layermap: { ...files.layermap, name: names.layermap }, drf: { ...files.drf, name: names.drf } };
 }
 
+// 노드(Process): 화면 이름 · 폴더 id ('/'는 폴더 이름에 못 써서 '_')
+export const NODES = ['2/3nm', '4nm', '5nm', '7nm', '8/10nm', '14nm'];
+export const nodeId = (name) => String(name).trim().replace(/[\\/:*?"<>|\s]+/g, '_');
+
 export function emptyWorkspace() {
-  return { version: 2, processes: [], dks: [], revisions: [] };
+  return { version: 2, processes: NODES.map((name) => ({ id: nodeId(name), name, label: '', classes: {}, master: null })), dks: [], revisions: [] };
 }
 
-export function addProcess(ws, id, files, label = '') {
-  if (ws.processes.some((p) => p.id === id)) throw new Error(`Process '${id}'가 이미 있어요`);
+const masterOf = (id, name, files, label) => ({ files, updated: now(), history: `${'='.repeat(72)}\n[${name} MASTER] 등록 ${now()} (${label || '업로드'})\n${'='.repeat(72)}\n\n` });
+
+/** 노드 추가 또는 (Master 미등록 노드에) Master 등록. name: 화면 이름 (예 2/3nm) */
+export function addProcess(ws, name, files, label = '') {
+  const id = nodeId(name);
   loadSet(files); // 파싱 확인
-  return { ...ws, processes: [...ws.processes, { id, label, classes: {}, master: { files, updated: now(), history: `${'='.repeat(72)}\n[${id} MASTER] 등록 ${now()} (${label || '업로드'})\n${'='.repeat(72)}\n\n` } }] };
+  const cur = ws.processes.find((p) => p.id === id);
+  if (cur?.master) throw new Error(`${cur.name}에는 이미 Master가 있어요 — 바꾸려면 Master 변경 작업으로`);
+  if (cur) return { ...ws, processes: ws.processes.map((p) => (p.id === id ? { ...p, label, master: masterOf(id, p.name, files, label) } : p)) };
+  return { ...ws, processes: [...ws.processes, { id, name: String(name).trim(), label, classes: {}, master: masterOf(id, name, files, label) }] };
+}
+
+/** 예전 작업공간(이름 없는 Process)도 읽히게 */
+export function normalizeWorkspace(ws) {
+  const processes = ws.processes.map((p) => ({ name: p.id, ...p }));
+  for (const name of NODES) if (!processes.some((p) => p.id === nodeId(name))) processes.push({ id: nodeId(name), name, label: '', classes: {}, master: null });
+  return { ...ws, processes };
 }
 
 export function setClass(ws, procId, layer, patch) {
@@ -51,13 +68,14 @@ export function addDk(ws, id, process) {
 /** 새 작업(리비전). ref: 'master' | 리비전 id. layers: Master에서 시작할 때 가져올 Layer (없으면 전부) */
 export function newRevision(ws, { kind, process, dk, ver, workDate, ref, layers }, settings) {
   const proc = processOf(ws, process);
-  if (!proc) throw new Error('Process를 골라 주세요');
+  if (!proc) throw new Error('노드를 골라 주세요');
+  if (!proc.master) throw new Error(`${proc.name}에 Master가 아직 없어요 — 먼저 Master를 등록하세요`);
   let base;
   let options = [];
   let refInfo;
   if (kind === 'master') {
     base = { files: proc.master.files, history: proc.master.history || '' };
-    refInfo = { kind: 'master', id: process, label: `${process} MASTER (${proc.master.updated})` };
+    refInfo = { kind: 'master', id: process, label: `${proc.name} MASTER (${proc.master.updated})` };
     ver = ver || 'master';
   } else {
     if (!dk) throw new Error('DK 이름이 필요해요');
@@ -66,8 +84,8 @@ export function newRevision(ws, { kind, process, dk, ver, workDate, ref, layers 
     if (ref === 'master') {
       const keep = layers ? new Set(layers) : new Set(loadSet(proc.master.files).tf.layerByName().keys());
       const files = renameFiles(filterSet(proc.master.files, keep).files, dkFileNames(dk));
-      base = { files, history: `${'='.repeat(72)}\n[${dk}] 생성 — ${process} MASTER에서 ${keep.size} Layer\n${'='.repeat(72)}\n\n` };
-      refInfo = { kind: 'master', id: process, label: `${process} MASTER (${proc.master.updated})` };
+      base = { files, history: `${'='.repeat(72)}\n[${dk}] 생성 — ${proc.name} MASTER에서 ${keep.size} Layer\n${'='.repeat(72)}\n\n` };
+      refInfo = { kind: 'master', id: process, label: `${proc.name} MASTER (${proc.master.updated})` };
     } else {
       const r = ws.revisions.find((x) => x.id === ref);
       if (!r) throw new Error('Reference 작업을 찾지 못했어요');
@@ -128,7 +146,7 @@ export function mergeInto(ws, targetId, sourceId, settings) {
   if (!target || !source) throw new Error('작업을 찾지 못했어요');
   if (target.status === 'approved') throw new Error('승인된 작업에는 합칠 수 없어요 — 새 작업을 만들어 합치세요');
   if (target.id === source.id) throw new Error('같은 작업이에요');
-  if (target.process !== source.process) throw new Error('다른 Process의 작업은 합칠 수 없어요');
+  if (target.process !== source.process) throw new Error('다른 노드의 작업은 합칠 수 없어요');
   if (isAncestor(ws, source.id, target.id)) throw new Error(`${source.folder}의 변경은 이미 이 작업에 들어 있어요`);
   const path = replayPath(ws, source.id, target.id);
   // 반영할 요청: 각 작업에서 실제로 반영된 것 (승인본은 고정된 include, 작업중은 지금 계산)
@@ -201,14 +219,16 @@ export function approveRevision(ws, id, settings) {
   return next;
 }
 
-/** 데모 작업공간: SF3 · SF2 Master, SF3_DK v1.0.0.0 (승인) + exp 작업 1건. rich면 exp → v1.0.0.1 Merge · incr 가지도 */
+/** 데모 작업공간: 노드 2/3nm · 4nm에 Master(합성), 2/3nm 아래 DK SF3 · SF2, 4nm 아래 SF4. 나머지 노드는 Master 미등록.
+ *  rich면 SF3에 exp → v1.0.0.1 Merge · incr 가지도 */
 export function seedWorkspace(settings, { rich = false } = {}) {
   let ws = emptyWorkspace();
-  ws = addProcess(ws, 'SF3', DEMO_MASTERS.SF3, 'DEMO');
-  ws = addProcess(ws, 'SF2', DEMO_MASTERS.SF2, 'DEMO');
-  ws = setClass(ws, 'SF2', 'RDL', { key: 'AP' }); // SF2의 RDL = SF3의 AP (이름이 다른 같은 목적 Layer)
-  const all = [...loadSet(DEMO_MASTERS.SF3).tf.layerByName().keys()].filter((l) => l !== 'DMEXCL');
-  let r = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0', workDate: '20261012', ref: 'master', layers: all }, settings);
+  ws = addProcess(ws, '2/3nm', DEMO_MASTERS['2_3nm'], 'DEMO');
+  ws = addProcess(ws, '4nm', DEMO_MASTERS['4nm'], 'DEMO');
+  ws = setClass(ws, '4nm', 'RDL', { key: 'AP' }); // 4nm의 RDL = 2/3nm의 AP (이름이 다른 같은 목적 Layer)
+  const N = '2_3nm';
+  const all = [...loadSet(DEMO_MASTERS[N]).tf.layerByName().keys()].filter((l) => l !== 'DMEXCL');
+  let r = newRevision(ws, { kind: 'dk', process: N, dk: 'SF3', ver: 'v1.0.0.0', workDate: '20261012', ref: 'master', layers: all }, settings);
   ws = r.ws;
   const first = r.rev.id;
   // DK에 없는 LPP 몇 개 (M11 fillDummy · AP pin) — 이번 작업에서 ADD 해 볼 수 있게
@@ -221,19 +241,29 @@ export function seedWorkspace(settings, { rich = false } = {}) {
   ws = addRequests(ws, first, [{ id: 'REQ-001', type: 'HIDE', row: 3, f: { req_id: 'REQ-001', type: 'HIDE', layer: 'prBoundary', purpose: 'drawing', requester: 'DK팀', reason: '사용자 선택 막기' } }], '초기 구성');
   ws = approveRevision(ws, first, settings);
   if (rich) {
-    // 그래프가 보이게: exp 가지 → 정식 v1.0.0.1에 Merge, incr 가지
+    // 같은 노드의 다른 DK: SF2 (M1~M9만)
+    const nine = all.filter((l) => !/^(M10|M11|VIA9|VIA10|PAD)$/.test(l));
+    const s2 = newRevision(ws, { kind: 'dk', process: N, dk: 'SF2', ver: 'v1.0.0.0', workDate: '20261008', ref: 'master', layers: nine }, settings);
+    ws = setOptions(s2.ws, s2.rev.id, [newOption('1P9M_6X1Z', 9, ['AP'])]);
+    ws = approveRevision(ws, s2.rev.id, settings);
+    // 4nm 노드의 DK
+    const all4 = [...loadSet(DEMO_MASTERS['4nm']).tf.layerByName().keys()].filter((l) => l !== 'DMEXCL');
+    const s4 = newRevision(ws, { kind: 'dk', process: '4nm', dk: 'SF4', ver: 'v1.0.0.0', workDate: '20261005', ref: 'master', layers: all4 }, settings);
+    ws = setOptions(s4.ws, s4.rev.id, [newOption('1P9M_6X1Z', 9, ['RDL'])]);
+    ws = approveRevision(ws, s4.rev.id, settings);
+    // SF3 그래프: exp 가지 → 정식 v1.0.0.1에 Merge, incr 가지
     const Q = (id, type, f) => ({ id, type, row: 0, f: { req_id: id, type, requester: 'DEMO', ...f } });
-    let b = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_exp_20261015', workDate: '20261015', ref: first }, settings);
+    const b = newRevision(ws, { kind: 'dk', process: N, dk: 'SF3', ver: 'v1.0.0.0_exp_20261015', workDate: '20261015', ref: first }, settings);
     ws = addRequests(b.ws, b.rev.id, [Q('EXP-01', 'ADD', { layer: 'AP', purpose: 'pin', reason: 'AP pin 시험 제공' })], 'DEMO');
     ws = approveRevision(ws, b.rev.id, settings);
-    const c = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.1', workDate: '20261020', ref: first }, settings);
+    const c = newRevision(ws, { kind: 'dk', process: N, dk: 'SF3', ver: 'v1.0.0.1', workDate: '20261020', ref: first }, settings);
     ws = addRequests(c.ws, c.rev.id, [Q('REL-01', 'CHANGE_DISPLAY', { layer: 'M7', purpose: 'drawing', stipple: 'dots', reason: 'M7 패턴 구분' })], 'DEMO');
     ws = mergeInto(ws, c.rev.id, b.rev.id, settings).ws;
     ws = approveRevision(ws, c.rev.id, settings);
-    const d = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_incr20261022', workDate: '20261022', ref: first }, settings);
+    const d = newRevision(ws, { kind: 'dk', process: N, dk: 'SF3', ver: 'v1.0.0.0_incr20261022', workDate: '20261022', ref: first }, settings);
     ws = addRequests(d.ws, d.rev.id, [Q('INC-01', 'HIDE', { layer: 'M11', purpose: 'pin', reason: '고객사 요청으로 M11 pin 숨김' })], 'DEMO');
     ws = approveRevision(ws, d.rev.id, settings);
   }
-  r = newRevision(ws, { kind: 'dk', process: 'SF3', dk: 'SF3_DK', ver: 'v1.0.0.0_exp_20261020', ref: first }, settings);
+  r = newRevision(ws, { kind: 'dk', process: N, dk: 'SF3', ver: 'v1.0.0.0_exp_20261020', ref: first }, settings);
   return { ws: r.ws, current: r.rev.id };
 }

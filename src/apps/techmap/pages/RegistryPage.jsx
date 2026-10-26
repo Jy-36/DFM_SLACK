@@ -27,7 +27,7 @@ export default function RegistryPage({ proc, go }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>{proc.id} 번호 대장</h1>
+          <h1>{proc.name} 번호 대장</h1>
           <p>Master 기준 Layer# · Purpose별 GDS layer/datatype. DK · Option은 여기 번호만 쓸 수 있어요. (Master 갱신 {proc.master.updated})</p>
         </div>
         <div className="head-actions">
@@ -45,7 +45,7 @@ export default function RegistryPage({ proc, go }) {
 
       <section className="panel">
         <h2>
-          Purpose 관례 <span className="small muted">이 Process에서 Purpose마다 가장 많이 쓰는 datatype — 벗어나면 표에 노란색</span>
+          Purpose 관례 <span className="small muted">이 노드에서 Purpose마다 가장 많이 쓰는 datatype — 벗어나면 표에 노란색</span>
         </h2>
         <div className="tm-chips">
           {reg.purposes.map((p) => (
