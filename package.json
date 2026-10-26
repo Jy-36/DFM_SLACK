@@ -1,7 +1,7 @@
 {
   "name": "dfm-slack",
   "private": true,
-  "version": "0.35.0-prototype",
+  "version": "0.36.0-prototype",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:engine": "node scripts/engine-check.mjs",
-    "test:mto": "node scripts/mto-check.mjs"
+    "test:mto": "node scripts/mto-check.mjs",
+    "test:techmap": "node scripts/techmap-check.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

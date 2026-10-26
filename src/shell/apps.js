@@ -1,6 +1,7 @@
 // DFM Slack에 넣을 수 있는 앱(탭) 목록. 새 앱은 src/apps/<이름>/ 에 만들고 여기에 한 줄 추가한다.
 import WorkTime from '../apps/worktime/WorkTime.jsx';
 import Mto from '../apps/mto/Mto.jsx';
+import Techmap from '../apps/techmap/Techmap.jsx';
 
 export const APPS = [
   {
@@ -16,6 +17,13 @@ export const APPS = [
     desc: 'GDS·Layer List로 STEP2·MTO 일정 계산, 간트·병목 분석',
     icon: 'mask',
     component: Mto,
+  },
+  {
+    id: 'techmap',
+    name: 'Techmap',
+    desc: 'Site Request로 techfile · layermap · drf 검토 · 업데이트',
+    icon: 'techmap',
+    component: Techmap,
   },
 ];
 
