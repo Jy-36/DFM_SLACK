@@ -1,8 +1,8 @@
 // WorkTime: DFM Slack 안의 탭 하나. 요약(휴대폰 크기)·확장 화면 전환은 셸이 정한 mode를 따른다.
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from './lib/store.js';
-import { summarizeMonth } from './lib/engine.js';
-import { fmtClock, minutesOfDay } from './lib/time.js';
+import { planSummary } from './lib/goal.js';
+import { fmtClock, minutesOfDay, ymd } from './lib/time.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
 import Mini from './pages/Mini.jsx';
 import Widget from './pages/Widget.jsx';
@@ -12,7 +12,7 @@ import Planner from './pages/Planner.jsx';
 import Sync from './pages/Sync.jsx';
 import Settings from './pages/Settings.jsx';
 
-export const WORKTIME_VERSION = '0.23.0';
+export const WORKTIME_VERSION = '0.24.0';
 
 const NAV = [
   ['dashboard', '현황'],
@@ -61,10 +61,28 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
     return () => clearTimeout(id);
   }, [toast]);
 
+  // 공통 summary: 계획 휴가(planLeaves)와 직접 정한 날(planPins)까지 반영 (GUIDE-plan-mechanism §2.5)
   const summary = useMemo(
-    () => summarizeMonth(now.getFullYear(), now.getMonth(), state.records, state.rules, state.plans, now),
-    [state.records, state.rules, state.plans, now],
+    () =>
+      planSummary({
+        year: now.getFullYear(),
+        month: now.getMonth(),
+        records: state.records,
+        rules: state.rules,
+        plans: state.plans,
+        pins: state.planPins,
+        leaves: state.planLeaves,
+        goal: state.planGoal,
+        now,
+      }),
+    [state.records, state.rules, state.plans, state.planPins, state.planLeaves, state.planGoal, now],
   );
+
+  // 날짜가 바뀌면 어제 이전 계획 데이터 정리 (GUIDE-plan-mechanism §8.4)
+  const todayKey = ymd(now);
+  useEffect(() => {
+    dispatch({ type: 'plan/prunePast', today: todayKey });
+  }, [todayKey, dispatch]);
 
   const go = (next, nextView) => {
     if (nextView) setView(nextView);

@@ -1,7 +1,7 @@
 {
   "name": "dfm-slack",
   "private": true,
-  "version": "0.23.0",
+  "version": "0.24.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:engine": "node scripts/engine-check.mjs",
+    "test:goal": "node scripts/goal-check.mjs",
     "test:mto": "node scripts/mto-check.mjs"
   },
   "dependencies": {

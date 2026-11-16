@@ -442,7 +442,7 @@ export function distributeAmong(summary, rules, plans, keys, locks = {}) {
 }
 
 /** 남은 양 room을 days에 고르게 채우되 하루 상한(caps)을 넘지 않게 (10분 단위 내림) */
-function waterFill(room, caps) {
+export function waterFill(room, caps) {
   const out = caps.map(() => 0);
   let left = Math.max(0, room);
   let open = caps.map((c, i) => i).filter((i) => caps[i] > 0);
