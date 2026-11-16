@@ -1458,3 +1458,31 @@ html.tauri:not([data-mode='widget']) .shell {
 .pl2-fill-row.is-dim { opacity: 0.72; }
 .pl2-fill-row.is-changed { outline: 1.5px dashed var(--pl2-acc); outline-offset: -2px; border-radius: 8px; }
 .pl2-fill-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── 근무 계획 v1.1 (먼저 맞추고 알리기 · 지난 주 접기 · 단축키 도움말) ── */
+.pl2-headok { height: 26px; padding: 0 10px; font-size: 12px; }
+.pl2-help-btn { width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--pl2-line); background: var(--pl2-card); color: var(--pl2-t2); font-weight: 700; font-size: 13px; cursor: pointer; flex: none; }
+.pl2-help-btn[aria-expanded='true'] { color: var(--pl2-acc); border-color: var(--pl2-acc); }
+.pl2-keyhelp { position: fixed; right: 24px; top: 84px; z-index: 45; width: 290px; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--pl2-card); border: 1px solid var(--pl2-line); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 27, 51, 0.18); font-size: 12.5px; color: var(--pl2-ink); }
+.pl2-keyhelp-h { display: flex; align-items: center; }
+.pl2-keyhelp-r { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.pl2-keyhelp-r > span:last-child { color: var(--pl2-t2); text-align: right; }
+.pl2-pastrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 14px; border: 1px solid var(--pl2-rec); background: var(--pl2-rec); border-radius: 10px; font: inherit; font-size: 13px; color: var(--pl2-ink); cursor: pointer; text-align: left; min-width: 0; }
+.pl2-pastrow .pl2-t2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pl2-pastrow:hover { filter: brightness(0.98); }
+.pl2-pastrow:focus-visible { outline: 2px solid var(--pl2-acc); outline-offset: 2px; }
+.pl2-cell--leaveRec { background: var(--pl2-hatch); }
+.pl2-legend > span:not(.pl2-lbl) { display: flex; align-items: center; }
+.pl2-legend .pl2-sw { width: 22px; height: 12px; border-radius: 3px; }
+.pl2-target-why { grid-column: 1 / -1; font-size: 11.5px; line-height: 1.4; color: var(--pl2-warn-text); }
+.pl2-toast { flex-wrap: wrap; row-gap: 6px; }
+.pl2-toast-warn { font-style: normal; opacity: 0.8; }
+.pl2-toast-menu { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 8px); width: min(380px, 90vw); display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--pl2-card); border: 1px solid var(--pl2-line); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 27, 51, 0.22); }
+.pl2-toast .pl2-toast-menu button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 12px; border-radius: 10px; text-decoration: none; text-align: left; color: var(--pl2-ink); font-weight: 600; white-space: normal; }
+.pl2-toast .pl2-toast-menu button span { font-size: 12px; font-weight: 500; color: var(--pl2-t2); }
+.pl2-toast .pl2-toast-menu button span.is-warn { color: var(--pl2-warn-text); }
+.pl2-toast .pl2-toast-menu button:hover, .pl2-toast .pl2-toast-menu button:focus-visible { background: var(--pl2-acc-bg); outline: none; }
+.pl2-toast .pl2-toast-menu button.is-on b { color: var(--pl2-acc); }
+.pl2-toast .pl2-toast-menu button:disabled { opacity: 0.45; cursor: default; }
+.pl2-cell-top .pl2-tag { display: block; flex: 0 1 auto; min-width: 0; line-height: 20px; max-width: calc(100% - 18px); padding: 0 4px; letter-spacing: -0.1px; }
+.pl2-row .pl2-step { width: 104px; }

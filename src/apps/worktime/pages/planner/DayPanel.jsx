@@ -4,7 +4,6 @@ import { LEAVE_ORDER } from '../../lib/rules.js';
 import { capacityOf } from '../../lib/engine.js';
 import { isFixedPin, BLOCK_BOTH } from '../../lib/goal.js';
 import { Stepper, Seg, Tag } from './ui.jsx';
-import { SuggestBox } from './Suggest.jsx';
 import { fieldHints, tryPin, quickOuts, hourChip, bulkResult } from './model.js';
 import { clock, dur, signed, mdLong, md, mdw } from './format.js';
 import { toMin } from '../../lib/time.js';
@@ -127,6 +126,11 @@ export function DayPinEditor({ v, ctx, applyPin, applyLeave, compact = false }) 
         </div>
       ))}
       {!compact && d.plannedExclude > 0 && <span className="pl2-fr-note">제외 {dur(d.plannedExclude)} · 근무기록에서 고치기</span>}
+      {v.violation && (
+        <p className="pl2-err" role="alert">
+          설정과 안 맞아요: {v.violation}. 값을 고치거나 자동으로 되돌려 주세요.
+        </p>
+      )}
       {err && (
         <p className="pl2-err" role="alert">
           {err}
@@ -153,15 +157,16 @@ export function DayPinEditor({ v, ctx, applyPin, applyLeave, compact = false }) 
                 <button
                   key={dl}
                   type="button"
-                  className="pl2-chip"
+                  className={`pl2-chip ${c.warn ? 'is-warn' : ''}`}
                   disabled={!!c.blocked}
-                  title={c.blocked}
+                  title={c.blocked || c.warn || undefined}
                   onClick={() => {
                     setErr(null);
-                    applyPin(v.key, c.apply.pin, c.label.replace('→', '·'));
+                    applyPin(v.key, c.apply.pin, c.label.replace(' →', ' ·'));
                   }}
                 >
                   {c.label}
+                  {c.warn ? ' !' : ''}
                 </button>
               );
             })}
@@ -207,21 +212,20 @@ function TodayExtra({ v, ctx, applyPin }) {
       <Seg
         label="다르게 나가면"
         className="pl2-seg--fill pl2-seg--two"
-        items={a.options.map((o) => ({ value: o.out, label: clock(o.out), sub: o.isPlan ? '계획' : signed(o.monthDelta) }))}
+        items={a.options.map((o) => ({ value: o.out, label: clock(o.out), sub: o.isPlan ? '계획' : `월말 ${signed(o.monthDelta)}` }))}
         value={a.plan.out}
         onChange={(x) => {
           const t = tryPin(v.d, v.pin, 'out', x, ctx);
           if (!t.blocked) applyPin(v.key, t.pin, `퇴근 ${clock(x)}으로 정함`);
         }}
       />
-      <span className="pl2-hint">작은 숫자는 월말 초과가 달라지는 양이에요. 고르면 남은 날에 어떻게 나눌지 이 아래에서 물어봐요.</span>
     </>
   );
 }
 
 /** 오른쪽 상세 패널 (Calendar) — 선택 상태에 따라 모양이 바뀜 */
 export default function DayPanel(props) {
-  const { v, ctx, go, applyPin, applyLeave, selectedViews, onNav, suggestion, showSug, applySpread, dismissSug, setHover, lastMode, bulk, onClose } = props;
+  const { v, ctx, go, applyPin, applyLeave, selectedViews, onNav, bulk, onClose } = props;
   const nav = <DayNav onPrev={() => onNav(-1)} onNext={() => onNav(1)} />;
   const close = onClose ? (
     <button type="button" className="pl2-x pl2-x--lg" onClick={onClose} aria-label="닫기">
@@ -266,7 +270,7 @@ export default function DayPanel(props) {
                   합계 {signed(res.delta)} · {dur(total + res.delta)}
                   {res.blocked.length ? ` · ${res.blocked.length}일은 못 바꿈` : ''}
                 </span>
-                <span className="pl2-hint">아래 막대에서 [적용]하면 달라진 양을 어디서 채울지 물어봐요.</span>
+                <span className="pl2-hint">[적용]하면 달라진 양은 남은 자동 날에서 맞춰요.</span>
               </>
             ) : (
               <span className="pl2-hint">아래 막대에서 출근·퇴근·실근무·휴가를 골라 한 번에 바꿔요.</span>
@@ -356,7 +360,6 @@ export default function DayPanel(props) {
             휴가 취소
           </button>
         </div>
-        {showSug && <SuggestBox suggestion={suggestion} onApply={applySpread} onDismiss={dismissSug} onHover={setHover} lastMode={lastMode} />}
       </>
     );
   }
@@ -391,7 +394,6 @@ export default function DayPanel(props) {
         )}
         {v.d.leaveLabel && cap > 0 && <span className="pl2-hint">{v.d.leaveLabel} 포함 · 실근무는 남은 시간이에요</span>}
       </div>
-      {showSug && <SuggestBox suggestion={suggestion} onApply={applySpread} onDismiss={dismissSug} onHover={setHover} lastMode={lastMode} />}
     </>
   );
 }

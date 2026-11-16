@@ -7,6 +7,14 @@ import { Cell, gridOf, HEADS } from './CalendarView.jsx';
 import { Kbd } from './ui.jsx';
 import { clock, dur, signed, mdw } from './format.js';
 
+/** 목표를 못 채우는 이유 한 줄: 무엇이 막는지 */
+function failWhy(o, draft, rules) {
+  if (o.capped) return '월 최대 근무 시간에 걸려요';
+  const lim = draft.cutoff || rules.recognizeTo;
+  const early = draft.earlyDays?.length ? ` · 일찍 퇴근 ${draft.earlyDays.length}요일` : '';
+  return `자동 ${o.days}일을 ${draft.startIn || rules.planDefaultIn}–${lim}${early} 안에서 다 채워도 ${dur(o.gap)} 모자라요`;
+}
+
 const LV = { ok: ['✓ 여유', 'ok'], tight: ['빡빡', 'warn'], fail: ['불가', 'bad'], max: ['최대', 'acc'] };
 
 export default function FillPreview(p) {
@@ -111,7 +119,12 @@ export default function FillPreview(p) {
                   ) : (
                     <span className="pl2-target-l">{id === 'max' ? `하루 ${dur(o.avgNet)} · OT ${signed(o.ot)}` : `하루 ${dur(o.avgNet)} · ${clock(o.avgOut)}`}</span>
                   )}
-                  {id !== 'custom' || on ? <span className={`pl2-target-b pl2-target-b--${lvTone}`}>{lvText}</span> : null}
+                  {id !== 'custom' || on ? (
+                    <span className={`pl2-target-b pl2-target-b--${lvTone}`} title={o.level === 'fail' ? failWhy(o, draft, rules) : undefined}>
+                      {o.level === 'fail' && o.gap ? `불가 · ${dur(o.gap)} 모자람` : lvText}
+                    </span>
+                  ) : null}
+                  {o.level === 'fail' && on && <span className="pl2-target-why">{failWhy(o, draft, rules)}</span>}
                 </div>
               );
             })}

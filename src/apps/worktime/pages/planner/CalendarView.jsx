@@ -3,12 +3,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { distributeByGoal, describePlan, excessForGoal } from '../../lib/goal.js';
 import { LEAVE_ORDER } from '../../lib/rules.js';
 import { toMin } from '../../lib/time.js';
-import { Kbd, Tag } from './ui.jsx';
+import { Tag } from './ui.jsx';
 import DayPanel from './DayPanel.jsx';
 import { clock, dur, signed } from './format.js';
 import { goalTitle } from './model.js';
 
 export const HEADS = ['월', '화', '수', '목', '금', '토', '일'];
+const CAL_PAST_KEY = 'worktime.calPastOpen';
+const readCalPast = () => {
+  try {
+    return localStorage.getItem(CAL_PAST_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+/** 접힌 지난 주 한 줄: 11/1 – 11/8 · 근무 5일 · 인정 46:08 / 필수 40:00 */
+function pastSummary(list) {
+  const work = list.filter((v) => v.d.isWorkday);
+  const rec = list.reduce((s, v) => s + (v.d.recognized || 0), 0);
+  const req = work.reduce((s, v) => s + (v.d.dayRequired || 0), 0);
+  const [a, b] = [list[0].key, list[list.length - 1].key].map((k) => k.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/'));
+  return `${a} – ${b} · 근무 ${work.length}일 · 인정 ${dur(rec)} / 필수 ${dur(req)} (${signed(rec - req)})`;
+}
 const LEVEL = { ok: ['✓ 여유', 'ok'], tight: ['빡빡해요', 'warn'], fail: ['못 채워요', 'bad'], max: ['최대한', 'acc'] };
 
 export function useGoalLevel(summary, rules, plans, pins, goal) {
@@ -73,7 +89,8 @@ function GoalSide({ summary, rules, goal, ctx, openFill, isPastMonth }) {
       <button type="button" className="pl2-btn pl2-btn--primary pl2-btn--block" onClick={openFill} disabled={isPastMonth}>
         조건 바꾸고 다시 채우기
       </button>
-      <div className="pl2-legend">
+      <div className="pl2-legend" aria-label="칸 색 안내">
+        <span className="pl2-lbl">칸 색</span>
         <span>
           <i className="pl2-sw pl2-sw--rec" />
           기록 · 회사 사이트
@@ -142,7 +159,11 @@ export function Cell({ v, selected, focused, preview, dim, onClick, onDoubleClic
     >
       <div className="pl2-cell-top">
         <span className={`pl2-cell-n ${sunday || v.d.holiday ? 'is-sun' : ''}`}>{v.n}</span>
-        {v.tag && v.state !== 'weekend' && <span className={`pl2-tag pl2-tag--${v.tagTone}`}>{v.tag}</span>}
+        {v.tag && v.state !== 'weekend' && (
+          <span className={`pl2-tag pl2-tag--${v.tagTone}`} title={v.tag}>
+            {v.tag}
+          </span>
+        )}
       </div>
       {v.state === 'weekend' && v.d.holiday && v.dow >= 1 && v.dow <= 5 && <span className="pl2-cell-hol">{v.d.holiday}</span>}
       {v.state !== 'weekend' && (
@@ -230,8 +251,30 @@ function BulkBar({ bulk, setBulk, onApply, onClear, count, ctx }) {
 }
 
 export default function CalendarView(p) {
-  const { views, viewOf, sel, select, setSel, summary, rules, goal, ctx, width, go, selectedViews, suggestion, sug, hover } = p;
+  const { views, viewOf, sel, select, setSel, summary, rules, goal, ctx, width, go, selectedViews, hover, isCurrent } = p;
   const cells = useMemo(() => gridOf(views), [views]);
+  // 이번 달: 다 지난 주는 한 줄로 접는다 (GUIDE-ui-window §3.3 v1.1)
+  const [pastOpen, setPastOpenRaw] = useState(readCalPast);
+  const setPastOpen = (on) => {
+    setPastOpenRaw(on);
+    try {
+      localStorage.setItem(CAL_PAST_KEY, on ? '1' : '0');
+    } catch {
+      /* 저장 불가 */
+    }
+  };
+  const pastRows = useMemo(() => {
+    if (!isCurrent) return 0;
+    let n = 0;
+    for (let i = 0; i < cells.length; i += 7) {
+      const row = cells.slice(i, i + 7).filter(Boolean);
+      if (row.length && row.every((v) => v.d.isPast)) n += 1;
+      else break;
+    }
+    return n;
+  }, [cells, isCurrent]);
+  const pastKeys = useMemo(() => new Set(cells.slice(0, pastRows * 7).filter(Boolean).map((v) => v.key)), [cells, pastRows]);
+  const collapsed = pastRows > 0 && !pastOpen && !sel.some((k) => pastKeys.has(k));
   const [focusKey, setFocusKey] = useState(null);
   const refs = useRef({});
   const panelRef = useRef(null);
@@ -247,6 +290,7 @@ export default function CalendarView(p) {
   const moveFocus = (key, delta) => {
     const i = views.findIndex((v) => v.key === key);
     const j = Math.max(0, Math.min(views.length - 1, i + delta));
+    if (collapsed && pastKeys.has(views[j].key)) return; // 접힌 지난 주로는 가지 않음
     setFocusKey(views[j].key);
   };
   const onKey = (v) => (e) => {
@@ -268,7 +312,6 @@ export default function CalendarView(p) {
   };
 
   const single = sel.length === 1 ? viewOf[sel[0]] : null;
-  const showSugInPanel = !!(suggestion && single && sug?.panelKey === single.key && !overlay);
   const navDay = (dl) => {
     if (!single) return;
     const i = views.findIndex((v) => v.key === single.key);
@@ -285,12 +328,6 @@ export default function CalendarView(p) {
       applyLeave={p.applyLeave}
       selectedViews={selectedViews}
       onNav={navDay}
-      suggestion={suggestion}
-      showSug={showSugInPanel}
-      applySpread={p.applySpread}
-      dismissSug={p.dismissSug}
-      setHover={p.setHover}
-      lastMode={p.lastMode}
       bulk={p.bulk}
       onClose={overlay ? () => setDrawerOpen(false) : null}
     />
@@ -308,8 +345,19 @@ export default function CalendarView(p) {
                 {h}
               </div>
             ))}
+            {pastRows > 0 && (
+              <button type="button" className="pl2-pastrow" aria-expanded={!collapsed} onClick={() => setPastOpen(collapsed)}>
+                <span className="pl2-t3">{collapsed ? '▸' : '▾'}</span>
+                <b>지난 {pastRows === 1 ? '주' : `${pastRows}주`}</b>
+                <span className="pl2-t2">
+                  {pastSummary(cells.slice(0, pastRows * 7).filter(Boolean))}
+                </span>
+                <span className="pl2-sp" />
+                <span className="pl2-lbl">{collapsed ? '펼치기' : '접기'}</span>
+              </button>
+            )}
             {cells.map((v, i) =>
-              v ? (
+              collapsed && i < pastRows * 7 ? null : v ? (
                 <Cell
                   key={v.key}
                   v={v}
@@ -332,22 +380,7 @@ export default function CalendarView(p) {
           </div>
           {selectedViews.length > 1 ? (
             <BulkBar bulk={p.bulk} setBulk={p.setBulk} onApply={p.applyBulk} onClear={() => setSel(sel.slice(-1))} count={selectedViews.filter((x) => x.selectable).length} ctx={ctx} />
-          ) : (
-            <div className="pl2-keys">
-              <span>
-                <Kbd>방향키</Kbd> 날짜 이동
-              </span>
-              <span>
-                <Kbd>Enter</Kbd> 고치기
-              </span>
-              <span>
-                <Kbd>Shift</Kbd> · <Kbd>Ctrl</Kbd>+클릭 여러 날
-              </span>
-              <span>
-                <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd> 되돌리기
-              </span>
-            </div>
-          )}
+          ) : null}
         </section>
         {(!overlay || drawerOpen) && (
           <aside ref={panelRef} className={`pl2-card pl2-ins ${overlay ? 'pl2-ins--drawer' : ''}`} aria-label="선택한 날">

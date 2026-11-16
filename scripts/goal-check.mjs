@@ -3,6 +3,7 @@ import { summarizeMonth, grossForNet, netFromGross, capacityOf } from '../src/ap
 import {
   distributeByGoal, DEFAULT_GOAL, excessForGoal, goalPreview, goalCapOf, goalStartOf, resolvePinTransition, resolveDay, checkResolved,
   withPlanLeaves, planSummary, spreadDelta, monthDrift, todayAdvice, isValidNet, isFixedPin, migrateV32, dropPast, BLOCK_BOTH,
+  autoReflow, protectedKeysOf, pinViolations, describePlan,
 } from '../src/apps/worktime/lib/goal.js';
 import { DEFAULT_RULES as R } from '../src/apps/worktime/lib/rules.js';
 import { generateMockRecords } from '../src/apps/worktime/lib/mockData.js';
@@ -260,6 +261,39 @@ console.log('\n— §8.7-12 이전 규칙');
   ok('날짜별 출근 → in pin', m.planPins[k2]?.in === '10:00');
   ok('계획 화면 휴가 → planLeaves', m.planLeaves[k3]?.leave === 'annual' && !m.records[k3] && m.moved === 1);
   ok('portal 기록은 옮기지 않음', m.records[k4]?.leave === 'annual' && !m.planLeaves[k4]);
+  ok('옮긴 records 원본을 backup 으로 돌려줌 (0.23 복구용)', m.backup?.[k3]?.leave === 'annual' && !m.backup[k4]);
+}
+
+console.log('— 자동 날 다시 맞추기 (v3.3 §6.6)');
+{
+  const G0 = { ...G, target: 'ot0' };
+  const s0 = planSummary({ year: 2026, month: 9, records: recs, rules: R, plans: {}, goal: G0, now });
+  const first = autoReflow(s0, R, {}, {}, G0);
+  ok('자동 값이 없으면 처음 채우기', first?.first === true && Object.keys(first.plans).length > 0);
+  const P1 = first.plans;
+  const s1 = planSummary({ year: 2026, month: 9, records: recs, rules: R, plans: P1, goal: G0, now });
+  ok('채운 직후엔 다시 맞출 것 없음', autoReflow(s1, R, P1, {}, G0) === null, `차이 ${fmtDur(monthDrift(s1, R, G0), { sign: true })}`);
+  // 기록이 바뀐 것처럼 자동 날 하나를 1시간 줄임 → 다른 날이 늘어남
+  const keep = protectedKeysOf(s1, R);
+  const victim = s1.upcoming.filter((d) => !d.isToday && d.key in P1 && !keep.includes(d.key)).at(-1).key;
+  const P2 = { ...P1, [victim]: P1[victim] - 60 };
+  const s2 = planSummary({ year: 2026, month: 9, records: recs, rules: R, plans: P2, goal: G0, now });
+  const rf = autoReflow(s2, R, P2, {}, G0);
+  ok('목표 −1:00 → 다시 맞춤', !!rf && !rf.first && rf.changes.length > 0, rf ? `${rf.changes.length}일` : '');
+  ok('오늘과 다음 근무일은 건드리지 않음', rf && keep.length === 1 && !rf.changes.some((c) => c.key === keep[0] || c.key === s2.todayKey));
+  const s3 = planSummary({ year: 2026, month: 9, records: recs, rules: R, plans: { ...P2, ...rf.plans }, goal: G0, now });
+  ok('맞춘 뒤 목표와 10분 안', Math.abs(monthDrift(s3, R, G0)) <= 10, fmtDur(monthDrift(s3, R, G0), { sign: true }));
+  ok('최대한 목표는 맞출 것 없음', autoReflow(s2, R, P2, {}, { ...G0, target: 'max' }) === null);
+  // 설정과 안 맞는 pin
+  const day = s1.upcoming.find((d) => !d.isToday && capacityOf(d, R) > 0);
+  const badPins = { [day.key]: { out: '23:00' } };
+  const v = pinViolations(s1, R, badPins, G0);
+  ok('설정과 안 맞는 직접 정한 날 찾기', v.length === 1 && v[0].key === day.key, v[0]?.why);
+  ok('맞는 pin 은 문제 없음', pinViolations(s1, R, { [day.key]: { out: '18:00' } }, G0).length === 0);
+  // 못 채우는 목표: 모자란 양
+  const g4b = { ...G, target: 'ot14', cutoff: '17:30' };
+  const d4 = describePlan(s, R, g4b, {}, distributeByGoal(s, R, {}, {}, g4b, null, true));
+  ok('못 채우면 모자란 양(gap)을 알려 줌', d4.level === 'fail' && d4.gap > 0, fmtDur(d4.gap));
 }
 
 console.log(fail ? `\n${count - fail} 통과 · ${fail} 실패` : `\n${count} 통과 · 0 실패`);

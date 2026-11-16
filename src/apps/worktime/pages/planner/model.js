@@ -56,7 +56,7 @@ export function dayView(d, ctx) {
 
   // 사이트·직접 입력 기록이 있는 미래 날 (근태 등) → 기록 상태
   if (!d.isToday && hasRecord(rec)) {
-    return finish({ ...v, state: 'leaveRec', tag: d.leaveLabel ? `${d.leaveLabel} · 기록` : '기록', tagTone: 'rec', main: d.credit ? dur(d.credit) : '', sub: '사이트 근태' });
+    return finish({ ...v, state: 'leaveRec', tag: d.leaveLabel || '기록', tagTone: 'rec', main: d.credit ? dur(d.credit) : '', sub: '사이트 근태' });
   }
 
   // 종일 계획 휴가 (또는 패밀리데이 쉼)
@@ -87,9 +87,9 @@ export function dayView(d, ctx) {
     const r = resolveDay(d, v.pin, rules, goal, P[d.key]);
     const base = { ...v, state: 'today', r, tag: '오늘', tagTone: 'today', editable: true, selectable: false };
     if (!a || a.state === 'leave') return finish({ ...base, main: d.leaveLabel || '휴가', sub: '' });
-    if (a.state === 'beforeIn') return finish({ ...base, main: `→ ${clock(a.plan.out)}`, sub: `출근 전 · ${clock(a.inMin)} 기준`, ...driftNote(a.drift) });
+    if (a.state === 'beforeIn') return finish({ ...base, main: `→ ${clock(a.plan.out)}`, sub: `출근 전 · ${clock(a.inMin)} 기준` });
     if (a.state === 'done') return finish({ ...base, main: '지금 나가도 돼요 ✓', mainSmall: true, sub: `${clock(d.inMin)} · ${dur(a.soFar)}` });
-    return finish({ ...base, main: `→ ${clock(a.plan.out)}`, sub: `${clock(d.inMin)} · ${dur(a.soFar)}`, ...driftNote(a.drift) });
+    return finish({ ...base, main: `→ ${clock(a.plan.out)}`, sub: `${clock(d.inMin)} · ${dur(a.soFar)}` });
   }
 
   // 앞으로의 근무일
@@ -112,10 +112,16 @@ export function dayView(d, ctx) {
     out.tagTone = 'neutral';
   }
   if (out.state === 'preview') out.tag = '미리보기';
-  // 알림 한 줄: 범위 밖(주황) > 근태 · 패밀리데이 · 일찍 퇴근
+  // 알림 한 줄: 설정과 안 맞음(주황) > 범위 밖(주황) > 근태 · 패밀리데이 · 일찍 퇴근
   const end = goalEndOf(d, rules, goal);
   const start = Math.max(toMin(goal.startIn || rules.planDefaultIn), toMin(rules.recognizeFrom));
-  if (r.out > end) {
+  const bad = v.pin ? checkResolved(r, rules) : null;
+  if (bad) {
+    out.note = '설정과 안 맞음';
+    out.noteTone = 'warn';
+    out.violation = bad;
+    out.tagTone = 'warn';
+  } else if (r.out > end) {
     out.note = `${clock(end)} 넘음`;
     out.noteTone = 'warn';
   } else if (r.in < start) {
@@ -126,11 +132,6 @@ export function dayView(d, ctx) {
   else if (rules.familyDayOn && d.key === summary.familyKey) out.note = '패밀리데이';
   else if (!fixed && goal.earlyDays?.includes(d.dow)) out.note = '일찍 퇴근';
   return finish(out);
-}
-
-function driftNote(drift) {
-  if (drift == null || Math.abs(drift) <= 10) return {};
-  return { note: `목표 ${signed(drift)}`, noteTone: 'warn' };
 }
 
 function finish(v) {
@@ -152,7 +153,7 @@ export function fieldHints(pin, isToday) {
   const t = {
     none: ['자동', '자동', '자동'],
     in: [set, '자동', '자동'],
-    out: ['자동', set, '자동 · 바꾸면 출근이 움직여요'],
+    out: ['자동', set, '자동 · 출근이 따라 움직임'],
     net: ['자동', '자동', set],
     'in+out': [set, set, '계산됨'],
     'in+net': [set, '계산됨', set],
@@ -186,14 +187,19 @@ export function quickOuts(d, goal, recentOuts) {
   return list.slice(0, 4).sort();
 }
 
-/** ±1시간 칩 라벨 (퇴근 정한 날은 출근이 움직임) */
+/**
+ * ±1시간 칩: 항상 퇴근이 움직이게 (퇴근을 정한 날은 퇴근을 옮김 — 출근이 시간대 밖으로 밀리지 않게).
+ * 근무 시간대(마지노선·출근 시작)를 벗어나면 warn
+ */
 export function hourChip(d, pin, r, delta, ctx) {
-  if (pin?.in != null && pin?.out != null) return null;
-  const t = tryPin(d, pin, 'net', r.net + delta, ctx);
+  const { rules, goal } = ctx;
+  const t = pin?.out != null ? tryPin(d, pin, 'out', r.out + delta, ctx) : tryPin(d, pin, 'net', r.net + delta, ctx);
   const sign = delta > 0 ? '+1시간' : '−1시간';
   if (t.blocked) return { label: `${sign}`, blocked: t.blocked };
-  if (pin?.out != null) return { label: `${sign} → 출근 ${clock(t.r.in)}`, apply: t };
-  return { label: `${sign} → 퇴근 ${clock(t.r.out)}`, apply: t };
+  const end = goalEndOf(d, rules, goal);
+  const start = Math.max(toMin(goal.startIn || rules.planDefaultIn), toMin(rules.recognizeFrom));
+  const warn = t.r.out > end ? `마지노선 ${clock(end)} 넘음` : t.r.in < start ? `${clock(start)}보다 이른 출근` : null;
+  return { label: `${sign} → 퇴근 ${clock(t.r.out)}`, apply: t, warn };
 }
 
 /** 일괄 적용 결과 미리 계산 → { pins, blocked:[{key, why}], delta } */
@@ -261,8 +267,11 @@ export function buildSuggestion(sug, ctx) {
       const latest = Math.max(...sp.changes.map((c) => resolveDay(summary.days.find((d) => d.key === c.key), pins[c.key], rules, goal, c.to).out));
       detail = `${mode === 'week' ? '그 주 ' : '자동 '}${n}일에 ${dur(per)}씩 ${sp.absorbed > 0 ? '늘려요' : '줄여요'} · 가장 늦은 퇴근 ${clock(latest)}`;
     }
-    const warn = sp.leftover && Math.abs(sp.leftover) >= 10 ? `${dur(Math.abs(sp.absorbed))}만 채울 수 있어요` : null;
-    return { mode, title, detail: warn && !n ? detail : detail, warn, spread: sp, disabled: !n };
+    const warn = sp.leftover && Math.abs(sp.leftover) >= 10 ? `${dur(Math.abs(sp.absorbed))}만 맞출 수 있어요` : null;
+    let short = '바꿀 수 있는 날이 없어요';
+    if (n && mode === 'near') short = `${sp.changes.slice(0, 2).map((c) => `${md(c.key)} ${signed(c.to - c.from)}`).join(', ')}${n > 2 ? ` 외 ${n - 2}일` : ''}`;
+    else if (n) short = `${mode === 'week' ? '그 주' : '남은'} ${n}일 ${signed(Math.sign(sp.absorbed) * (Math.round(Math.abs(sp.absorbed) / n / 10) * 10 || 10))}씩`;
+    return { mode, title, detail, short, warn, spread: sp, disabled: !n };
   };
   res.options.push(mk('even', -drift, '남은 날 고르게'));
   res.options.push(mk('near', -drift, '내일부터 차례로'));

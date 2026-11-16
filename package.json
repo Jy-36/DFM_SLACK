@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "test:engine": "node scripts/engine-check.mjs",
     "test:goal": "node scripts/goal-check.mjs",
+    "test:model": "node scripts/model-check.mjs",
     "test:mto": "node scripts/mto-check.mjs"
   },
   "dependencies": {

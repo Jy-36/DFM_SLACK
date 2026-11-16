@@ -1,7 +1,8 @@
 // WorkTime: DFM Slack 안의 탭 하나. 요약(휴대폰 크기)·확장 화면 전환은 셸이 정한 mode를 따른다.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from './lib/store.js';
-import { planSummary } from './lib/goal.js';
+import { planSummary, autoReflow, pinViolations } from './lib/goal.js';
+import { signed, md, dur } from './pages/planner/format.js';
 import { fmtClock, minutesOfDay, ymd } from './lib/time.js';
 import { BrandMark, Icon, Pill } from '../../shared/ui.jsx';
 import Mini from './pages/Mini.jsx';
@@ -83,6 +84,37 @@ export default function WorkTime({ mode, setMode, widget, setWidget }) {
   useEffect(() => {
     dispatch({ type: 'plan/prunePast', today: todayKey });
   }, [todayKey, dispatch]);
+
+  // 자동 날 다시 맞추기: 기록·날짜·설정이 바뀌면 (사용자가 직접 바꾼 건 근무 계획 화면이 처리) — GUIDE §6.6
+  const prevRef = useRef(null);
+  useEffect(() => {
+    const prev = prevRef.current;
+    if (prev && prev.records === state.records && prev.rules === state.rules && prev.todayKey === todayKey) return; // StrictMode 두 번 실행
+    prevRef.current = { records: state.records, rules: state.rules, todayKey };
+    const r = autoReflow(summary, state.rules, state.plans, state.planPins, state.planGoal);
+    const rulesChanged = prev && prev.rules !== state.rules;
+    const extra = [];
+    if (rulesChanged) {
+      const bad = pinViolations(summary, state.rules, state.planPins, state.planGoal);
+      if (bad.length) extra.push(`설정이 바뀌어 직접 정한 ${bad.length}일이 인정 시간대를 벗어났어요 (주황 표시) — 그날을 고쳐 주세요`);
+    }
+    if (!r) {
+      for (const t of extra) dispatch({ type: 'plan/notice', text: t });
+      return;
+    }
+    if (r.first) {
+      dispatch({ type: 'plan/reflow', first: true, plans: r.plans });
+      return;
+    }
+    const why = !prev ? '목표에 맞게' : rulesChanged ? '설정이 바뀌어' : prev.todayKey !== todayKey ? '날짜가 넘어가' : '기록이 바뀌어';
+    const n = r.changes.length;
+    const per = Math.round(r.changes.reduce((s, c) => s + (c.to - c.from), 0) / n / 10) * 10;
+    const keep = r.keep.length ? ` · ${md(r.keep[0])}은 그대로` : '';
+    const left = Math.abs(r.leftover) >= 10 ? ` · 목표와 ${dur(Math.abs(r.leftover))} 차이는 남음` : '';
+    dispatch({ type: 'plan/reflow', plans: r.plans, text: `${why} 남은 ${n}일을 ${per ? `${signed(per)}씩` : '조금씩'} 맞췄어요${keep}${left}`, extra });
+    // summary 는 records·rules·todayKey 에서 같이 바뀐다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.records, state.rules, todayKey]);
 
   const go = (next, nextView) => {
     if (nextView) setView(nextView);

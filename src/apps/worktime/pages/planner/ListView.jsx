@@ -1,13 +1,12 @@
 // List: 표에서 바로 고치기 + 오른쪽 서랍 (GUIDE-ui-window §4, SPEC-list-v2)
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { isFixedPin, monthDrift } from '../../lib/goal.js';
+import { isFixedPin } from '../../lib/goal.js';
 import { LEAVE_ORDER } from '../../lib/rules.js';
 import { toMin, weekKeyOf, parseYmd } from '../../lib/time.js';
-import { Kbd, Tag, TimeCell, Stepper } from './ui.jsx';
+import { Tag, TimeCell, Stepper } from './ui.jsx';
 import { DayPinEditor } from './DayPanel.jsx';
-import { SuggestBox } from './Suggest.jsx';
 import { tryPin, bulkResult } from './model.js';
-import { clock, dur, signed, md, mdw, gapText } from './format.js';
+import { clock, dur, signed, md, mdw } from './format.js';
 import { useGoalLevel } from './CalendarView.jsx';
 import { goalTitle } from './model.js';
 
@@ -20,7 +19,7 @@ const readPast = () => {
   }
 };
 
-function MonthCard({ summary, drift, isCurrent, rules }) {
+function MonthCard({ summary }) {
   const max = Math.max(summary.possible, summary.projected) * 1.02 || 1;
   const pct = (m) => `${Math.max(0, Math.min(100, (m / max) * 100))}%`;
   const done = summary.doneReq;
@@ -46,18 +45,6 @@ function MonthCard({ summary, drift, isCurrent, rules }) {
           필수 {Math.round(summary.required / 60)} | 최대 {Math.round(summary.possible / 60)}
         </span>
       </span>
-      {isCurrent &&
-        (Math.abs(drift) > 10 ? (
-          <div className="pl2-goalbox is-warn">
-            <span>목표까지</span>
-            <b>{gapText(drift)}</b>
-          </div>
-        ) : (
-          <div className="pl2-goalbox">
-            <span>목표</span>
-            <b>✓ 맞음</b>
-          </div>
-        ))}
     </div>
   );
 }
@@ -212,12 +199,11 @@ function Row({ v, ctx, selected, onToggle, applyPin, focusRow, idx, expanded, se
 }
 
 export default function ListView(p) {
-  const { views, summary, sel, select, setSel, ctx, listNarrow, suggestion, sug, hover, isCurrent, rules, goal, go, selectedViews, bulk, setBulk } = p;
+  const { views, summary, sel, select, setSel, ctx, listNarrow, hover, isCurrent, rules, goal, go, selectedViews, bulk, setBulk } = p;
   const [pastOpen, setPastOpenRaw] = useState(readPast);
   const [expanded, setExpanded] = useState(null);
   const [folded, setFolded] = useState({});
   const lv = useGoalLevel(summary, rules, ctx.plans, ctx.pins, goal);
-  const drift = isCurrent ? monthDrift(summary, rules, goal) : 0;
   const ctx2 = useMemo(() => ({ ...ctx, applyLeave: p.applyLeave }), [ctx, p.applyLeave]);
 
   const setPastOpen = (v) => {
@@ -270,7 +256,6 @@ export default function ListView(p) {
     else el.focus();
   };
 
-  const showSugInDrawer = !listNarrow && suggestion && sug?.panelKey;
   let rowIdx = 0;
   const res = selecting ? bulkResult(selectedViews.filter((x) => x.r), bulk, ctx) : null;
   const anyDraft = ['in', 'out', 'net'].some((f) => bulk[f] != null) || bulk.auto;
@@ -421,45 +406,16 @@ export default function ListView(p) {
             </Fragment>
           );
         })}
-
-        <div className="pl2-keys pl2-keys--list">
-          <span>
-            <Kbd>↑</Kbd> <Kbd>↓</Kbd> 줄 이동
-          </span>
-          <span>
-            <Kbd>Tab</Kbd> 출근 → 퇴근 → 실근무
-          </span>
-          <span>
-            <Kbd>Enter</Kbd> 고치기 · <Kbd>Esc</Kbd> 취소
-          </span>
-          <span>
-            <Kbd>Space</Kbd> 줄 선택
-          </span>
-          <span>
-            <Kbd>Del</Kbd> 자동으로
-          </span>
-        </div>
       </section>
 
       {!listNarrow && (
         <aside className="pl2-drawer">
-          <MonthCard summary={summary} drift={drift} isCurrent={isCurrent} rules={rules} />
-          {showSugInDrawer ? (
-            <div className="pl2-card pl2-sugcard">
-              <div className="pl2-sugcard-h">
-                <b>{sug.label}</b>
-                <span className="pl2-sp" />
-                <span className="pl2-lbl">
-                  <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>
-                </span>
-              </div>
-              <SuggestBox suggestion={suggestion} onApply={p.applySpread} onDismiss={p.dismissSug} onHover={p.setHover} lastMode={p.lastMode} />
-            </div>
-          ) : selecting ? (
+          <MonthCard summary={summary} />
+          {selecting ? (
             <div className="pl2-card pl2-sidecard">
               <b>{anyDraft ? '이렇게 바꾸면' : '여러 날 선택'}</b>
               <span className="pl2-t2">{anyDraft && res ? `합계 ${signed(res.delta)}${res.blocked.length ? ` · ${res.blocked.length}일은 못 바꿈` : ''}` : '위 막대에서 출근·퇴근·실근무·휴가를 골라 한 번에 바꿔요.'}</span>
-              <span className="pl2-hint">[적용]하면 달라진 양을 어디서 채울지 물어봐요. 선택하는 동안 줄 안의 칸은 잠시 멈춰요.</span>
+              <span className="pl2-hint">[적용]하면 달라진 양은 남은 자동 날에서 맞춰요. 선택하는 동안 줄 안의 칸은 잠시 멈춰요.</span>
             </div>
           ) : (
             <div className="pl2-card pl2-sidecard">
@@ -478,7 +434,7 @@ export default function ListView(p) {
                 <span>계획한 휴가</span>
                 <b>{rest.filter((v) => v.state === 'leavePlan').length}일</b>
               </div>
-              <span className="pl2-hint">한 날을 바꾸면 여기서 남은 날에 어떻게 나눌지 물어봐요.</span>
+              <span className="pl2-hint">한 날을 바꾸면 남은 자동 날이 바로 맞춰지고, 아래 알림에서 방식을 바꾸거나 되돌릴 수 있어요.</span>
             </div>
           )}
         </aside>

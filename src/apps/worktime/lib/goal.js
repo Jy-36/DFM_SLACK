@@ -343,7 +343,8 @@ export function describePlan(summary, rules, goal, pins, r) {
   if (goal.target === 'max') level = 'max';
   else if (!r.feasible) level = 'fail';
   else if (avgOut >= TIGHT_OUT || rows.some((x) => x.net >= TIGHT_NET)) level = 'tight';
-  return { rows, days: rows.length, avgNet, avgOut, latestOut, reached: r.reached, ot, level, feasible: r.feasible, capped: r.capped };
+  const gap = r.wanted === Infinity || r.feasible ? 0 : Math.max(0, r.wanted - r.reached);
+  return { rows, days: rows.length, avgNet, avgOut, latestOut, reached: r.reached, ot, level, feasible: r.feasible, capped: r.capped, gap };
 }
 
 /** 목표 선택지 전체 미리보기 → { header, options: { required|ot0|ot14|max|custom } } */
@@ -424,6 +425,49 @@ export function spreadDelta(summary, rules, plans = {}, pins = {}, goal = DEFAUL
 }
 
 // ─────────────────────────────────────────────────────────────
+// 자동 날 다시 맞추기 (v3.3 · GUIDE-plan-mechanism §6.6)
+// ─────────────────────────────────────────────────────────────
+
+/** 다시 맞출 때 건드리지 않는 날: 오늘 + 다음 근무일 (이미 알려 줬을 수 있는 날) */
+export function protectedKeysOf(summary, rules) {
+  const next = summary.upcoming.find((d) => !d.isToday && d.key > summary.todayKey && capacityOf(d, rules) > 0);
+  return next ? [next.key] : [];
+}
+
+/**
+ * 기록 동기화 · 날짜 넘어감 · 설정 변경으로 생긴 목표 차이를 자동 날에 고르게 반영한다.
+ * 사용자가 직접 바꾼 경우는 화면이 따로 처리한다 (§6.1). 자동 값이 하나도 없으면 처음 채우기.
+ * → null (바꿀 것 없음) | { first, plans, changes, drift, keep, leftover }
+ */
+export function autoReflow(summary, rules, plans = {}, pins = {}, goal = DEFAULT_GOAL) {
+  const autos = autoDaysOf(summary, rules, pins);
+  if (!autos.length) return null;
+  if (autos.every((d) => plans[d.key] == null)) {
+    const r = distributeByGoal(summary, rules, plans, pins, goal, null, true);
+    return { first: true, plans: r.plans, changes: [], drift: 0, keep: [], leftover: 0 };
+  }
+  const drift = monthDrift(summary, rules, goal);
+  if (Math.abs(drift) < 10) return null;
+  const keep = protectedKeysOf(summary, rules);
+  const sp = spreadDelta(summary, rules, plans, pins, goal, { amount: -drift, mode: 'even', exclude: keep });
+  if (!sp.changes.length) return null;
+  return { first: false, plans: sp.plans, changes: sp.changes, drift, keep, leftover: sp.leftover };
+}
+
+/** 직접 정한 날 중 지금 설정(인정 시간대 등)과 안 맞는 날 → [{ key, why }] */
+export function pinViolations(summary, rules, pins = {}, goal = DEFAULT_GOAL) {
+  const P = summary.effPlans || {};
+  const out = [];
+  for (const d of summary.upcoming) {
+    const pin = pins[d.key];
+    if (!pin || d.isToday) continue;
+    const why = checkResolved(resolveDay(d, pin, rules, goal, P[d.key]), rules);
+    if (why) out.push({ key: d.key, why });
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 오늘
 // ─────────────────────────────────────────────────────────────
 
@@ -480,9 +524,11 @@ export function migrateV32(state, todayKey) {
   }
   for (const k of Object.keys(planPins)) if (planPins[k].in && planPins[k].out && planPins[k].net != null) delete planPins[k].net; // 최대 두 개
   let moved = 0;
+  const backup = {};
   for (const [k, rec] of Object.entries(state.records || {})) {
     if (k < todayKey || !rec) continue;
     if (rec.edited && rec.source !== 'portal' && rec.leave && !rec.in && !rec.out) {
+      backup[k] = rec; // 0.23 으로 되돌릴 때 쓰는 원본 (planV32Backup)
       planLeaves[k] = { leave: rec.leave, ...(rec.leaveMin != null ? { leaveMin: rec.leaveMin } : {}) };
       const rest = { ...rec };
       delete rest.leave;
@@ -493,7 +539,7 @@ export function migrateV32(state, todayKey) {
       moved += 1;
     }
   }
-  return { planPins, planLeaves, records, moved };
+  return { planPins, planLeaves, records, moved, backup };
 }
 
 /** key < todayKey 인 항목을 뺀 사본 */

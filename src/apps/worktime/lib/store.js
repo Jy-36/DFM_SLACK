@@ -53,12 +53,14 @@ function initialState() {
     planSpreadMode: saved?.planSpreadMode || 'even',
     planV32Migrated: !!saved?.planV32Migrated,
     planMigratedLeaves: saved?.planMigratedLeaves || 0,
+    planV32Backup: saved?.planV32Backup || null, // 이전 때 옮긴 records 원본 (0.23 으로 되돌릴 때 복구용)
     planHistory: [],
     planNotices: [],
   };
   if (!base.planV32Migrated) {
     const m = migrateV32(base, todayKey);
     Object.assign(base, { planPins: m.planPins, planLeaves: m.planLeaves, records: m.records, planV32Migrated: true, planMigratedLeaves: m.moved });
+    if (m.moved) base.planV32Backup = { at: new Date().toISOString(), records: m.backup };
     if (m.moved) console.info(`[근무 계획] 계획 화면 휴가 ${m.moved}건을 planLeaves 로 옮겼습니다`);
   }
   return pruneState(base, todayKey);
@@ -133,7 +135,7 @@ function reducer(state, action) {
         if (pl) {
           if (pl.leave !== rec.leave) {
             const [, mm, dd] = key.split('-');
-            planNotices.push(`${Number(mm)}/${Number(dd)} 계획 휴가 대신 사이트 기록(${rec.leave ? '근태' : '근무'})을 반영했어요`);
+            planNotices.push({ text: `${Number(mm)}/${Number(dd)} 계획 휴가 대신 사이트 기록(${rec.leave ? '근태' : '근무'})을 반영했어요` });
           }
           delete planLeaves[key];
         }
@@ -241,9 +243,21 @@ function reducer(state, action) {
       return { ...h, planLeaves, planPins };
     }
     case 'plan/applySpread': {
-      const h = withHistory(state, action.label || '나머지 날 맞춤');
-      return { ...h, plans: { ...state.plans, ...action.plans } };
+      // history:false = 바로 앞 편집(pin 등)과 한 번에 되돌림. base = 이 plans 위에 덮어씀 (방식 바꾸기)
+      const h = action.history === false ? state : withHistory(state, action.label || '나머지 날 맞춤');
+      return { ...h, plans: { ...(action.base || state.plans), ...action.plans } };
     }
+    case 'plan/reflow': {
+      // 기록·날짜·설정 변화로 생긴 차이를 자동 날에 반영 (GUIDE §6.6). first = 처음 채우기 (기록·알림 없음)
+      if (action.first) return { ...state, plans: { ...state.plans, ...action.plans } };
+      const h = withHistory(state, '기록 반영');
+      const notices = [...state.planNotices];
+      if (action.text) notices.push({ text: action.text, undoAt: h.planHistory.length });
+      for (const t of action.extra || []) notices.push({ text: t });
+      return { ...h, plans: { ...state.plans, ...action.plans }, planNotices: notices };
+    }
+    case 'plan/notice':
+      return { ...state, planNotices: [...state.planNotices, { text: action.text }] };
     case 'plan/fill': {
       // 조건대로 채우기 · 처음부터 다시 짜기 · 처음 열 때: plans 만 바꿈 (출근은 저장하지 않음)
       const h = action.history === false ? state : withHistory(state, action.label || '조건대로 채움');
