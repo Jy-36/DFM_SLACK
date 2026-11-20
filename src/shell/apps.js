@@ -4,8 +4,8 @@ import Mto from '../apps/mto/Mto.jsx';
 import Techmap from '../apps/techmap/Techmap.jsx';
 import OsChecker from '../apps/oschecker/OsChecker.jsx';
 
-// disabled: true 인 앱은 탭 목록 · + 메뉴에서 빠진다 (코드는 그대로, 다시 켜려면 줄을 지우면 됨)
-const ALL_APPS = [
+// disabled: true 인 앱은 탭이 회색으로 보이기만 하고 고를 수 없다 (코드는 그대로, 다시 켜려면 줄을 지우면 됨)
+export const ALL_APPS = [
   {
     id: 'worktime',
     name: 'WorkTime',
@@ -39,6 +39,7 @@ const ALL_APPS = [
   },
 ];
 
+// APPS = 켜져 있는 앱만 (열기 · 선택 대상)
 export const APPS = ALL_APPS.filter((a) => !a.disabled);
 
 export const appById = (id) => APPS.find((a) => a.id === id) || null;

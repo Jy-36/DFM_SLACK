@@ -1010,3 +1010,9 @@ html.tauri:not([data-mode='widget']) .shell {
 .app:not(.nav-mini) .brand { padding-right: 0; gap: 8px; }
 .app:not(.nav-mini) .brand > .brand-mark { width: 32px; height: 32px; border-radius: 10px; }
 .app:not(.nav-mini) .brand .brand-text .brand-name { font-size: 15px; }
+
+/* 비활성 앱: 탭은 보이지만 고를 수 없음 */
+.sb-tab.is-disabled, .sb-tab.is-disabled:hover { opacity: 0.45; cursor: not-allowed; background: none; color: var(--muted); }
+.add-item.is-disabled { opacity: 0.55; }
+.add-item.is-disabled:hover { background: none; }
+.add-item.is-disabled .chip { cursor: not-allowed; }

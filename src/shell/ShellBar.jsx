@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isTauri } from '../shared/platform.js';
 import { Icon, ThemeCycle } from '../shared/ui.jsx';
 import { DfmLogo } from '../shared/Logo.jsx';
-import { APPS, appById } from './apps.js';
+import { ALL_APPS } from './apps.js';
 import { EDITION } from '../shared/edition.js';
 
 async function win(action) {
@@ -47,8 +47,20 @@ function AddMenu({ tabs, addTab, closeTab, onClose }) {
   return (
     <div className="add-menu" ref={ref} role="dialog" aria-label="앱 추가">
       <div className="add-menu-head">앱 추가</div>
-      {APPS.map((app) => {
+      {ALL_APPS.map((app) => {
         const added = tabs.includes(app.id);
+        if (app.disabled) {
+          return (
+            <div className="add-item is-disabled" key={app.id} title="이번 Prototype에서는 비활성화">
+              <span className="add-icon"><Icon name={app.icon} size={16} /></span>
+              <span className="add-text">
+                <strong>{app.name}</strong>
+                <span>{app.desc}</span>
+              </span>
+              <button type="button" className="chip" disabled>비활성</button>
+            </div>
+          );
+        }
         return (
           <div className="add-item" key={app.id}>
             <span className="add-icon"><Icon name={app.icon} size={16} /></span>
@@ -87,9 +99,17 @@ export default function ShellBar({ tabs, active, setActive, fresh = [], addTab, 
       </div>
 
       <div className="sb-tabs" role="tablist" aria-label="앱 탭" data-tauri-drag-region>
-        {tabs.map((id) => {
-          const app = appById(id);
-          if (!app) return null;
+        {ALL_APPS.map((app) => {
+          const id = app.id;
+          if (app.disabled) {
+            return (
+              <button key={id} type="button" role="tab" aria-selected={false} aria-disabled="true" disabled className="sb-tab is-disabled" title={`${app.name} — 이번 Prototype에서는 비활성화`}>
+                <Icon name={app.icon} size={14} />
+                {app.name}
+              </button>
+            );
+          }
+          if (!tabs.includes(id)) return null;
           return (
             <button
               key={id}

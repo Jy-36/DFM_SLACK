@@ -19,8 +19,8 @@ const read = () => {
 };
 const TONE = { match: 'good', diff: 'bad', bad: 'bad', onlyA: 'neutral', onlyB: 'neutral' };
 const FILTERS = [
-  ['issue', '확인 필요'],
-  ['all', '전체'],
+  ['issue', 'To Check'],
+  ['all', 'All'],
   ['diff', 'Error'],
   ['onlyA', 'Layer Info Only'],
   ['onlyB', 'DWR Only'],
@@ -117,17 +117,17 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
   const options = (
     <div className="osc-opts">
       <label className="osc-opt">
-        <span>DWR 배율</span>
-        <input className="input num" type="number" step="0.001" min="0" value={s.opt.shrink} onChange={(e) => setOpt({ shrink: Number(e.target.value) || 0 })} aria-label="DWR Chip Size 배율" />
+        <span>Shrink Factor</span>
+        <input className="input num" type="number" step="0.001" min="0" value={s.opt.shrink} onChange={(e) => setOpt({ shrink: Number(e.target.value) || 0 })} aria-label="Shrink Factor" />
       </label>
-      <span className="small muted">이름은 그대로(대소문자 구분), Size는 오차 없이 같아야 Pass · 비교 제외: {EXCLUDE.join(' · ')}</span>
+      <span className="small muted">비교 제외: {EXCLUDE.join(' · ')}</span>
     </div>
   );
 
   const summary = (
-    <div className="osc-sum" role="group" aria-label="비교 결과 요약">
+    <div className="osc-sum" role="group" aria-label="Result summary">
       <button type="button" className={`osc-sum-item ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>
-        <span className="label">비교</span>
+        <span className="label">Compared</span>
         <b className="num">{res.total}</b>
         <span className="osc-sum-foot">{res.excluded.length ? `제외 ${res.excluded.join(' · ')}` : `제외 대상 없음`}</span>
       </button>
@@ -152,7 +152,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
       <table className="data-table osc-table">
         <thead>
           <tr>
-            <th>결과</th>
+            <th>Result</th>
             <th>Structure</th>
             <th className="r">Layer Info · UR X × UR Y</th>
             {!compact && <th className="r">DWR · Chip Size</th>}
@@ -227,9 +227,9 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
   const verdict = has && (
     <div className={`osc-verdict ${issues ? 'bad' : 'good'}`} role="status">
       {issues ? (
-        <><b>{issues}건 확인 필요</b> · Pass {res.counts.match} / 전체 {res.total}{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
+        <><b>{issues} To Check</b> · Pass {res.counts.match} / All {res.total}{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
       ) : (
-        <><Icon name="check" size={16} /> <b>모두 Pass</b> · {res.total}건{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
+        <><Icon name="check" size={16} /> <b>All Pass</b> · {res.total}{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
       )}
     </div>
   );
@@ -287,7 +287,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           {has ? (
             <section className="panel">
               <h2>
-                <span>비교 결과</span>
+                <span>Result</span>
                 {verdict}
               </h2>
               {summary}
@@ -387,13 +387,13 @@ function Widget({ res, setMode, widget, setWidget }) {
       </div>
       <div className="wg-main" data-tauri-drag-region>
         <div className="wg-clock-wrap" data-tauri-drag-region>
-          <span className="wg-label">확인 필요</span>
+          <span className="wg-label">To Check</span>
           <b className="wg-clock num">{res.total ? issues : '-'}</b>
         </div>
         {res.total > 0 && (
           <div className="wg-side">
             <span className="num"><small>Pass</small> {res.counts.match}</span>
-            <span className="num"><small>전체</small> {res.total}</span>
+            <span className="num"><small>All</small> {res.total}</span>
           </div>
         )}
       </div>
