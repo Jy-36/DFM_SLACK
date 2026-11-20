@@ -34,7 +34,10 @@ function initialTabs() {
   const tabs = (saved || all).filter((id) => appById(id));
   const known = seen || (saved ? LEGACY_APPS : all);
   const added = all.filter((id) => !known.includes(id) && !tabs.includes(id));
-  return { tabs: [...tabs, ...added], added };
+  const next = [...tabs, ...added];
+  // 남은 탭이 하나도 없으면(예: 쓰던 앱이 비활성화됨) 켜져 있는 앱을 모두 연다
+  if (!next.length) return { tabs: all, added: [] };
+  return { tabs: next, added };
 }
 
 export default function Shell() {
@@ -48,7 +51,7 @@ export default function Shell() {
   const [tabs, setTabs] = useState(init.tabs);
   const [fresh, setFresh] = useState(init.added);
   const [active, setActive] = useState(() => {
-    const a = read(ACTIVE_KEY, 'worktime');
+    const a = read(ACTIVE_KEY, APPS[0]?.id);
     return appById(a) ? a : null;
   });
 

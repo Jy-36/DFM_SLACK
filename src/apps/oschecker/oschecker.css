@@ -77,3 +77,5 @@
   .osc-inputs { grid-template-columns: minmax(0, 1fr); }
   .osc-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.osc-desc { margin: 6px 0 0; padding-left: 18px; color: var(--muted); display: grid; gap: 2px; font-size: 13px; }
+.osc-desc b { color: var(--fg); font-weight: 600; }

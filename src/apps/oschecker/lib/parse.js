@@ -237,7 +237,7 @@ export function compare(aItems, bItems) {
 
 export const A_NAME = 'Layer Information';
 export const B_NAME = 'DWR';
-export const STATUS_LABEL = { match: '일치', diff: '불일치', bad: '숫자 못 읽음', onlyA: `${A_NAME}에만`, onlyB: `${B_NAME}에만` };
+export const STATUS_LABEL = { match: 'Pass', diff: 'Error', bad: 'Error · 숫자 못 읽음', onlyA: 'Layer Info Only', onlyB: 'DWR Only' };
 
 // 소수점 끝 0 정리 (최대 6자리)
 export function fmt(n, d = 6) {

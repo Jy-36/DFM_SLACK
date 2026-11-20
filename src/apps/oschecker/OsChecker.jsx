@@ -5,10 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon, Pill } from '../../shared/ui.jsx';
 import { DfmLogo } from '../../shared/Logo.jsx';
 import { isTauri } from '../../shared/platform.js';
-import { parseA, parseB, compare, resultTsv, fmt, fmtSize, fmtDelta, STATUS_LABEL, DEFAULTS, EXCLUDE, A_NAME, B_NAME, SAMPLE_A, SAMPLE_B, A_FIELDS, B_FIELDS } from './lib/parse.js';
+import { parseA, parseB, compare, resultTsv, fmt, fmtSize, fmtDelta, STATUS_LABEL, DEFAULTS, EXCLUDE, A_NAME, B_NAME, A_FIELDS, B_FIELDS } from './lib/parse.js';
 import './oschecker.css';
 
-export const OSCHECKER_VERSION = '0.2.0';
+export const OSCHECKER_VERSION = '0.3.0';
 const KEY = 'oschecker.state';
 const read = () => {
   try {
@@ -19,12 +19,12 @@ const read = () => {
 };
 const TONE = { match: 'good', diff: 'bad', bad: 'bad', onlyA: 'neutral', onlyB: 'neutral' };
 const FILTERS = [
-  ['issue', '문제만'],
+  ['issue', '확인 필요'],
   ['all', '전체'],
-  ['diff', '불일치'],
-  ['onlyA', 'Layer Info에만'],
-  ['onlyB', 'DWR에만'],
-  ['match', '일치'],
+  ['diff', 'Error'],
+  ['onlyA', 'Layer Info Only'],
+  ['onlyB', 'DWR Only'],
+  ['match', 'Pass'],
 ];
 
 async function copyText(text) {
@@ -120,7 +120,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
         <span>DWR 배율</span>
         <input className="input num" type="number" step="0.001" min="0" value={s.opt.shrink} onChange={(e) => setOpt({ shrink: Number(e.target.value) || 0 })} aria-label="DWR Chip Size 배율" />
       </label>
-      <span className="small muted">이름은 그대로(대소문자 구분), Size는 오차 없이 같아야 일치 · 비교 제외: {EXCLUDE.join(' · ')}</span>
+      <span className="small muted">이름은 그대로(대소문자 구분), Size는 오차 없이 같아야 Pass · 비교 제외: {EXCLUDE.join(' · ')}</span>
     </div>
   );
 
@@ -132,15 +132,15 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
         <span className="osc-sum-foot">{res.excluded.length ? `제외 ${res.excluded.join(' · ')}` : `제외 대상 없음`}</span>
       </button>
       <button type="button" className={`osc-sum-item ${filter === 'match' ? 'on' : ''}`} onClick={() => setFilter('match')}>
-        <span className="label">일치</span>
+        <span className="label">Pass</span>
         <b className="num tone-good">{res.counts.match}</b>
       </button>
       <button type="button" className={`osc-sum-item ${filter === 'diff' ? 'on' : ''}`} onClick={() => setFilter('diff')}>
-        <span className="label">불일치</span>
+        <span className="label">Error</span>
         <b className={`num ${res.counts.diff + res.counts.bad ? 'tone-bad' : ''}`}>{res.counts.diff + res.counts.bad}</b>
       </button>
       <button type="button" className={`osc-sum-item ${filter === 'onlyA' || filter === 'onlyB' ? 'on' : ''}`} onClick={() => setFilter(res.counts.onlyA ? 'onlyA' : 'onlyB')}>
-        <span className="label">한쪽만</span>
+        <span className="label" title="한쪽에만 있어 짝이 없는 Structure">Unmatched</span>
         <b className="num">{res.counts.onlyA + res.counts.onlyB}</b>
         <span className="osc-sum-foot">Layer Info {res.counts.onlyA} · DWR {res.counts.onlyB}</span>
       </button>
@@ -195,7 +195,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           })}
         </tbody>
       </table>
-      {!rows.length && <p className="empty osc-empty">{res.total ? (filter === 'issue' ? '문제 없음 — 모든 Structure의 Size가 같아요' : '해당하는 항목이 없어요') : res.excluded.length ? `비교할 Structure가 없어요 (제외: ${res.excluded.join(' · ')})` : '양쪽 Text를 붙여 넣으면 바로 비교해요'}</p>}
+      {!rows.length && <p className="empty osc-empty">{res.total ? (filter === 'issue' ? '모두 Pass — 모든 Structure의 Size가 같아요' : '해당하는 항목이 없어요') : res.excluded.length ? `비교할 Structure가 없어요 (제외: ${res.excluded.join(' · ')})` : '양쪽 Text를 붙여 넣으면 바로 비교해요'}</p>}
     </div>
   );
 
@@ -218,7 +218,6 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
 
   const headBtns = (
     <div className="head-actions">
-      <button type="button" className="btn small ghost" onClick={() => set({ a: SAMPLE_A, b: SAMPLE_B })}>샘플 넣기</button>
       <button type="button" className="btn small ghost" disabled={!s.a && !s.b} onClick={() => set({ a: '', b: '' })}>
         <Icon name="trash" size={14} /> 비우기
       </button>
@@ -228,9 +227,9 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
   const verdict = has && (
     <div className={`osc-verdict ${issues ? 'bad' : 'good'}`} role="status">
       {issues ? (
-        <><b>{issues}건 확인 필요</b> · 일치 {res.counts.match} / 전체 {res.total}{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
+        <><b>{issues}건 확인 필요</b> · Pass {res.counts.match} / 전체 {res.total}{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
       ) : (
-        <><Icon name="check" size={16} /> <b>모두 일치</b> · {res.total}건{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
+        <><Icon name="check" size={16} /> <b>모두 Pass</b> · {res.total}건{res.dups ? ` · 중복 이름 ${res.dups}` : ''}</>
       )}
     </div>
   );
@@ -242,6 +241,13 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           <div className="mini-card-head">
             <h3>OS Size Checker</h3>
             {headBtns}
+          </div>
+          <div className="small muted">
+            Layer Information과 DWR Mail 표를 붙여 넣으면 Structure ↔ Struct Name 매칭하여 Size가 같은지 확인
+            <ul className="osc-desc">
+              <li><b>Layer Information 기준</b> : UR X × UR Y</li>
+              <li><b>DWR 기준</b> : Chip Size × {shrinkTxt}</li>
+            </ul>
           </div>
           {inputs}
           {options}
@@ -266,7 +272,11 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           <div className="page-head">
             <div>
               <h1>OS Size Checker</h1>
-              <p>Layer Information과 DWR을 붙여 넣으면 Structure ↔ Struct Name 으로 맞춰서 Size가 같은지 확인해요. Layer Information = UR X × UR Y, DWR = Chip Size × {shrinkTxt}.</p>
+              <p>Layer Information과 DWR Mail 표를 붙여 넣으면 Structure ↔ Struct Name 매칭하여 Size가 같은지 확인</p>
+              <ul className="osc-desc">
+                <li><b>Layer Information 기준</b> : UR X × UR Y</li>
+                <li><b>DWR 기준</b> : Chip Size × {shrinkTxt}</li>
+              </ul>
             </div>
             {headBtns}
           </div>
@@ -286,7 +296,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
             </section>
           ) : (
             <div className="banner">
-              {!pa.items.length && !pb.items.length ? 'Layer Information과 DWR 양쪽에 Text를 붙여 넣어 주세요. 처음이면 [샘플 넣기]로 모양을 확인할 수 있어요.' : !pa.items.length ? 'Layer Information을 읽지 못했어요 — 맨 왼쪽 칸에 Module · UpperRightX · Structure 같은 항목 이름이 있어야 해요.' : 'DWR을 읽지 못했어요 — Struct Name · Chip Size 머리줄을 같이 붙여 넣어 주세요.'}
+              {!pa.items.length && !pb.items.length ? 'Layer Information과 DWR 양쪽에 Text를 붙여 넣어 주세요.' : !pa.items.length ? 'Layer Information을 읽지 못했어요 — 맨 왼쪽 칸에 Module · UpperRightX · Structure 같은 항목 이름이 있어야 해요.' : 'DWR을 읽지 못했어요 — Struct Name · Chip Size 머리줄을 같이 붙여 넣어 주세요.'}
             </div>
           )}
         </div>
@@ -382,14 +392,14 @@ function Widget({ res, setMode, widget, setWidget }) {
         </div>
         {res.total > 0 && (
           <div className="wg-side">
-            <span className="num"><small>일치</small> {res.counts.match}</span>
+            <span className="num"><small>Pass</small> {res.counts.match}</span>
             <span className="num"><small>전체</small> {res.total}</span>
           </div>
         )}
       </div>
-      <div className="wg-bar" aria-label={`일치 ${Math.round(pct * 100)}%`}><i style={{ width: `${pct * 100}%` }} /></div>
+      <div className="wg-bar" aria-label={`Pass ${Math.round(pct * 100)}%`}><i style={{ width: `${pct * 100}%` }} /></div>
       <div className="wg-foot">
-        <span className="num">{res.total ? `불일치 ${res.counts.diff + res.counts.bad} · 한쪽만 ${res.counts.onlyA + res.counts.onlyB}` : 'Text를 붙여 넣어 주세요'}</span>
+        <span className="num">{res.total ? `Error ${res.counts.diff + res.counts.bad} · Unmatched ${res.counts.onlyA + res.counts.onlyB}` : 'Text를 붙여 넣어 주세요'}</span>
         <label className="wg-opacity" title="투명도">
           <Icon name="drop" size={12} />
           <input type="range" min="35" max="100" step="5" value={Math.round(widget.opacity * 100)} onChange={(e) => setWidget({ opacity: Number(e.target.value) / 100 })} aria-label="투명도" />

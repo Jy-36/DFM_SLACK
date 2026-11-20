@@ -310,7 +310,7 @@ DEMO: 2/3nm Master(M1~M11) 아래 DK SF3 · SF2, 4nm Master(이름이 다르고 
 # OS Checker
 
 탭 이름 **OS Checker** (창 제목 `DFM Slack - OS Checker`), 화면 제목 **OS Size Checker**.
-**Layer Information**과 **DWR** 두 Text를 붙여 넣으면 이름으로 짝을 맞춰 Size가 같은지 바로 보여 줍니다. 입력은 이 PC에만 저장돼 다음에 열어도 남아 있습니다.
+Layer Information과 DWR Mail 표를 붙여 넣으면 Structure ↔ Struct Name 매칭하여 Size가 같은지 확인합니다 (Layer Information 기준: UR X × UR Y, DWR 기준: Chip Size × 0.98). 입력은 이 PC에만 저장돼 다음에 열어도 남아 있습니다.
 
 | | Layer Information | DWR |
 |---|---|---|
@@ -320,9 +320,10 @@ DEMO: 2/3nm Master(M1~M11) 아래 DK SF3 · SF2, 4nm Master(이름이 다르고 
 | Size | UpperRightX × UpperRightY | (Chip X × 0.98) × (Chip Y × 0.98) |
 
 - **SCRIBE · BLIND · SC1 · OOB** Structure는 비교하지 않습니다 (요약에 제외된 이름 표시).
-- 이름은 그대로(대소문자 구분) 맞추고, Size는 **오차 없이** 같아야 일치입니다 (0.98 곱셈의 부동소수점 찌꺼기만 소수 6자리에서 정리).
+- 이름은 그대로(대소문자 구분) 맞추고, Size는 **오차 없이** 같아야 Pass입니다 (0.98 곱셈의 부동소수점 찌꺼기만 소수 6자리에서 정리).
 - 칸 구분은 탭(엑셀 복사) · 공백 2칸 이상 · 공백 한 칸 순서로 알아봅니다. Layer Information은 같은 항목 이름이 다시 나오면 새 묶음으로 봅니다. DWR은 머리줄로 열 위치를 찾으므로 열 순서가 달라도 됩니다.
 - Chip Size는 `10000 x 8000` · `10000x8000` · `10000 × 8000` · `10000*8000` 을 읽습니다.
-- 결과: **일치 · 불일치 · Layer Info에만 · DWR에만 · 숫자 못 읽음**. 가로·세로만 반대인 불일치는 `가로·세로 바뀜`, 같은 이름이 여러 번이면 `중복` 표시(첫 값으로 비교). 줄을 누르면 양쪽 원래 값.
+- 결과: **Pass · Error · Unmatched**(Layer Info Only / DWR Only). 숫자를 못 읽은 줄도 Error. 가로·세로만 반대인 Error는 `가로·세로 바뀜`, 같은 이름이 여러 번이면 `중복` 표시(첫 값으로 비교). 줄을 누르면 양쪽 원래 값.
+- 현재 Prototype(v0.42.0~)은 **OS Checker 탭만 켜져 있습니다** — WorkTime · MTO · Techmap은 `src/shell/apps.js`의 `disabled: true`로 꺼 둠(코드는 그대로).
 - DWR 배율(기본 0.98)은 화면에서 바꿀 수 있습니다. **결과 복사**: 탭 구분 표로 복사 → 엑셀에 붙여 넣기.
 - 확인: `node scripts/oschecker-check.mjs` (`npm run test:engine` 에 포함)
