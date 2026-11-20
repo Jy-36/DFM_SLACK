@@ -162,4 +162,6 @@ console.log('\n── MTO 일정 엔진 (scripts/mto-check.mjs)');
 const mto = spawnSync(process.execPath, [fileURLToPath(new URL('./mto-check.mjs', import.meta.url))], { stdio: 'inherit' });
 console.log('\n── Techmap 엔진 (scripts/techmap-check.mjs)');
 const tm = spawnSync(process.execPath, [fileURLToPath(new URL('./techmap-check.mjs', import.meta.url))], { stdio: 'inherit' });
-process.exit(fail || mto.status || tm.status ? 1 : 0);
+console.log('\n── OS Size Checker (scripts/oschecker-check.mjs)');
+const osc = spawnSync(process.execPath, [fileURLToPath(new URL('./oschecker-check.mjs', import.meta.url))], { stdio: 'inherit' });
+process.exit(fail || mto.status || tm.status || osc.status ? 1 : 0);

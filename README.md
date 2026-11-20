@@ -1,7 +1,7 @@
 # DFM Slack
 
 업무용 도구를 탭으로 모아 쓰는 Windows 데스크톱 앱입니다 (Tauri 2 + React 18).
-탭: 선택근무제 근무시간을 관리하는 **WorkTime**, Mask STEP2·MTO 일정을 계산하는 **MTO**, Site Request로 techfile·layermap·drf를 검토·수정하는 **Techmap**.
+탭: 선택근무제 근무시간을 관리하는 **WorkTime**, Mask STEP2·MTO 일정을 계산하는 **MTO**, Site Request로 techfile·layermap·drf를 검토·수정하는 **Techmap**, 두 Text의 Structure Size를 맞춰 보는 **OS Checker**.
 
 - 상단 바의 **+** 로 앱을 탭으로 추가하거나 닫습니다.
 - 처음에는 **요약 화면**(모니터 오른쪽 끝, 위아래 꽉 차게, 둥근 모서리)으로 열리고, 상단 바 버튼으로 **확장 화면**(1440×940, 모니터보다 크면 줄임)으로 바꿉니다.
@@ -21,6 +21,7 @@ src/
     worktime/     WorkTime 앱 (정산 엔진 lib/, 화면 pages/)
     mto/          MTO 일정 앱 (규칙 엔진 lib/, 화면 pages/, 간트 components/)
     techmap/      Techmap 앱 (파서·검사·패치 엔진 lib/, 화면 pages/)
+    oschecker/    OS Size Checker (붙여 넣기 파서·비교 lib/parse.js, 화면 OsChecker.jsx)
   shared/         여러 앱이 같이 쓰는 UI·테마·창 크기·공휴일 표
 src-tauri/        데스크톱 앱 (창, 사내 사이트 수집 커맨드)
 ```
@@ -305,3 +306,23 @@ VSCode 터미널 `opencode run --dir <inbox> -f site_request.txt -f context.json
 ## 확인
 `npm run test:techmap` — 엔진 · 작업공간 · 분기/Merge 88건 + Python 참조 엔진과 글자 단위 비교 (`test:engine` · CI에서도 같이).
 DEMO: 2/3nm Master(M1~M11) 아래 DK SF3 · SF2, 4nm Master(이름이 다르고 VI4 번호가 일부러 다름) 아래 SF4, 나머지 노드는 미등록. SF3 v1.0.0.0 → exp_20261015 → v1.0.0.1(exp Merge) · incr20261022 · exp_20261020(작업중).
+
+# OS Checker
+
+탭 이름 **OS Checker** (창 제목 `DFM Slack - OS Checker`), 화면 제목 **OS Size Checker**.
+두 Text를 붙여 넣으면 이름으로 짝을 맞춰 Size가 같은지 바로 보여 줍니다. 입력은 이 PC에만 저장돼 다음에 열어도 남아 있습니다.
+
+| | A · Structure 표 | B · Struct 목록 |
+|---|---|---|
+| 모양 | 줄마다 맨 왼쪽이 항목 이름, 오른쪽으로 Structure마다 값 | 머리줄 + 한 줄에 한 건 |
+| 항목 | Module · Blockcount · MaskVersion · LowerLeftX · LowerLeftY · UpperRightX · UpperRightY · Polarity · Select · Structure | No · Struct Name · DB Class · GDS File · Chip Size · Cust.Nick · GDS ID · EBEAM Prefix · Place.X · Place.Y |
+| 구분자 | Structure | Struct Name |
+| Size | UpperRightX × UpperRightY | (Chip X × 0.98) × (Chip Y × 0.98) |
+
+- 칸 구분은 탭(엑셀 복사) · 공백 2칸 이상 · 공백 한 칸 순서로 알아봅니다. A는 같은 항목 이름이 다시 나오면 새 묶음으로 봅니다(세로로 한 건씩 붙여 넣어도 됨). B는 머리줄로 열 위치를 찾으므로 열 순서가 달라도 됩니다.
+- Chip Size는 `10000 x 8000` · `10000x8000` · `10000 × 8000` · `10000*8000` 을 읽습니다.
+- 결과: **일치 · 불일치 · 가로·세로 뒤바뀜 · A에만 · B에만 · 숫자 못 읽음**, 같은 이름이 여러 번이면 `중복` 표시(첫 값으로 비교). 줄을 누르면 양쪽 원래 값.
+- 옵션: B 배율(기본 0.98) · 허용 오차(기본 0.001) · 이름 대소문자 무시 · 뒤바뀜도 일치로.
+- **결과 복사**: 탭 구분 표로 복사 → 엑셀에 붙여 넣기.
+- 확인: `node scripts/oschecker-check.mjs` (`npm run test:engine` 에 포함)
+

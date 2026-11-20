@@ -1,0 +1,79 @@
+/* OS Size Checker 탭. 공통 디자인(styles.css)을 그대로 쓰고 여기에는 이 탭에만 있는 것만. */
+.osc .mono { font-family: 'Cascadia Mono', 'D2Coding', Consolas, 'SFMono-Regular', Menlo, monospace; }
+.osc { word-break: keep-all; }
+.osc .r { text-align: right; }
+.osc .num { font-variant-numeric: tabular-nums; }
+
+/* 입력 */
+.osc-in-panel { display: grid; gap: 14px; }
+.osc-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.osc-inputs.one { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.osc-box { display: grid; gap: 6px; min-width: 0; }
+.osc-box-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.osc-box-head b { font-size: 14px; }
+.osc-box-count { margin-left: auto; }
+.osc-tag { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: var(--accent); color: var(--accent-ink); }
+.osc-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osc-text { min-height: 220px; height: 260px; resize: vertical; font-size: 12px; line-height: 1.55; tab-size: 12; white-space: pre; overflow: auto; }
+.osc-compact .osc-text { min-height: 120px; height: 140px; }
+.osc-text::placeholder { color: var(--faint); }
+.osc-warn { font-size: 12px; color: var(--warn); }
+.osc-warn ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); display: grid; gap: 2px; }
+.osc-warn .link-btn { color: var(--warn); font-size: 12px; }
+
+/* 옵션 */
+.osc-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.osc-opt { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.osc-opt .input { width: 96px; padding-block: 5px; text-align: right; }
+.osc-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--fg); cursor: pointer; }
+
+/* 결과 요약 */
+.osc-verdict { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; padding: 4px 12px; border-radius: 999px; }
+.osc-verdict.good { background: var(--good-soft); color: var(--good); }
+.osc-verdict.bad { background: var(--bad-soft); color: var(--bad); }
+.osc-sum { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px; }
+.osc-sum-item { display: grid; gap: 2px; justify-items: start; padding: 12px 16px; border: 0; border-right: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.osc-sum-item:last-child { border-right: 0; }
+.osc-sum-item:hover { background: var(--surface-2); }
+.osc-sum-item.on { background: var(--accent-soft); }
+.osc-sum-item b { font-family: var(--font-num); font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; }
+.osc-sum-foot { font-size: 11.5px; color: var(--muted); }
+.osc-compact .osc-sum { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 0; }
+.osc-compact .osc-sum-item { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.osc-compact .osc-sum-item b { font-size: 18px; }
+
+/* 도구줄 */
+.osc-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.osc-search { max-width: 240px; padding-block: 6px; }
+.osc-compact .osc-search { max-width: none; flex: 1; min-width: 120px; }
+.osc-badge { font-size: 10.5px; font-weight: 700; min-width: 18px; height: 16px; line-height: 16px; padding: 0 5px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); text-align: center; }
+
+/* 표 */
+.osc-table td, .osc-table th { padding-block: 7px; }
+.osc-row { cursor: pointer; }
+.osc-row:hover { background: var(--surface-2); }
+.osc-row.open { background: var(--accent-soft); }
+.osc-row.s-diff td:first-child, .osc-row.s-bad td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.osc-row.s-swap td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.osc-key { font-weight: 700; }
+.osc-info { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.osc-dup { margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--warn); border: 1px solid var(--warn); border-radius: 5px; padding: 0 4px; }
+.osc-empty { text-align: center; padding: 22px 0; }
+.osc-compact .osc-table { font-size: 12px; }
+.osc-compact .osc-table td, .osc-compact .osc-table th { padding: 6px 6px; }
+
+/* 원래 값 */
+.osc-detail td { background: var(--surface-2); white-space: normal; }
+.osc-raw { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 4px 0; }
+.osc-rawbox { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; display: grid; gap: 6px; }
+.osc-rawbox dl { margin: 0; display: grid; gap: 2px; }
+.osc-rawbox dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; font-size: 12px; padding: 1px 4px; border-radius: 4px; }
+.osc-rawbox dt { color: var(--muted); }
+.osc-rawbox dd { margin: 0; overflow-wrap: anywhere; }
+.osc-rawbox .hi { background: var(--accent-soft); }
+.osc-rawbox .hi dd { font-weight: 700; color: var(--accent-strong); }
+
+@media (max-width: 900px) {
+  .osc-inputs { grid-template-columns: minmax(0, 1fr); }
+  .osc-sum { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

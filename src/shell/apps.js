@@ -2,6 +2,7 @@
 import WorkTime from '../apps/worktime/WorkTime.jsx';
 import Mto from '../apps/mto/Mto.jsx';
 import Techmap from '../apps/techmap/Techmap.jsx';
+import OsChecker from '../apps/oschecker/OsChecker.jsx';
 
 export const APPS = [
   {
@@ -24,6 +25,13 @@ export const APPS = [
     desc: 'Site Request로 techfile · layermap · drf 검토 · 업데이트',
     icon: 'techmap',
     component: Techmap,
+  },
+  {
+    id: 'oschecker',
+    name: 'OS Checker',
+    desc: '두 Text를 붙여 넣어 Structure별 Size(UR X×Y ↔ Chip Size×0.98) 일치 확인',
+    icon: 'ossize',
+    component: OsChecker,
   },
 ];
 

@@ -121,6 +121,7 @@ const ICONS = {
   check: 'M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L21 7.5l-1.4-1.4z',
   trash: 'M9 3h6l1 2h4v2H4V5h4l1-2zM6 9h12l-1 12H7L6 9zm4 2v8h1.5v-8H10zm2.5 0v8H14v-8h-1.5z',
   // Techmap 탭: 세 파일(줄) + 확인 표시
+  ossize: 'M3 3h2v18H3V3zm16 0h2v18h-2V3zM7 7h10v10H7V7zm2 2v6h6V9H9zM6 1h12v1.5H6V1zm0 20.5h12V23H6v-1.5z',
   techmap: 'M4 3h11l5 5v6h-2V9h-4V5H6v14h7v2H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm4 7h6v2H8v-2zm0 4h4v2H8v-2zm6.6 3.2 1.4-1.4 1.6 1.6 3.4-3.4 1.4 1.4-4.8 4.8-3-3z',
 };
 
