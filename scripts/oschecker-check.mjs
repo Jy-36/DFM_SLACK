@@ -37,7 +37,7 @@ eq('A "Upper Right X:" 모양도 읽음', parseA('Upper Right X: 10 20\nUpperRig
 
 // B: 탭 머리줄
 const b = parseB(SAMPLE_B);
-eq('B 샘플 건수', b.items.length, 5);
+eq('B 샘플 건수 (SCRIBE 포함 6, 비교에서 제외)', b.items.length, 6);
 eq('B TOP_CHIP_A ×0.98', [fmt(b.items[0].w), fmt(b.items[0].h)], ['9800', '7840']);
 eq('B 머리줄 있음', b.headerless, false);
 
@@ -53,18 +53,17 @@ eq('B 열 순서 다름', bOrd.items.map((i) => [i.key, i.chipX, i.chipY]), [['X
 const r = compare(a.items, b.items);
 const st = Object.fromEntries(r.rows.map((x) => [x.key, x.status]));
 eq('TOP_CHIP_A 일치', st.TOP_CHIP_A, 'match');
-eq('TEG_01 일치 (4900.49 = 5000.5×0.98)', st.TEG_01, 'match');
+eq('TEG_01 일치 (4900.49 = 5000.5×0.98, 부동소수점 찌꺼기 무시)', st.TEG_01, 'match');
 eq('TOP_CHIP_B 불일치', st.TOP_CHIP_B, 'diff');
-eq('TEG_02 가로세로 뒤바뀜', st.TEG_02, 'swap');
+eq('TEG_02 가로세로 바뀜 → 불일치 + 표시', [st.TEG_02, r.rows.find((x) => x.key === 'TEG_02').swapped], ['diff', true]);
 eq('TEG_03 B에만', st.TEG_03, 'onlyB');
-eq('개수', r.counts, { match: 2, diff: 1, swap: 1, bad: 0, onlyA: 0, onlyB: 1 });
-eq('뒤바뀜 허용하면 일치', compare(a.items, b.items, { allowSwap: true }).counts.match, 3);
+eq('SCRIBE 제외', [st.SCRIBE, r.excluded], [undefined, ['SCRIBE']]);
+eq('개수', r.counts, { match: 2, diff: 2, bad: 0, onlyA: 0, onlyB: 1 });
 const diffRow = r.rows.find((x) => x.key === 'TOP_CHIP_B');
-eq('TOP_CHIP_B ΔX', fmt(diffRow.dw), fmt(12250 - 12500 * 0.98));
-eq('대소문자 무시', compare([{ key: 'abc', w: 1, h: 1, ok: true }], [{ key: 'ABC', w: 1, h: 1, ok: true }]).counts.match, 1);
-eq('대소문자 구분', compare([{ key: 'abc', w: 1, h: 1, ok: true }], [{ key: 'ABC', w: 1, h: 1, ok: true }], { ignoreCase: false }).counts.onlyA, 1);
-eq('허용 오차 0.01', compare([{ key: 'k', w: 1.005, h: 2, ok: true }], [{ key: 'k', w: 1, h: 2, ok: true }], { tol: 0.01 }).counts.match, 1);
-eq('허용 오차 0.001 이면 불일치', compare([{ key: 'k', w: 1.005, h: 2, ok: true }], [{ key: 'k', w: 1, h: 2, ok: true }]).counts.diff, 1);
+eq('TOP_CHIP_B ΔY', fmt(diffRow.dh), fmt(9310 - 9600 * 0.98));
+eq('오차 없음: 0.001 차이도 불일치', compare([{ key: 'k', w: 1.001, h: 2, ok: true }], [{ key: 'k', w: 1, h: 2, ok: true }]).counts.diff, 1);
+eq('대소문자는 다른 이름', compare([{ key: 'abc', w: 1, h: 1, ok: true }], [{ key: 'ABC', w: 1, h: 1, ok: true }]).counts.onlyA, 1);
+eq('BLIND · SC1 · OOB 제외', compare(['BLIND', 'SC1', 'OOB', 'X'].map((key) => ({ key, w: 1, h: 1, ok: true })), [{ key: 'X', w: 1, h: 1, ok: true }]).total, 1);
 eq('중복 Key 표시', compare([{ key: 'k', w: 1, h: 1, ok: true }, { key: 'k', w: 1, h: 1, ok: true }], [{ key: 'k', w: 1, h: 1, ok: true }]).dups, 1);
 eq('결과 TSV 줄 수', resultTsv(r).split('\n').length, 6);
 

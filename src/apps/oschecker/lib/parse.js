@@ -1,17 +1,18 @@
 // OS Size Checker 계산 (순수 함수 — scripts/oschecker-check.mjs 로 확인)
 //
-// A (Structure 표): 줄마다 맨 왼쪽이 항목 이름, 오른쪽으로 Structure마다 값이 한 칸씩.
+// A = Layer Information (Structure 표): 줄마다 맨 왼쪽이 항목 이름, 오른쪽으로 Structure마다 값이 한 칸씩.
 //   Module / Blockcount / MaskVersion / LowerLeftX / LowerLeftY / UpperRightX / UpperRightY / Polarity / Select / Structure
 //   구분자(Key) = Structure, Size = UpperRightX × UpperRightY
 //   같은 항목 이름이 다시 나오면 새 묶음으로 본다 (세로로 한 건씩 붙여 넣어도, 여러 묶음이어도 됨).
-// B (Struct 목록): 머리줄 + 한 줄에 한 건.
+// B = DWR (Struct 목록): 머리줄 + 한 줄에 한 건.
 //   No / Struct Name / DB Class / GDS File / Chip Size / Cust.Nick / GDS ID / EBEAM Prefix / Place.X / Place.Y
 //   구분자(Key) = Struct Name, Size = (Chip X × 0.98) × (Chip Y × 0.98)
+// SCRIBE · BLIND · SC1 · OOB Structure는 비교하지 않는다 (EXCLUDE).
 
 export const A_FIELDS = ['Module', 'Blockcount', 'MaskVersion', 'LowerLeftX', 'LowerLeftY', 'UpperRightX', 'UpperRightY', 'Polarity', 'Select', 'Structure'];
 export const B_FIELDS = ['No', 'Struct Name', 'DB Class', 'GDS File', 'Chip Size', 'Cust.Nick', 'GDS ID', 'EBEAM Prefix', 'Place.X', 'Place.Y'];
 
-export const DEFAULTS = { shrink: 0.98, tol: 0.001, ignoreCase: true, allowSwap: false };
+export const DEFAULTS = { shrink: 0.98 };
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[\s._:\-()]/g, '');
 const A_INDEX = new Map(A_FIELDS.map((f) => [norm(f), f]));
@@ -181,55 +182,65 @@ export function parseB(text, shrink = DEFAULTS.shrink) {
 }
 
 // ── 비교 ──────────────────────────────────────────────────────────────
-// status: match | swap(가로세로 뒤바뀜) | diff | onlyA | onlyB | bad(숫자를 못 읽음)
-export function compare(aItems, bItems, opt = {}) {
-  const o = { ...DEFAULTS, ...opt };
-  const k = (s) => (o.ignoreCase ? s.toUpperCase() : s);
+// 이름은 그대로(대소문자 구분) 맞추고, Size는 오차 없이 같아야 일치.
+// (0.98 곱셈의 부동소수점 찌꺼기만 지우려고 소수 6자리에서 반올림해 비교)
+// status: match | diff | onlyA | onlyB | bad(숫자를 못 읽음) · diff 중 가로·세로만 바뀐 건 swapped 표시
+export const EXCLUDE = ['SCRIBE', 'BLIND', 'SC1', 'OOB'];
+const r6 = (n) => Math.round(n * 1e6) / 1e6;
+export const isExcluded = (key) => EXCLUDE.includes(String(key).trim().toUpperCase());
+
+export function compare(aItems, bItems) {
+  const excluded = new Set();
   const group = (items) => {
     const m = new Map();
     for (const it of items) {
-      const kk = k(it.key);
-      if (!m.has(kk)) m.set(kk, []);
-      m.get(kk).push(it);
+      if (isExcluded(it.key)) {
+        excluded.add(it.key);
+        continue;
+      }
+      if (!m.has(it.key)) m.set(it.key, []);
+      m.get(it.key).push(it);
     }
     return m;
   };
   const ga = group(aItems);
   const gb = group(bItems);
   const keys = [...new Set([...ga.keys(), ...gb.keys()])];
-  const eps = o.tol + 1e-9;
   const rows = [];
   for (const kk of keys) {
     const as = ga.get(kk) || [];
     const bs = gb.get(kk) || [];
     const a = as[0] || null;
     const b = bs[0] || null;
-    const row = { key: (a || b).key, a, b, dupA: as.length, dupB: bs.length, dw: NaN, dh: NaN };
+    const row = { key: kk, a, b, dupA: as.length, dupB: bs.length, dw: NaN, dh: NaN, swapped: false };
     if (!a) row.status = 'onlyB';
     else if (!b) row.status = 'onlyA';
     else if (!a.ok || !b.ok) row.status = 'bad';
     else {
-      row.dw = a.w - b.w;
-      row.dh = a.h - b.h;
-      if (Math.abs(row.dw) <= eps && Math.abs(row.dh) <= eps) row.status = 'match';
-      else if (Math.abs(a.w - b.h) <= eps && Math.abs(a.h - b.w) <= eps) row.status = o.allowSwap ? 'match' : 'swap';
-      else row.status = 'diff';
-      if (row.status === 'match' && Math.abs(row.dw) > eps) row.swapped = true;
+      row.dw = r6(a.w - b.w);
+      row.dh = r6(a.h - b.h);
+      if (r6(a.w) === r6(b.w) && r6(a.h) === r6(b.h)) row.status = 'match';
+      else {
+        row.status = 'diff';
+        row.swapped = r6(a.w) === r6(b.h) && r6(a.h) === r6(b.w);
+      }
     }
     rows.push(row);
   }
-  const order = { diff: 0, swap: 1, bad: 2, onlyA: 3, onlyB: 4, match: 5 };
+  const order = { diff: 0, bad: 1, onlyA: 2, onlyB: 3, match: 4 };
   rows.sort((x, y) => order[x.status] - order[y.status] || x.key.localeCompare(y.key, undefined, { numeric: true }));
-  const counts = { match: 0, diff: 0, swap: 0, bad: 0, onlyA: 0, onlyB: 0 };
+  const counts = { match: 0, diff: 0, bad: 0, onlyA: 0, onlyB: 0 };
   rows.forEach((r) => counts[r.status]++);
   const dups = rows.filter((r) => r.dupA > 1 || r.dupB > 1).length;
-  return { rows, counts, dups, total: rows.length };
+  return { rows, counts, dups, total: rows.length, excluded: [...excluded] };
 }
 
-export const STATUS_LABEL = { match: '일치', diff: '불일치', swap: '가로·세로 뒤바뀜', bad: '숫자 못 읽음', onlyA: 'A에만 있음', onlyB: 'B에만 있음' };
+export const A_NAME = 'Layer Information';
+export const B_NAME = 'DWR';
+export const STATUS_LABEL = { match: '일치', diff: '불일치', bad: '숫자 못 읽음', onlyA: `${A_NAME}에만`, onlyB: `${B_NAME}에만` };
 
-// 소수점 끝 0 정리 (최대 4자리)
-export function fmt(n, d = 4) {
+// 소수점 끝 0 정리 (최대 6자리)
+export function fmt(n, d = 6) {
   if (!Number.isFinite(n)) return '-';
   const s = n.toFixed(d).replace(/\.?0+$/, '');
   return s === '-0' ? '0' : s;
@@ -238,12 +249,12 @@ export const fmtSize = (w, h) => (Number.isFinite(w) && Number.isFinite(h) ? `${
 export const fmtDelta = (n) => (!Number.isFinite(n) ? '' : Math.abs(n) < 1e-9 ? '0' : `${n > 0 ? '+' : '−'}${fmt(Math.abs(n))}`);
 
 export function resultTsv(res) {
-  const head = ['Key', '결과', 'A UR X', 'A UR Y', 'B Chip X', 'B Chip Y', 'B ×shrink X', 'B ×shrink Y', 'ΔX (A−B)', 'ΔY (A−B)', 'A Module', 'B GDS File'];
+  const head = ['Structure', '결과', 'LayerInfo UR X', 'LayerInfo UR Y', 'DWR Chip X', 'DWR Chip Y', 'DWR ×0.98 X', 'DWR ×0.98 Y', 'ΔX (LayerInfo−DWR)', 'ΔY (LayerInfo−DWR)', 'Module', 'GDS File'];
   const lines = [head.join('\t')];
   for (const r of res.rows) {
     lines.push([
       r.key,
-      STATUS_LABEL[r.status] + (r.dupA > 1 || r.dupB > 1 ? ` (중복 A${r.dupA}/B${r.dupB})` : ''),
+      STATUS_LABEL[r.status] + (r.swapped ? ' (가로·세로 바뀜)' : '') + (r.dupA > 1 || r.dupB > 1 ? ` (중복 A${r.dupA}/B${r.dupB})` : ''),
       r.a ? fmt(r.a.w) : '',
       r.a ? fmt(r.a.h) : '',
       r.b ? fmt(r.b.chipX) : '',
@@ -279,4 +290,5 @@ export const SAMPLE_B = [
   ['3', 'TOP_CHIP_B', 'MAIN', 'chip_b.gds', '12500 x 9600', 'BBB', 'G003', 'EC', '0', '0'],
   ['4', 'TEG_02', 'TEG', 'teg02.gds', '10000 x 8000', 'BBB', 'G004', 'ED', '0', '200'],
   ['5', 'TEG_03', 'TEG', 'teg03.gds', '3000 x 3000', 'BBB', 'G005', 'EE', '0', '0'],
+  ['6', 'SCRIBE', 'SCRIBE', 'scribe.gds', '80 x 80', 'BBB', 'G006', 'EF', '0', '0'],
 ].map((r) => r.join('\t')).join('\n');

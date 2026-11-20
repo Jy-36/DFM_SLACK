@@ -1,14 +1,14 @@
 // OS Size Checker: 두 Text를 붙여 넣어 같은 Structure의 Size가 같은지 확인하는 DFM Slack 탭.
-// A = Structure 표 (Size = UpperRightX × UpperRightY), B = Struct 목록 (Size = Chip X·Y × 0.98).
+// Layer Information (Size = UpperRightX × UpperRightY) ↔ DWR (Size = Chip X·Y × 0.98). SCRIBE · BLIND · SC1 · OOB 제외.
 // 계산은 lib/parse.js (순수 함수, scripts/oschecker-check.mjs로 확인).
 import { useEffect, useMemo, useState } from 'react';
 import { Icon, Pill } from '../../shared/ui.jsx';
 import { DfmLogo } from '../../shared/Logo.jsx';
 import { isTauri } from '../../shared/platform.js';
-import { parseA, parseB, compare, resultTsv, fmt, fmtSize, fmtDelta, STATUS_LABEL, DEFAULTS, SAMPLE_A, SAMPLE_B, A_FIELDS, B_FIELDS } from './lib/parse.js';
+import { parseA, parseB, compare, resultTsv, fmt, fmtSize, fmtDelta, STATUS_LABEL, DEFAULTS, EXCLUDE, A_NAME, B_NAME, SAMPLE_A, SAMPLE_B, A_FIELDS, B_FIELDS } from './lib/parse.js';
 import './oschecker.css';
 
-export const OSCHECKER_VERSION = '0.1.0';
+export const OSCHECKER_VERSION = '0.2.0';
 const KEY = 'oschecker.state';
 const read = () => {
   try {
@@ -17,14 +17,13 @@ const read = () => {
     return {};
   }
 };
-const TONE = { match: 'good', diff: 'bad', swap: 'warn', bad: 'bad', onlyA: 'neutral', onlyB: 'neutral' };
+const TONE = { match: 'good', diff: 'bad', bad: 'bad', onlyA: 'neutral', onlyB: 'neutral' };
 const FILTERS = [
   ['issue', '문제만'],
   ['all', '전체'],
   ['diff', '불일치'],
-  ['swap', '뒤바뀜'],
-  ['onlyA', 'A에만'],
-  ['onlyB', 'B에만'],
+  ['onlyA', 'Layer Info에만'],
+  ['onlyB', 'DWR에만'],
   ['match', '일치'],
 ];
 
@@ -46,7 +45,7 @@ async function copyText(text) {
 function useOsState() {
   const [s, setS] = useState(() => {
     const v = read();
-    return { a: v.a || '', b: v.b || '', opt: { ...DEFAULTS, ...(v.opt || {}) } };
+    return { a: v.a || '', b: v.b || '', opt: { shrink: v.opt?.shrink ?? DEFAULTS.shrink } };
   });
   useEffect(() => {
     try {
@@ -57,7 +56,7 @@ function useOsState() {
   }, [s]);
   const pa = useMemo(() => parseA(s.a), [s.a]);
   const pb = useMemo(() => parseB(s.b, s.opt.shrink), [s.b, s.opt.shrink]);
-  const res = useMemo(() => compare(pa.items, pb.items, s.opt), [pa, pb, s.opt]);
+  const res = useMemo(() => compare(pa.items, pb.items), [pa, pb]);
   return { s, setS, pa, pb, res };
 }
 
@@ -93,8 +92,8 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
   const inputs = (
     <div className={`osc-inputs ${compact ? 'one' : ''}`}>
       <InputBox
-        tag="A"
-        title="Structure 표"
+        tag="L"
+        title={A_NAME}
         hint={`항목 이름 | 값 | 값 … — Size = UpperRightX × UpperRightY`}
         placeholder={`${A_FIELDS.join('\t…\n')}\t…\n\n(왼쪽에 항목 이름, 오른쪽으로 Structure마다 값 — 엑셀에서 그대로 복사해 붙여 넣기)`}
         value={s.a}
@@ -103,10 +102,10 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
         warnings={[...(pa.missing.length && s.a.trim() ? [`없는 항목: ${pa.missing.join(', ')}`] : []), ...pa.warnings]}
       />
       <InputBox
-        tag="B"
-        title="Struct 목록"
+        tag="D"
+        title={B_NAME}
         hint={`머리줄 + 한 줄에 한 건 — Size = Chip X × ${shrinkTxt} · Chip Y × ${shrinkTxt}`}
-        placeholder={`${B_FIELDS.join('\t')}\n1\tTOP_CHIP\tMAIN\tchip.gds\t10000 x 8000\t…\n\n(머리줄까지 같이 복사해 붙여 넣기)`}
+        placeholder={`${B_FIELDS.join('\t')}\n1\tTOP_CHIP\tMAIN\tchip.gds\t10000 x 8000\t…\n\n(DWR 머리줄까지 같이 복사해 붙여 넣기)`}
         value={s.b}
         onChange={(v) => set({ b: v })}
         count={pb.items.length}
@@ -118,29 +117,19 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
   const options = (
     <div className="osc-opts">
       <label className="osc-opt">
-        <span>B 배율</span>
-        <input className="input num" type="number" step="0.001" min="0" value={s.opt.shrink} onChange={(e) => setOpt({ shrink: Number(e.target.value) || 0 })} aria-label="B Chip Size 배율" />
+        <span>DWR 배율</span>
+        <input className="input num" type="number" step="0.001" min="0" value={s.opt.shrink} onChange={(e) => setOpt({ shrink: Number(e.target.value) || 0 })} aria-label="DWR Chip Size 배율" />
       </label>
-      <label className="osc-opt">
-        <span>허용 오차</span>
-        <input className="input num" type="number" step="0.0001" min="0" value={s.opt.tol} onChange={(e) => setOpt({ tol: Math.max(0, Number(e.target.value) || 0) })} aria-label="허용 오차" />
-      </label>
-      <label className="osc-check">
-        <input type="checkbox" checked={s.opt.ignoreCase} onChange={(e) => setOpt({ ignoreCase: e.target.checked })} />
-        <span>이름 대소문자 무시</span>
-      </label>
-      <label className="osc-check">
-        <input type="checkbox" checked={s.opt.allowSwap} onChange={(e) => setOpt({ allowSwap: e.target.checked })} />
-        <span>가로·세로 뒤바뀜도 일치로</span>
-      </label>
+      <span className="small muted">이름은 그대로(대소문자 구분), Size는 오차 없이 같아야 일치 · 비교 제외: {EXCLUDE.join(' · ')}</span>
     </div>
   );
 
   const summary = (
     <div className="osc-sum" role="group" aria-label="비교 결과 요약">
       <button type="button" className={`osc-sum-item ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>
-        <span className="label">전체</span>
+        <span className="label">비교</span>
         <b className="num">{res.total}</b>
+        <span className="osc-sum-foot">{res.excluded.length ? `제외 ${res.excluded.join(' · ')}` : `제외 대상 없음`}</span>
       </button>
       <button type="button" className={`osc-sum-item ${filter === 'match' ? 'on' : ''}`} onClick={() => setFilter('match')}>
         <span className="label">일치</span>
@@ -150,14 +139,10 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
         <span className="label">불일치</span>
         <b className={`num ${res.counts.diff + res.counts.bad ? 'tone-bad' : ''}`}>{res.counts.diff + res.counts.bad}</b>
       </button>
-      <button type="button" className={`osc-sum-item ${filter === 'swap' ? 'on' : ''}`} onClick={() => setFilter('swap')}>
-        <span className="label">뒤바뀜</span>
-        <b className={`num ${res.counts.swap ? 'tone-warn' : ''}`}>{res.counts.swap}</b>
-      </button>
       <button type="button" className={`osc-sum-item ${filter === 'onlyA' || filter === 'onlyB' ? 'on' : ''}`} onClick={() => setFilter(res.counts.onlyA ? 'onlyA' : 'onlyB')}>
         <span className="label">한쪽만</span>
         <b className="num">{res.counts.onlyA + res.counts.onlyB}</b>
-        <span className="osc-sum-foot">A {res.counts.onlyA} · B {res.counts.onlyB}</span>
+        <span className="osc-sum-foot">Layer Info {res.counts.onlyA} · DWR {res.counts.onlyB}</span>
       </button>
     </div>
   );
@@ -169,11 +154,11 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           <tr>
             <th>결과</th>
             <th>Structure</th>
-            <th className="r">A · UR X × UR Y</th>
-            {!compact && <th className="r">B · Chip Size</th>}
-            <th className="r">B · × {shrinkTxt}</th>
-            <th className="r">ΔX (A−B)</th>
-            <th className="r">ΔY (A−B)</th>
+            <th className="r">Layer Info · UR X × UR Y</th>
+            {!compact && <th className="r">DWR · Chip Size</th>}
+            <th className="r">DWR · × {shrinkTxt}</th>
+            <th className="r" title="Layer Information − DWR">ΔX</th>
+            <th className="r" title="Layer Information − DWR">ΔY</th>
             {!compact && <th>Module / GDS File</th>}
           </tr>
         </thead>
@@ -185,22 +170,23 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
               <tr key={r.key} className={`osc-row s-${r.status} ${isOpen ? 'open' : ''}`} onClick={() => setOpen(isOpen ? null : r.key)} title="눌러서 원래 값 보기">
                 <td>
                   <Pill tone={TONE[r.status]}>{STATUS_LABEL[r.status]}</Pill>
+                  {r.swapped && <span className="osc-dup" title="Layer Information의 가로·세로가 DWR과 반대">가로·세로 바뀜</span>}
                   {(r.dupA > 1 || r.dupB > 1) && <span className="osc-dup" title="같은 이름이 여러 번 — 첫 번째 값으로 비교">중복</span>}
                 </td>
                 <td className="mono osc-key">{r.key}</td>
                 <td className="r num">{r.a ? fmtSize(r.a.w, r.a.h) : '-'}</td>
                 {!compact && <td className="r num muted">{r.b ? fmtSize(r.b.chipX, r.b.chipY) : '-'}</td>}
                 <td className="r num">{r.b ? fmtSize(r.b.w, r.b.h) : '-'}</td>
-                <td className={`r num ${bad && Math.abs(r.dw) > s.opt.tol ? 'tone-bad' : 'muted'}`}>{fmtDelta(r.dw)}</td>
-                <td className={`r num ${bad && Math.abs(r.dh) > s.opt.tol ? 'tone-bad' : 'muted'}`}>{fmtDelta(r.dh)}</td>
+                <td className={`r num ${bad && r.dw !== 0 ? 'tone-bad' : 'muted'}`}>{fmtDelta(r.dw)}</td>
+                <td className={`r num ${bad && r.dh !== 0 ? 'tone-bad' : 'muted'}`}>{fmtDelta(r.dh)}</td>
                 {!compact && <td className="small muted osc-info">{[r.a?.raw.Module, r.b?.raw['GDS File']].filter(Boolean).join(' / ')}</td>}
               </tr>,
               isOpen && (
                 <tr key={`${r.key}-d`} className="osc-detail">
                   <td colSpan={compact ? 5 : 8}>
                     <div className="osc-raw">
-                      <RawBox title={`A · ${r.a?.src || '없음'}`} fields={A_FIELDS} rec={r.a?.raw} hi={['UpperRightX', 'UpperRightY', 'Structure']} />
-                      <RawBox title={`B · ${r.b?.src || '없음'}`} fields={B_FIELDS} rec={r.b?.raw} hi={['Struct Name', 'Chip Size']} />
+                      <RawBox title={`${A_NAME} · ${r.a?.src || '없음'}`} fields={A_FIELDS} rec={r.a?.raw} hi={['UpperRightX', 'UpperRightY', 'Structure']} />
+                      <RawBox title={`${B_NAME} · ${r.b?.src || '없음'}`} fields={B_FIELDS} rec={r.b?.raw} hi={['Struct Name', 'Chip Size']} />
                     </div>
                   </td>
                 </tr>
@@ -209,7 +195,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           })}
         </tbody>
       </table>
-      {!rows.length && <p className="empty osc-empty">{res.total ? (filter === 'issue' ? '문제 없음 — 모든 Structure의 Size가 같아요' : '해당하는 항목이 없어요') : '양쪽 Text를 붙여 넣으면 바로 비교해요'}</p>}
+      {!rows.length && <p className="empty osc-empty">{res.total ? (filter === 'issue' ? '문제 없음 — 모든 Structure의 Size가 같아요' : '해당하는 항목이 없어요') : res.excluded.length ? `비교할 Structure가 없어요 (제외: ${res.excluded.join(' · ')})` : '양쪽 Text를 붙여 넣으면 바로 비교해요'}</p>}
     </div>
   );
 
@@ -280,7 +266,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
           <div className="page-head">
             <div>
               <h1>OS Size Checker</h1>
-              <p>두 Text를 붙여 넣으면 Structure ↔ Struct Name 으로 맞춰서 Size가 같은지 확인해요. A = UR X × UR Y, B = Chip Size × {shrinkTxt}.</p>
+              <p>Layer Information과 DWR을 붙여 넣으면 Structure ↔ Struct Name 으로 맞춰서 Size가 같은지 확인해요. Layer Information = UR X × UR Y, DWR = Chip Size × {shrinkTxt}.</p>
             </div>
             {headBtns}
           </div>
@@ -300,7 +286,7 @@ function CheckerPage({ s, setS, pa, pb, res, compact, notify, expand }) {
             </section>
           ) : (
             <div className="banner">
-              {!pa.items.length && !pb.items.length ? 'A · B 양쪽에 Text를 붙여 넣어 주세요. 처음이면 [샘플 넣기]로 모양을 확인할 수 있어요.' : !pa.items.length ? 'A(Structure 표)를 읽지 못했어요 — 맨 왼쪽 칸에 Module · UpperRightX · Structure 같은 항목 이름이 있어야 해요.' : 'B(Struct 목록)를 읽지 못했어요 — Struct Name · Chip Size 머리줄을 같이 붙여 넣어 주세요.'}
+              {!pa.items.length && !pb.items.length ? 'Layer Information과 DWR 양쪽에 Text를 붙여 넣어 주세요. 처음이면 [샘플 넣기]로 모양을 확인할 수 있어요.' : !pa.items.length ? 'Layer Information을 읽지 못했어요 — 맨 왼쪽 칸에 Module · UpperRightX · Structure 같은 항목 이름이 있어야 해요.' : 'DWR을 읽지 못했어요 — Struct Name · Chip Size 머리줄을 같이 붙여 넣어 주세요.'}
             </div>
           )}
         </div>
@@ -321,7 +307,7 @@ function InputBox({ tag, title, hint, placeholder, value, onChange, count, warni
         </span>
       </div>
       <span className="small muted osc-hint">{hint}</span>
-      <textarea className="input mono osc-text" spellCheck={false} wrap="off" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} aria-label={`${tag} ${title}`} />
+      <textarea className="input mono osc-text" spellCheck={false} wrap="off" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} aria-label={title} />
       {warnings.length > 0 && (
         <div className="osc-warn">
           <button type="button" className="link-btn" onClick={() => setShowWarn((v) => !v)}>
@@ -403,7 +389,7 @@ function Widget({ res, setMode, widget, setWidget }) {
       </div>
       <div className="wg-bar" aria-label={`일치 ${Math.round(pct * 100)}%`}><i style={{ width: `${pct * 100}%` }} /></div>
       <div className="wg-foot">
-        <span className="num">{res.total ? `불일치 ${res.counts.diff} · 뒤바뀜 ${res.counts.swap} · 한쪽만 ${res.counts.onlyA + res.counts.onlyB}` : 'Text를 붙여 넣어 주세요'}</span>
+        <span className="num">{res.total ? `불일치 ${res.counts.diff + res.counts.bad} · 한쪽만 ${res.counts.onlyA + res.counts.onlyB}` : 'Text를 붙여 넣어 주세요'}</span>
         <label className="wg-opacity" title="투명도">
           <Icon name="drop" size={12} />
           <input type="range" min="35" max="100" step="5" value={Math.round(widget.opacity * 100)} onChange={(e) => setWidget({ opacity: Number(e.target.value) / 100 })} aria-label="투명도" />

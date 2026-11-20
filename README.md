@@ -310,19 +310,19 @@ DEMO: 2/3nm Master(M1~M11) 아래 DK SF3 · SF2, 4nm Master(이름이 다르고 
 # OS Checker
 
 탭 이름 **OS Checker** (창 제목 `DFM Slack - OS Checker`), 화면 제목 **OS Size Checker**.
-두 Text를 붙여 넣으면 이름으로 짝을 맞춰 Size가 같은지 바로 보여 줍니다. 입력은 이 PC에만 저장돼 다음에 열어도 남아 있습니다.
+**Layer Information**과 **DWR** 두 Text를 붙여 넣으면 이름으로 짝을 맞춰 Size가 같은지 바로 보여 줍니다. 입력은 이 PC에만 저장돼 다음에 열어도 남아 있습니다.
 
-| | A · Structure 표 | B · Struct 목록 |
+| | Layer Information | DWR |
 |---|---|---|
 | 모양 | 줄마다 맨 왼쪽이 항목 이름, 오른쪽으로 Structure마다 값 | 머리줄 + 한 줄에 한 건 |
 | 항목 | Module · Blockcount · MaskVersion · LowerLeftX · LowerLeftY · UpperRightX · UpperRightY · Polarity · Select · Structure | No · Struct Name · DB Class · GDS File · Chip Size · Cust.Nick · GDS ID · EBEAM Prefix · Place.X · Place.Y |
 | 구분자 | Structure | Struct Name |
 | Size | UpperRightX × UpperRightY | (Chip X × 0.98) × (Chip Y × 0.98) |
 
-- 칸 구분은 탭(엑셀 복사) · 공백 2칸 이상 · 공백 한 칸 순서로 알아봅니다. A는 같은 항목 이름이 다시 나오면 새 묶음으로 봅니다(세로로 한 건씩 붙여 넣어도 됨). B는 머리줄로 열 위치를 찾으므로 열 순서가 달라도 됩니다.
+- **SCRIBE · BLIND · SC1 · OOB** Structure는 비교하지 않습니다 (요약에 제외된 이름 표시).
+- 이름은 그대로(대소문자 구분) 맞추고, Size는 **오차 없이** 같아야 일치입니다 (0.98 곱셈의 부동소수점 찌꺼기만 소수 6자리에서 정리).
+- 칸 구분은 탭(엑셀 복사) · 공백 2칸 이상 · 공백 한 칸 순서로 알아봅니다. Layer Information은 같은 항목 이름이 다시 나오면 새 묶음으로 봅니다. DWR은 머리줄로 열 위치를 찾으므로 열 순서가 달라도 됩니다.
 - Chip Size는 `10000 x 8000` · `10000x8000` · `10000 × 8000` · `10000*8000` 을 읽습니다.
-- 결과: **일치 · 불일치 · 가로·세로 뒤바뀜 · A에만 · B에만 · 숫자 못 읽음**, 같은 이름이 여러 번이면 `중복` 표시(첫 값으로 비교). 줄을 누르면 양쪽 원래 값.
-- 옵션: B 배율(기본 0.98) · 허용 오차(기본 0.001) · 이름 대소문자 무시 · 뒤바뀜도 일치로.
-- **결과 복사**: 탭 구분 표로 복사 → 엑셀에 붙여 넣기.
+- 결과: **일치 · 불일치 · Layer Info에만 · DWR에만 · 숫자 못 읽음**. 가로·세로만 반대인 불일치는 `가로·세로 바뀜`, 같은 이름이 여러 번이면 `중복` 표시(첫 값으로 비교). 줄을 누르면 양쪽 원래 값.
+- DWR 배율(기본 0.98)은 화면에서 바꿀 수 있습니다. **결과 복사**: 탭 구분 표로 복사 → 엑셀에 붙여 넣기.
 - 확인: `node scripts/oschecker-check.mjs` (`npm run test:engine` 에 포함)
-
